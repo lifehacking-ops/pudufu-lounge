@@ -1,0 +1,1074 @@
+<title>프드프 라운지 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     토큰 — aistudy/app/globals.css 의 @theme 블록을 그대로 옮긴 것.
+     무채색 기조, 강조색 없음. ink 가 브랜드 컬러 역할.
+     의미색은 late(지각) / danger(반려) 둘뿐이며 외곽선+텍스트로만 쓴다.
+     ------------------------------------------------------------------ */
+  :root {
+    --ink: #0a0a0b;
+    --graphite: #2e2e32;
+    --slate: #6b6b70;
+    --mist: #a6a6ac;
+    --line: #ececef;
+    --cloud: #f5f5f7;
+    --canvas: #fafafb;
+    --surface: #ffffff;
+    --late: #c2660a;
+    --danger: #d92d20;
+
+    --radius-card: 20px;
+    --radius-chip: 999px;
+    --shadow-card: 0 1px 2px rgba(10, 10, 11, .04), 0 8px 28px rgba(10, 10, 11, .05);
+    --shadow-hero: 0 2px 8px rgba(10, 10, 11, .18), 0 24px 60px rgba(10, 10, 11, .22);
+
+    --font-sans: "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", sans-serif;
+    --font-display: "Space Grotesk", ui-monospace, sans-serif;
+
+    --col: 460px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -.01em;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  button, input, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: 0; padding: 0; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .tnum { font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .disp { font-family: var(--font-display); }
+
+  .hatch {
+    background-image: repeating-linear-gradient(-45deg,
+      currentColor 0, currentColor 1.5px, transparent 1.5px, transparent 4px);
+  }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .rise { animation: rise .5s cubic-bezier(.22, 1, .36, 1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; }
+    * { transition: none !important; }
+  }
+
+  /* ---------------- 셸 ---------------- */
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 20;
+    border-bottom: 1px solid var(--line);
+    background: rgba(250, 250, 251, .82);
+    backdrop-filter: blur(12px);
+  }
+
+  .toolbar-in {
+    margin: 0 auto; max-width: var(--col); height: 56px;
+    display: flex; align-items: center; gap: 8px; padding: 0 20px;
+  }
+
+  .lounge-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 15px; font-weight: 700; letter-spacing: -.02em;
+    min-width: 0;
+  }
+
+  .lounge-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lounge-btn svg { flex: none; color: var(--mist); }
+
+  .toolbar-sp { flex: 1; }
+
+  .icon-btn {
+    display: grid; place-items: center; width: 32px; height: 32px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+    color: var(--slate); flex: none;
+  }
+
+  .me { font-size: 12px; font-weight: 500; color: var(--ink); flex: none; }
+
+  .lounge-menu {
+    position: absolute; top: 50px; left: 20px; z-index: 30;
+    min-width: 232px; padding: 4px;
+    border-radius: 14px; border: 1px solid var(--line);
+    background: var(--surface); box-shadow: var(--shadow-card);
+  }
+
+  .lounge-menu button {
+    display: flex; width: 100%; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 9px 12px; border-radius: 10px;
+    font-size: 13px; color: var(--slate); text-align: left;
+  }
+
+  .lounge-menu button:hover { background: var(--cloud); }
+  .lounge-menu button[aria-current="true"] { color: var(--ink); font-weight: 600; }
+  .lounge-menu .now { font-size: 11px; font-weight: 600; color: var(--mist); }
+
+  /* ---------------- 검색 오버레이 ---------------- */
+
+  .search-wrap {
+    position: sticky; top: 56px; z-index: 19;
+    border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+
+  .search-in { margin: 0 auto; max-width: var(--col); padding: 12px 20px 14px; }
+
+  .search-field {
+    width: 100%; border-radius: 16px; border: 1px solid var(--line);
+    background: var(--surface); padding: 11px 14px; font-size: 14px; outline: none;
+  }
+
+  .search-field::placeholder { color: var(--mist); }
+  .search-field:focus { border-color: var(--ink); }
+
+  .res-group {
+    margin-top: 14px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--mist);
+  }
+
+  .res-row {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid var(--line);
+  }
+
+  .res-row .t { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); }
+  .res-row .m { font-size: 11px; color: var(--mist); white-space: nowrap; }
+  .res-empty { padding: 16px 0; font-size: 13px; color: var(--slate); }
+
+  /* ---------------- 본문 ---------------- */
+
+  main { margin: 0 auto; max-width: var(--col); padding: 24px 20px 56px; }
+  .stack { display: grid; gap: 16px; }
+
+  .card {
+    border-radius: var(--radius-card); border: 1px solid var(--line);
+    background: var(--surface); padding: 20px; box-shadow: var(--shadow-card);
+  }
+
+  .card-t { font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .meta { font-size: 12px; color: var(--slate); }
+
+  /* 히어로 — 이 화면에서 유일한 검정 반전 면 */
+  .hero {
+    display: block; width: 100%; text-align: left;
+    border-radius: var(--radius-card); background: var(--ink);
+    color: var(--surface); padding: 24px; box-shadow: var(--shadow-hero);
+    transition: transform .18s ease;
+  }
+
+  .hero:active { transform: scale(.985); }
+  .hero-kicker { font-size: 13px; font-weight: 500; color: var(--mist); margin: 0; }
+  .hero-h { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0 0; }
+  .hero-due { font-size: 13px; color: var(--mist); margin: 24px 0 0; }
+
+  .hero-count {
+    display: block; font-family: var(--font-display); font-size: 52px;
+    font-weight: 600; line-height: 1; margin-top: 4px;
+  }
+
+  .hero-track { height: 4px; border-radius: 999px; background: var(--graphite); overflow: hidden; margin-top: 16px; }
+  .hero-fill { height: 100%; border-radius: 999px; background: var(--surface); }
+  .hero-sub { font-size: 12px; color: var(--mist); margin: 6px 0 0; }
+
+  .hero-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+  .hero-foot .s { font-size: 14px; color: var(--mist); }
+
+  .btn-invert {
+    border-radius: var(--radius-chip); background: var(--surface);
+    color: var(--ink); padding: 10px 16px; font-size: 14px; font-weight: 600;
+  }
+
+  /* ---------------- 글쓰기 ---------------- */
+
+  .composer {
+    border-radius: var(--radius-card); border: 1px solid var(--line);
+    background: var(--surface); box-shadow: var(--shadow-card);
+    transition: border-color .15s ease;
+  }
+
+  .composer.open { border-color: var(--ink); }
+
+  .composer-rest {
+    display: flex; width: 100%; align-items: center; gap: 10px;
+    padding: 16px 20px; text-align: left; font-size: 14px; color: var(--mist);
+    cursor: text;
+  }
+
+  .ava {
+    width: 26px; height: 26px; border-radius: 999px; flex: none;
+    background: var(--cloud); color: var(--slate);
+    display: grid; place-items: center; font-size: 11px; font-weight: 600;
+  }
+
+  .composer-open { padding: 20px; display: grid; gap: 14px; }
+
+  .ta {
+    width: 100%; min-height: 84px; resize: vertical;
+    border-radius: 16px; border: 1px solid var(--line); background: var(--surface);
+    padding: 12px 14px; font-size: 14px; line-height: 1.6; outline: none;
+  }
+
+  .ta::placeholder { color: var(--mist); }
+  .ta:focus { border-color: var(--ink); }
+
+  .field-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--mist); }
+
+  .chiprow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+
+  .chip {
+    border-radius: var(--radius-chip); border: 1px solid var(--line);
+    padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--slate);
+    transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+  }
+
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+
+  .attach {
+    border-radius: 8px; border: 1px solid var(--line);
+    padding: 5px 9px; font-size: 11px; font-weight: 600; color: var(--slate);
+    cursor: default;
+  }
+
+  .composer-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .btn-ghost { font-size: 13px; font-weight: 600; color: var(--slate); padding: 8px 4px; }
+
+  .btn-primary {
+    margin-left: auto; border-radius: var(--radius-chip); background: var(--ink);
+    color: var(--surface); padding: 10px 16px; font-size: 14px; font-weight: 600;
+    transition: transform .18s ease, opacity .15s ease;
+  }
+
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary:not(:disabled):active { transform: scale(.97); }
+
+  /* ---------------- 8주 리본 ---------------- */
+
+  .ribbon { display: flex; gap: 4px; margin-top: 12px; }
+  .rcell { height: 24px; flex: 1; border-radius: 5px; }
+  .r-ontime { background: var(--ink); }
+  .r-late { border: 1px solid rgba(194, 102, 10, .5); background: var(--surface); color: var(--late); }
+  .r-none { background: var(--cloud); border: 1px solid var(--line); }
+  .r-future { border: 1px dashed var(--line); }
+
+  /* ---------------- 필터 ---------------- */
+
+  .filterbar {
+    position: sticky; top: 56px; z-index: 15;
+    margin: 0 -20px; padding: 12px 20px 10px;
+    background: rgba(250, 250, 251, .92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .seg {
+    display: flex; gap: 2px; border-radius: var(--radius-chip);
+    background: var(--cloud); padding: 2px; overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .seg::-webkit-scrollbar { display: none; }
+
+  .seg button {
+    flex: 1 0 auto; border-radius: var(--radius-chip);
+    padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--slate);
+    white-space: nowrap; transition: color .15s ease, background-color .15s ease;
+  }
+
+  .seg button[aria-pressed="true"] {
+    background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(10, 10, 11, .06);
+  }
+
+  .subfilter { display: flex; align-items: center; gap: 6px; margin-top: 9px; overflow-x: auto; scrollbar-width: none; }
+  .subfilter::-webkit-scrollbar { display: none; }
+
+  .wk {
+    flex: none; border-radius: 8px; border: 1px solid var(--line);
+    padding: 5px 9px; font-size: 12px; font-weight: 600; color: var(--slate);
+    transition: border-color .15s ease, color .15s ease;
+  }
+
+  .wk[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
+  .wk .n { font-family: var(--font-display); }
+
+  .resultline {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin-top: 10px; font-size: 12px; color: var(--slate);
+  }
+
+  .resultline .c { color: var(--ink); font-weight: 600; }
+  .sortbtn { font-size: 12px; font-weight: 600; color: var(--mist); }
+  .sortbtn[aria-pressed="true"] { color: var(--ink); }
+  .sortsep { color: var(--line); }
+
+  /* ---------------- 피드 ---------------- */
+
+  .feed { display: grid; gap: 10px; margin-top: 14px; }
+
+  .post {
+    border-radius: var(--radius-card); border: 1px solid var(--line);
+    background: var(--surface); padding: 16px 18px; box-shadow: var(--shadow-card);
+  }
+
+  .post.pinned { border-color: var(--graphite); }
+
+  .post-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .post-wk { font-size: 12px; font-weight: 600; color: var(--mist); white-space: nowrap; }
+  .post-cat { font-size: 11px; font-weight: 600; color: var(--slate); }
+  .post-dot { color: var(--line); }
+  .post-h { font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin: 7px 0 0; }
+  .post-b { font-size: 13px; color: var(--slate); margin: 5px 0 0; }
+  .post-foot { display: flex; align-items: center; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--mist); }
+
+  .like { font-size: 12px; font-weight: 500; color: var(--mist); }
+  .like[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: var(--radius-chip); padding: 3px 9px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+
+  .b-ontime { background: var(--ink); color: var(--surface); }
+  .b-live { border: 1px solid var(--graphite); color: var(--graphite); }
+  .b-late { border: 1px solid rgba(194, 102, 10, .4); color: var(--late); }
+  .b-none { border: 1px solid var(--line); color: var(--mist); }
+  .b-pin { border: 1px solid var(--graphite); color: var(--graphite); }
+
+  .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex: none; }
+  .sq { width: 8px; height: 8px; border-radius: 2px; border: 1px solid rgba(194, 102, 10, .5); flex: none; }
+
+  .empty {
+    border-radius: var(--radius-card); border: 1px dashed var(--line);
+    padding: 32px 20px; text-align: center; font-size: 13px; color: var(--slate);
+  }
+
+  /* ---------------- 강의 화면 ---------------- */
+
+  .backrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .backbtn { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--slate); }
+
+  .video {
+    border-radius: 14px; border: 1px dashed var(--line); background: var(--cloud);
+    aspect-ratio: 16 / 9; display: grid; place-items: center;
+    font-size: 12px; color: var(--mist); text-align: center; padding: 12px;
+  }
+
+  .seclist { list-style: none; margin: 12px 0 0; padding: 0; }
+
+  .seclist li {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 11px 0; border-top: 1px solid var(--line);
+  }
+
+  .seclist .n { font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--mist); flex: none; width: 18px; }
+  .seclist .t { flex: 1; min-width: 0; font-size: 13px; }
+  .seclist .d { font-family: var(--font-display); font-size: 12px; color: var(--mist); flex: none; }
+  .seclist li[data-cur="true"] .t { font-weight: 700; }
+  .seclist li[data-cur="true"] .n { color: var(--ink); }
+
+  .guidebox {
+    border-radius: 14px; background: var(--cloud); padding: 14px 16px;
+    font-size: 13px; color: var(--slate); margin-top: 12px;
+  }
+
+  .guidebox b { color: var(--ink); font-weight: 600; }
+  .guidebox ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+
+  .pct { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1; }
+
+  .ptrack { height: 4px; border-radius: 999px; background: var(--cloud); overflow: hidden; margin-top: 12px; }
+  .pfill { height: 100%; border-radius: 999px; background: var(--ink); transition: width .25s ease; }
+
+  .quests { display: grid; gap: 2px; margin-top: 14px; }
+
+  .quests label {
+    display: flex; align-items: center; gap: 9px; padding: 7px 0;
+    font-size: 13px; color: var(--slate); cursor: pointer;
+  }
+
+  .quests input { accent-color: var(--ink); width: 15px; height: 15px; flex: none; margin: 0; }
+  .quests label:has(input:checked) { color: var(--mist); text-decoration: line-through; }
+
+  /* ---------------- 스펙 시트 (앱 UI 밖) ---------------- */
+
+  .sheet {
+    border-top: 1px solid var(--line); background: var(--surface);
+    margin-top: 40px; padding: 40px 20px 64px;
+  }
+
+  .sheet-in { margin: 0 auto; max-width: 760px; }
+  .sheet h2 { font-size: 18px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .sheet p.lead { font-size: 13px; color: var(--slate); margin: 8px 0 0; max-width: 60ch; }
+
+  .maptable { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 13px; }
+
+  .maptable th {
+    text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--mist); padding: 0 10px 8px 0; border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  .maptable td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .maptable td:first-child { font-family: var(--font-display); font-weight: 600; color: var(--ink); white-space: nowrap; width: 36px; }
+  .maptable td:nth-child(2) { font-weight: 600; }
+  .maptable td:last-child { color: var(--slate); }
+  .maptable tr[data-new="true"] td:nth-child(2)::after {
+    content: "신규"; margin-left: 7px; border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 6px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--slate);
+  }
+
+  .note { margin-top: 26px; border-radius: 14px; background: var(--cloud); padding: 14px 16px; font-size: 12px; color: var(--slate); }
+  .note b { color: var(--ink); font-weight: 600; }
+  .note ul { margin: 8px 0 0; padding-left: 17px; display: grid; gap: 4px; }
+
+  .tablescroll { overflow-x: auto; }
+</style>
+
+<header class="toolbar">
+  <div class="toolbar-in">
+    <button type="button" class="lounge-btn" id="loungeBtn" aria-expanded="false">
+      <span>AI눈높이 · 3기 라운지</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="toolbar-sp"></div>
+    <button type="button" class="icon-btn" id="searchBtn" aria-label="라운지 통합 검색" aria-expanded="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </button>
+    <span class="me">박현종</span>
+  </div>
+
+  <div class="lounge-menu" id="loungeMenu" hidden>
+    <button type="button" aria-current="true">AI눈높이 · 3기 라운지 <span class="now">지금</span></button>
+    <button type="button">AI눈높이 · 2기 라운지</button>
+    <button type="button">실전 세일즈 · 1기 라운지</button>
+  </div>
+</header>
+
+<div class="search-wrap" id="searchWrap" hidden>
+  <div class="search-in">
+    <input type="text" class="search-field" id="searchField" autocomplete="off"
+           placeholder="이 라운지에서 검색 — 글, 강의, 교안, 멤버">
+    <div id="searchResults"></div>
+  </div>
+</div>
+
+<!-- ==================== 라운지 ==================== -->
+<main id="screenLounge" class="rise">
+  <div class="stack">
+
+    <!-- 글쓰기: 도착하자마자 첫 요소 -->
+    <div class="composer" id="composer">
+      <button type="button" class="composer-rest" id="composerRest">
+        <span class="ava" aria-hidden="true">박</span>
+        오늘 뭐 배우셨어요? 여기 바로 쓰면 됩니다
+      </button>
+
+      <div class="composer-open" id="composerOpen" hidden>
+        <textarea class="ta" id="ta" placeholder="3회차 과제라고 쓰고 그대로 올리면 됩니다"></textarea>
+
+        <div>
+          <div class="field-label">카테고리</div>
+          <div class="chiprow" id="catChips">
+            <button type="button" class="chip" aria-pressed="true">과제</button>
+            <button type="button" class="chip" aria-pressed="false">질문</button>
+            <button type="button" class="chip" aria-pressed="false">후기</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="field-label">회차</div>
+          <div class="chiprow" id="wkChips">
+            <button type="button" class="chip" aria-pressed="true"><span class="disp">3</span>회차</button>
+            <button type="button" class="chip" aria-pressed="false"><span class="disp">2</span>회차</button>
+            <button type="button" class="chip" aria-pressed="false">해당 없음</button>
+          </div>
+        </div>
+
+        <div class="composer-foot">
+          <span class="attach">사진</span>
+          <span class="attach">링크</span>
+          <span class="attach">영상</span>
+          <button type="button" class="btn-ghost" id="composerCancel">취소</button>
+          <button type="button" class="btn-primary" id="composerPost" disabled>게시하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 히어로: 이 화면에서 유일한 검정 반전 면 -->
+    <button type="button" class="hero" id="heroBtn">
+      <p class="hero-kicker">이번 주 과제 · <span class="disp">3</span>회차</p>
+      <h1 class="hero-h">Claude로 폴더 정리 자동화</h1>
+      <p class="hero-due">정시 마감까지 · 금 18:00</p>
+      <span class="hero-count tnum" id="countdown">--:--:--</span>
+      <div class="hero-track"><div class="hero-fill" style="width:71%"></div></div>
+      <p class="hero-sub"><span class="tnum">24</span>명 중 <span class="tnum">17</span>명 제출</p>
+      <div class="hero-foot">
+        <span class="s">내 상태 · 미제출</span>
+        <span class="btn-invert">강의 이어보기</span>
+      </div>
+    </button>
+
+    <!-- 8주 완주 리본 -->
+    <section class="card">
+      <h2 class="card-t">8주 완주 현황</h2>
+      <p class="meta" style="margin:4px 0 0"><span class="tnum">3</span>회차 중 <span class="tnum">2</span>회 완주 · 정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span></p>
+      <div class="ribbon" aria-label="8주 완주 현황">
+        <div class="rcell r-ontime" title="1회차 · 정시 제출"></div>
+        <div class="rcell r-late hatch" title="2회차 · 지각 제출"></div>
+        <div class="rcell r-none" title="3회차 · 미제출"></div>
+        <div class="rcell r-future" title="4회차 · 예정"></div>
+        <div class="rcell r-future" title="5회차 · 예정"></div>
+        <div class="rcell r-future" title="6회차 · 예정"></div>
+        <div class="rcell r-future" title="7회차 · 예정"></div>
+        <div class="rcell r-future" title="8회차 · 예정"></div>
+      </div>
+    </section>
+
+    <!-- 상단 고정: 명예의 전당 (필터와 무관하게 항상 최상단) -->
+    <article class="post pinned">
+      <div class="post-head">
+        <span class="badge b-pin">상단 고정</span>
+        <span class="post-cat">운영진</span>
+        <span class="post-dot">·</span>
+        <span class="meta">계속 누적</span>
+      </div>
+      <h3 class="post-h">명예의 전당 — 이번 달 뽑힌 결과물</h3>
+      <p class="post-b">강사님이 고른 결과물을 이 글 하나에 계속 쌓습니다. 별도 메뉴 없이 최상단 고정.</p>
+      <div class="post-foot">
+        <button type="button" class="like" aria-pressed="false" data-n="48">좋아요 <span class="tnum">48</span></button>
+        <span>댓글 <span class="tnum">12</span></span>
+      </div>
+    </article>
+
+    <!-- 필터: 게시판 이동을 대체한다 -->
+    <div>
+      <div class="filterbar">
+        <div class="seg" id="catFilter" role="group" aria-label="카테고리 필터">
+          <button type="button" aria-pressed="true" data-cat="전체">전체</button>
+          <button type="button" aria-pressed="false" data-cat="과제">과제</button>
+          <button type="button" aria-pressed="false" data-cat="질문">질문</button>
+          <button type="button" aria-pressed="false" data-cat="후기">후기</button>
+          <button type="button" aria-pressed="false" data-cat="공지">공지</button>
+        </div>
+
+        <div class="subfilter" id="wkFilter" role="group" aria-label="회차 필터">
+          <button type="button" class="wk" aria-pressed="true" data-wk="0">전체 회차</button>
+          <button type="button" class="wk" aria-pressed="false" data-wk="3"><span class="n">3</span>회차</button>
+          <button type="button" class="wk" aria-pressed="false" data-wk="2"><span class="n">2</span>회차</button>
+          <button type="button" class="wk" aria-pressed="false" data-wk="1"><span class="n">1</span>회차</button>
+        </div>
+
+        <div class="resultline">
+          <span><span class="c tnum" id="resultCount">0</span>개</span>
+          <span>
+            <button type="button" class="sortbtn" id="sortNew" aria-pressed="true">최신순</button>
+            <span class="sortsep">|</span>
+            <button type="button" class="sortbtn" id="sortLike" aria-pressed="false">좋아요순</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="feed" id="feed"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ==================== 강의 ==================== -->
+<main id="screenCourse" class="rise" hidden>
+  <div class="stack">
+
+    <div class="backrow">
+      <button type="button" class="backbtn" id="backBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        라운지로
+      </button>
+    </div>
+
+    <section class="card">
+      <p class="meta"><span class="disp">3</span>회차 · 시작하기 전 봐야 할 것</p>
+      <h1 class="card-t" style="font-size:20px;margin-top:4px">Claude로 폴더 정리 자동화</h1>
+      <ul class="seclist">
+        <li><span class="n">00</span><span class="t">이번 강의 소개</span><span class="d">1:40</span></li>
+        <li><span class="n">01</span><span class="t">필요한 툴 세팅</span><span class="d">3:10</span></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <p class="meta">강의 · 4~5분 단위</p>
+      <div class="video" style="margin-top:12px">영상 자리<br>(정적 프로토타입)</div>
+      <ul class="seclist">
+        <li data-cur="true"><span class="n">02</span><span class="t">폴더 규칙 정하기</span><span class="d">4:20</span></li>
+        <li><span class="n">03</span><span class="t">Claude에 폴더 연결하기</span><span class="d">4:55</span></li>
+        <li><span class="n">04</span><span class="t">제안 확인하고 적용하기</span><span class="d">4:05</span></li>
+        <li><span class="n">05</span><span class="t">되돌리기와 예외 처리</span><span class="d">3:30</span></li>
+      </ul>
+
+      <div class="guidebox">
+        <b>교안 — 폴더 규칙 정하기</b>
+        <ol>
+          <li>기준을 날짜로 할지 프로젝트로 할지 먼저 정한다.</li>
+          <li>규칙은 세 줄을 넘기지 않는다. 길면 지켜지지 않는다.</li>
+          <li>예외 폴더는 목록으로 따로 빼둔다.</li>
+        </ol>
+      </div>
+      <p class="meta" style="margin-top:10px">교안은 강의 아래 같이 게시되어, 검색만으로 이 강의에 바로 닿는다.</p>
+    </section>
+
+    <section class="card">
+      <p class="meta">진도율</p>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:6px">
+        <span class="pct tnum" id="pct">60%</span>
+        <span class="meta">퀘스트 <span class="tnum" id="qDone">3</span>/<span class="tnum">5</span></span>
+      </div>
+      <div class="ptrack"><div class="pfill" id="pfill" style="width:60%"></div></div>
+      <div class="quests" id="quests">
+        <label><input type="checkbox" checked> 강의 소개 읽기</label>
+        <label><input type="checkbox" checked> 툴 세팅 끝내기</label>
+        <label><input type="checkbox" checked> 영상 보기</label>
+        <label><input type="checkbox"> 과제 올리기</label>
+        <label><input type="checkbox"> 남의 글 3개 읽기</label>
+      </div>
+      <p class="meta" style="margin-top:12px">재생 시간이 아니라 스스로 체크한 퀘스트가 %를 채운다.</p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-t">과제 제시</h2>
+      <p class="meta" style="margin:6px 0 0">커뮤니티에 <b style="color:var(--ink)">3회차 과제</b>라고 쓰고 게시하세요.</p>
+      <div style="margin-top:14px">
+        <button type="button" class="btn-primary" id="toWriteBtn" style="margin-left:0">라운지에서 바로 쓰기</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ==================== 스펙 시트 ==================== -->
+<section class="sheet">
+  <div class="sheet-in">
+    <h2>P1 항목이 화면 어디에 놓였는가</h2>
+    <p class="lead">기획안 8장의 P1 여덟 개를 이 프로토타입의 어느 요소가 담당하는지 정리한 표입니다. 프로토타입은 aistudy(AI눈높이 LMS)의 디자인 토큰과 컴포넌트 규칙을 그대로 씁니다.</p>
+
+    <div class="tablescroll">
+      <table class="maptable">
+        <thead>
+          <tr><th>번호</th><th>P1 항목</th><th>프로토타입에서</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>마지막 강의 라운지로 랜딩</td><td>상단 라운지명이 곧 현재 위치. 전환 목록에서 현재 라운지에 &lsquo;지금&rsquo; 표시</td></tr>
+          <tr><td>2</td><td>첫 페이지가 곧 글쓰기 화면</td><td>히어로보다 위, 스크롤 없이 처음 닿는 자리에 입력창</td></tr>
+          <tr><td>3</td><td>클릭 한 번에 즉시 작성</td><td>입력창을 누르면 그 자리에서 펼쳐짐. 페이지 이동 없음</td></tr>
+          <tr><td>4</td><td>창은 하나, 카테고리만 토글</td><td>펼친 입력창 안의 카테고리 · 회차 칩</td></tr>
+          <tr data-new="true"><td>5</td><td>게시판 대신 필터</td><td>카테고리 세그먼트 + 회차 버튼. 누르면 같은 화면에서 피드만 바뀐다</td></tr>
+          <tr><td>6</td><td>라운지에서 강의로 바로 접근</td><td>검정 히어로 전체가 강의 진입 버튼</td></tr>
+          <tr><td>7</td><td>라운지 간 이동 토글</td><td>상단 라운지명 옆 토글</td></tr>
+          <tr><td>8</td><td>통합 검색</td><td>상단 검색. 글 · 강의 · 교안 · 멤버가 한 결과에</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <b>디자인 시스템 준수 사항</b>
+      <ul>
+        <li>토큰은 <code>aistudy/app/globals.css</code>의 <code>@theme</code>를 그대로 옮겼습니다. 강조색을 새로 만들지 않았고, 의미색은 지각(late)에만 썼습니다.</li>
+        <li>검정 반전 면은 화면당 하나입니다. 라운지에서는 과제 히어로 하나뿐입니다.</li>
+        <li>상태는 색이 아니라 채움 농도와 형태로 구분합니다. 정시=솔리드, 진행중=외곽선+점, 지각=앰버 외곽선+해치, 미제출=옅은 외곽선.</li>
+        <li>8주 리본, 상태 배지, 세그먼트 탭, 카드 · 히어로 · 버튼 · 인풋 조합은 DESIGN.md의 문자열을 따랐습니다.</li>
+        <li>UI에 이모지를 쓰지 않았습니다. 아이콘은 인라인 SVG입니다.</li>
+        <li>한글은 Pretendard, 숫자는 Space Grotesk입니다. 한글에는 display 페이스를 쓰지 않았습니다.</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <b>프로토타입이라서 다른 점</b>
+      <ul>
+        <li>피드 · 검색 · 랭킹 데이터는 예시입니다. 사람 이름과 수치는 실제 값이 아닙니다.</li>
+        <li>영상은 자리만 잡아둔 점선 박스입니다.</li>
+        <li>라운지 전환과 첨부 버튼은 표시만 하고 동작하지 않습니다. 나머지 — 글쓰기, 필터, 검색, 좋아요, 퀘스트 진도율, 강의 이동 — 는 실제로 동작합니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- 데이터 (예시) ---------------- */
+
+  var POSTS = [
+    { cat: "과제", wk: 3, author: "이서준", when: "2시간 전", state: "ontime", likes: 9, comments: 4,
+      title: "3회차 과제 — 폴더 정리 스킬 적용 결과",
+      body: "규칙을 세 줄로 줄이니 제안이 훨씬 정확해졌습니다. 적용 전후 스크린샷 같이 올립니다." },
+    { cat: "질문", wk: 3, author: "정민아", when: "4시간 전", state: null, likes: 3, comments: 7,
+      title: "커넥터 연결에서 권한 오류가 납니다",
+      body: "툴 세팅 단계까지는 됐는데 폴더 접근 권한에서 막힙니다. 같은 증상 겪으신 분 있을까요?" },
+    { cat: "과제", wk: 3, author: "박수빈", when: "6시간 전", state: "late", likes: 5, comments: 2,
+      title: "3회차 과제 — 늦었지만 올립니다",
+      body: "예외 폴더 목록을 따로 빼는 부분에서 오래 걸렸습니다." },
+    { cat: "공지", wk: 0, author: "운영진", when: "어제", state: null, likes: 14, comments: 1,
+      title: "4회차는 수요일 10시에 열립니다",
+      body: "이번 회차부터 교안이 강의 아래에 같이 올라갑니다. 검색으로 바로 찾을 수 있습니다." },
+    { cat: "후기", wk: 2, author: "김도현", when: "어제", state: null, likes: 22, comments: 9,
+      title: "2회차 하고 나서 업무 시간이 실제로 줄었습니다",
+      body: "매주 반복하던 정리 작업이 사라졌습니다. 한 주에 두 시간 정도 아끼는 느낌입니다." },
+    { cat: "과제", wk: 2, author: "최윤서", when: "3일 전", state: "ontime", likes: 11, comments: 3,
+      title: "2회차 과제 — 커넥터 연결까지 완료",
+      body: "권한 오류는 폴더를 다시 고르니 해결됐습니다." },
+    { cat: "질문", wk: 1, author: "한지우", when: "5일 전", state: null, likes: 2, comments: 6,
+      title: "1회차 교안에서 말한 기준이 헷갈립니다",
+      body: "날짜 기준과 프로젝트 기준을 섞어 써도 되는지 궁금합니다." },
+    { cat: "후기", wk: 1, author: "오세진", when: "6일 전", state: null, likes: 8, comments: 2,
+      title: "1회차 마치고 남기는 짧은 후기",
+      body: "생각보다 준비할 게 적어서 좋았습니다." }
+  ];
+
+  var SEARCH = [
+    { g: "글",   t: "3회차 과제 — 폴더 정리 스킬 적용 결과", m: "이서준" },
+    { g: "글",   t: "커넥터 연결에서 권한 오류가 납니다",     m: "정민아" },
+    { g: "글",   t: "2회차 하고 나서 업무 시간이 실제로 줄었습니다", m: "김도현" },
+    { g: "강의", t: "3회차 · 폴더 규칙 정하기",               m: "4:20" },
+    { g: "강의", t: "3회차 · Claude에 폴더 연결하기",         m: "4:55" },
+    { g: "강의", t: "2회차 · 커넥터 연결",                    m: "9:20" },
+    { g: "교안", t: "3회차 교안 · 폴더 규칙 정하기",          m: "교안" },
+    { g: "교안", t: "2회차 교안 · 권한 오류 대처",            m: "교안" },
+    { g: "멤버", t: "이서준",                                 m: "3기" },
+    { g: "멤버", t: "정민아",                                 m: "3기" }
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  /* ---------------- 히어로 카운트다운 ---------------- */
+
+  var target = Date.now() + (2 * 24 + 6) * 3600e3 + 12 * 60e3 + 5e3;
+  var cd = $("countdown");
+
+  function tick() {
+    var left = Math.max(0, target - Date.now());
+    var s = Math.floor(left / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    cd.textContent = p(h) + ":" + p(m) + ":" + p(ss);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  /* ---------------- 라운지 전환 토글 (P1-7) ---------------- */
+
+  var loungeBtn = $("loungeBtn"), loungeMenu = $("loungeMenu");
+
+  loungeBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var open = loungeMenu.hidden;
+    loungeMenu.hidden = !open;
+    loungeBtn.setAttribute("aria-expanded", String(open));
+  });
+
+  /* ---------------- 통합 검색 (P1-8) ---------------- */
+
+  var searchBtn = $("searchBtn"), searchWrap = $("searchWrap");
+  var searchField = $("searchField"), searchResults = $("searchResults");
+
+  function renderSearch() {
+    var q = searchField.value.trim().toLowerCase();
+    var hits = q
+      ? SEARCH.filter(function (r) { return (r.t + " " + r.m).toLowerCase().indexOf(q) > -1; })
+      : SEARCH;
+
+    searchResults.textContent = "";
+
+    if (!hits.length) {
+      searchResults.appendChild(el("p", "res-empty", "“" + searchField.value.trim() + "” 결과가 없습니다"));
+      return;
+    }
+
+    ["글", "강의", "교안", "멤버"].forEach(function (g) {
+      var rows = hits.filter(function (r) { return r.g === g; });
+      if (!rows.length) return;
+      searchResults.appendChild(el("div", "res-group", g + " " + rows.length));
+      rows.forEach(function (r) {
+        var row = el("div", "res-row");
+        row.appendChild(el("span", "t", r.t));
+        row.appendChild(el("span", "m", r.m));
+        searchResults.appendChild(row);
+      });
+    });
+  }
+
+  searchBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var open = searchWrap.hidden;
+    searchWrap.hidden = !open;
+    searchBtn.setAttribute("aria-expanded", String(open));
+    if (open) { renderSearch(); searchField.focus(); }
+  });
+
+  searchField.addEventListener("input", renderSearch);
+
+  document.addEventListener("click", function (e) {
+    if (!loungeMenu.hidden && !loungeMenu.contains(e.target) && !loungeBtn.contains(e.target)) {
+      loungeMenu.hidden = true;
+      loungeBtn.setAttribute("aria-expanded", "false");
+    }
+    if (!searchWrap.hidden && !searchWrap.contains(e.target) && !searchBtn.contains(e.target)) {
+      searchWrap.hidden = true;
+      searchBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    loungeMenu.hidden = true;
+    loungeBtn.setAttribute("aria-expanded", "false");
+    searchWrap.hidden = true;
+    searchBtn.setAttribute("aria-expanded", "false");
+  });
+
+  /* ---------------- 글쓰기 (P1-2 · 3 · 4) ---------------- */
+
+  var composer = $("composer"), rest = $("composerRest"), open = $("composerOpen");
+  var ta = $("ta"), postBtn = $("composerPost"), cancelBtn = $("composerCancel");
+
+  function setComposer(on) {
+    composer.classList.toggle("open", on);
+    rest.hidden = on;
+    open.hidden = !on;
+    if (on) ta.focus();
+  }
+
+  rest.addEventListener("click", function () { setComposer(true); });
+  cancelBtn.addEventListener("click", function () {
+    ta.value = ""; postBtn.disabled = true; setComposer(false);
+  });
+  ta.addEventListener("input", function () { postBtn.disabled = !ta.value.trim(); });
+
+  function wireExclusive(container) {
+    var buttons = Array.prototype.slice.call(container.querySelectorAll("button"));
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+      });
+    });
+    return function () {
+      var on = buttons.filter(function (b) { return b.getAttribute("aria-pressed") === "true"; })[0];
+      return on || buttons[0];
+    };
+  }
+
+  var currentCat = wireExclusive($("catChips"));
+  var currentWk = wireExclusive($("wkChips"));
+
+  postBtn.addEventListener("click", function () {
+    var text = ta.value.trim();
+    if (!text) return;
+
+    var wkLabel = currentWk().textContent.trim();
+    var wk = parseInt(wkLabel, 10);
+
+    POSTS.unshift({
+      cat: currentCat().textContent.trim(),
+      wk: isNaN(wk) ? 0 : wk,
+      author: "박현종",
+      when: "방금",
+      state: "live",
+      likes: 0,
+      comments: 0,
+      title: text.split("\n")[0].slice(0, 60),
+      body: text.split("\n").slice(1).join(" ").slice(0, 140)
+    });
+
+    ta.value = "";
+    postBtn.disabled = true;
+    setComposer(false);
+    render();
+  });
+
+  /* ---------------- 필터 (P1-5) ---------------- */
+
+  var state = { cat: "전체", wk: 0, sort: "new" };
+
+  function wireFilter(container, attr, key, after) {
+    var buttons = Array.prototype.slice.call(container.querySelectorAll("button"));
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+        var raw = b.getAttribute(attr);
+        state[key] = attr === "data-wk" ? parseInt(raw, 10) : raw;
+        if (after) after();
+        render();
+      });
+    });
+  }
+
+  wireFilter($("catFilter"), "data-cat", "cat");
+  wireFilter($("wkFilter"), "data-wk", "wk");
+
+  var sortNew = $("sortNew"), sortLike = $("sortLike");
+
+  sortNew.addEventListener("click", function () {
+    state.sort = "new";
+    sortNew.setAttribute("aria-pressed", "true");
+    sortLike.setAttribute("aria-pressed", "false");
+    render();
+  });
+
+  sortLike.addEventListener("click", function () {
+    state.sort = "like";
+    sortLike.setAttribute("aria-pressed", "true");
+    sortNew.setAttribute("aria-pressed", "false");
+    render();
+  });
+
+  /* ---------------- 피드 렌더 ---------------- */
+
+  var BADGE = {
+    ontime: { cls: "b-ontime", label: "정시", mark: null },
+    live:   { cls: "b-live",   label: "진행중", mark: "dot" },
+    late:   { cls: "b-late",   label: "지각", mark: "sq" }
+  };
+
+  function badge(stateKey) {
+    var d = BADGE[stateKey];
+    if (!d) return null;
+    var b = el("span", "badge " + d.cls);
+    if (d.mark === "dot") b.appendChild(el("span", "dot"));
+    if (d.mark === "sq") b.appendChild(el("span", "sq hatch"));
+    b.appendChild(document.createTextNode(d.label));
+    return b;
+  }
+
+  var feed = $("feed"), resultCount = $("resultCount");
+
+  function render() {
+    var rows = POSTS.filter(function (p) {
+      if (state.cat !== "전체" && p.cat !== state.cat) return false;
+      if (state.wk !== 0 && p.wk !== state.wk) return false;
+      return true;
+    });
+
+    if (state.sort === "like") {
+      rows = rows.slice().sort(function (a, b) { return b.likes - a.likes; });
+    }
+
+    resultCount.textContent = String(rows.length);
+    feed.textContent = "";
+
+    if (!rows.length) {
+      feed.appendChild(el("p", "empty", "이 조건에 맞는 글이 아직 없습니다."));
+      return;
+    }
+
+    rows.forEach(function (p) {
+      var card = el("article", "post");
+
+      var head = el("div", "post-head");
+      if (p.wk) {
+        var wkEl = el("span", "post-wk");
+        wkEl.appendChild(el("span", "disp", String(p.wk)));
+        wkEl.appendChild(document.createTextNode("회차"));
+        head.appendChild(wkEl);
+      }
+      head.appendChild(el("span", "post-cat", p.cat));
+      head.appendChild(el("span", "post-dot", "·"));
+      head.appendChild(el("span", "meta", p.author));
+      head.appendChild(el("span", "post-dot", "·"));
+      head.appendChild(el("span", "meta", p.when));
+      var b = badge(p.state);
+      if (b) {
+        var sp = el("span");
+        sp.style.marginLeft = "auto";
+        sp.appendChild(b);
+        head.appendChild(sp);
+      }
+      card.appendChild(head);
+
+      card.appendChild(el("h3", "post-h", p.title));
+      if (p.body) card.appendChild(el("p", "post-b", p.body));
+
+      var foot = el("div", "post-foot");
+      var like = el("button", "like");
+      like.type = "button";
+      like.setAttribute("aria-pressed", "false");
+      like.textContent = "좋아요 " + p.likes;
+      like.addEventListener("click", function () {
+        var on = like.getAttribute("aria-pressed") === "true";
+        p.likes += on ? -1 : 1;
+        like.setAttribute("aria-pressed", String(!on));
+        like.textContent = "좋아요 " + p.likes;
+      });
+      foot.appendChild(like);
+      foot.appendChild(el("span", null, "댓글 " + p.comments));
+      card.appendChild(foot);
+
+      feed.appendChild(card);
+    });
+  }
+
+  render();
+
+  /* ---------------- 명예의 전당 좋아요 ---------------- */
+
+  Array.prototype.slice.call(document.querySelectorAll(".post.pinned .like")).forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var on = btn.getAttribute("aria-pressed") === "true";
+      var n = parseInt(btn.getAttribute("data-n"), 10) + (on ? 0 : 1) - (on ? 1 : 0);
+      btn.setAttribute("data-n", String(n));
+      btn.setAttribute("aria-pressed", String(!on));
+      btn.textContent = "좋아요 ";
+      var num = el("span", "tnum", String(n));
+      btn.appendChild(num);
+    });
+  });
+
+  /* ---------------- 화면 전환 (P1-6) ---------------- */
+
+  var lounge = $("screenLounge"), course = $("screenCourse");
+
+  function show(which) {
+    lounge.hidden = which !== "lounge";
+    course.hidden = which !== "course";
+    window.scrollTo(0, 0);
+  }
+
+  $("heroBtn").addEventListener("click", function () { show("course"); });
+  $("backBtn").addEventListener("click", function () { show("lounge"); });
+
+  $("toWriteBtn").addEventListener("click", function () {
+    show("lounge");
+    setComposer(true);
+  });
+
+  /* ---------------- 퀘스트 진도율 ---------------- */
+
+  var quests = $("quests"), pct = $("pct"), pfill = $("pfill"), qDone = $("qDone");
+
+  quests.addEventListener("change", function () {
+    var boxes = Array.prototype.slice.call(quests.querySelectorAll("input"));
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    var value = Math.round((done / boxes.length) * 100);
+    pct.textContent = value + "%";
+    pfill.style.width = value + "%";
+    qDone.textContent = String(done);
+  });
+})();
+</script>

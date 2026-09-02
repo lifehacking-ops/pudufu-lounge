@@ -1,0 +1,1689 @@
+<meta charset="utf-8">
+<title>2026 돈 되는 릴스 라운지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
+
+<style>
+  /* ==================================================================
+     토큰 — aistudy/app/globals.css @theme 그대로.
+     무채색 기조, 강조색 없음. 의미색은 late(지각)/danger(반려) 둘뿐.
+     이 프로토타입은 검정 반전 면을 쓰지 않는다(합의 사항).
+     ================================================================== */
+  :root {
+    --ink: #0a0a0b;
+    --graphite: #2e2e32;
+    --slate: #6b6b70;
+    --mist: #a6a6ac;
+    --line: #ececef;
+    --cloud: #f5f5f7;
+    --canvas: #fafafb;
+    --surface: #ffffff;
+    --late: #c2660a;
+    --danger: #d92d20;
+
+    --radius-card: 20px;
+    --radius-chip: 999px;
+    --shadow-card: 0 1px 2px rgba(10, 10, 11, .04), 0 8px 28px rgba(10, 10, 11, .05);
+
+    --font-sans: "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", sans-serif;
+    --font-display: "Space Grotesk", ui-monospace, sans-serif;
+
+    --page: 1160px;
+    --rail: 300px;
+    --curric: 320px;
+    --h-top: 60px;
+    --h-nav: 46px;
+    --h-shell: 106px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -.01em;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  button, input, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: 0; padding: 0; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* 작성자 스타일의 display 가 UA 의 hidden{display:none} 을 덮는 것을 막는다 */
+  [hidden] { display: none !important; }
+
+  .tnum { font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .disp { font-family: var(--font-display); }
+
+  .hatch {
+    background-image: repeating-linear-gradient(-45deg,
+      currentColor 0, currentColor 1.5px, transparent 1.5px, transparent 4px);
+  }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .rise { animation: rise .5s cubic-bezier(.22, 1, .36, 1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; }
+    * { transition: none !important; }
+  }
+
+  /* ================= 상단바 ================= */
+
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-in {
+    margin: 0 auto; max-width: var(--page); height: var(--h-top);
+    display: flex; align-items: center; gap: 16px; padding: 0 24px;
+  }
+
+  .brand {
+    display: inline-flex; align-items: center; gap: 8px; flex: none;
+    font-size: 17px; font-weight: 700; letter-spacing: -.03em;
+  }
+
+  .brand-mark {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 7px; background: var(--ink); color: var(--surface);
+    font-size: 11px; font-weight: 700; letter-spacing: 0;
+  }
+
+  .lounge-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    border-radius: var(--radius-chip); border: 1px solid var(--line);
+    padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--ink);
+    max-width: 260px;
+  }
+
+  .lounge-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lounge-btn svg { flex: none; color: var(--mist); }
+
+  .searchbox { position: relative; flex: 1; min-width: 0; max-width: 520px; margin: 0 auto; }
+
+  .search-field {
+    width: 100%; border-radius: var(--radius-chip); border: 1px solid var(--line);
+    background: var(--cloud); padding: 9px 14px 9px 38px; font-size: 13px; outline: none;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+
+  .search-field::placeholder { color: var(--mist); }
+  .search-field:focus { background: var(--surface); border-color: var(--ink); }
+
+  .search-ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--mist); pointer-events: none; }
+
+  .search-panel {
+    position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 50;
+    border-radius: 16px; border: 1px solid var(--line); background: var(--surface);
+    box-shadow: var(--shadow-card); padding: 6px 0; max-height: 60vh; overflow-y: auto;
+  }
+
+  .res-group {
+    padding: 10px 16px 4px; font-size: 11px; font-weight: 600;
+    letter-spacing: .06em; color: var(--mist);
+  }
+
+  .res-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 16px; }
+  .res-row:hover { background: var(--cloud); }
+  .res-row .t { flex: 1; min-width: 0; font-size: 13px; }
+  .res-row .m { font-size: 11px; color: var(--mist); white-space: nowrap; }
+  .res-empty { padding: 14px 16px; font-size: 13px; color: var(--slate); }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; flex: none; }
+
+  .btn-sec {
+    border-radius: var(--radius-chip); border: 1px solid var(--line);
+    padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--slate);
+    white-space: nowrap; transition: color .15s ease, border-color .15s ease;
+  }
+
+  .btn-sec:hover { color: var(--ink); border-color: var(--mist); }
+
+  .who { display: inline-flex; align-items: center; gap: 7px; }
+  .who span { font-size: 13px; font-weight: 600; }
+
+  .ava {
+    display: grid; place-items: center; border-radius: 999px; flex: none;
+    background: var(--cloud); color: var(--slate);
+    font-size: 11px; font-weight: 600; width: 28px; height: 28px;
+  }
+
+  .ava-24 { width: 24px; height: 24px; font-size: 10px; }
+  .ava-34 { width: 34px; height: 34px; font-size: 12px; }
+  .ava-ink { background: var(--ink); color: var(--surface); }
+
+  .lounge-menu {
+    position: absolute; top: calc(var(--h-top) - 8px); left: 24px; z-index: 50;
+    min-width: 264px; padding: 5px; border-radius: 16px;
+    border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-card);
+  }
+
+  .lounge-menu button {
+    display: flex; width: 100%; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 10px 12px; border-radius: 11px;
+    font-size: 13px; color: var(--slate); text-align: left;
+  }
+
+  .lounge-menu button:hover { background: var(--cloud); }
+  .lounge-menu button[aria-current="true"] { color: var(--ink); font-weight: 600; }
+  .lounge-menu .now { font-size: 11px; font-weight: 600; color: var(--mist); }
+
+  /* ================= 탭 네비 ================= */
+
+  .nav {
+    position: sticky; top: var(--h-top); z-index: 35;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+
+  .nav-in {
+    margin: 0 auto; max-width: var(--page); height: var(--h-nav);
+    display: flex; align-items: stretch; gap: 4px; padding: 0 24px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+
+  .nav-in::-webkit-scrollbar { display: none; }
+
+  .nav-in button {
+    position: relative; padding: 0 12px; font-size: 14px; font-weight: 600;
+    color: var(--slate); white-space: nowrap; transition: color .15s ease;
+  }
+
+  .nav-in button:hover { color: var(--ink); }
+  .nav-in button[aria-current="true"] { color: var(--ink); }
+
+  .nav-in button[aria-current="true"]::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px;
+    height: 2px; background: var(--ink); border-radius: 2px 2px 0 0;
+  }
+
+  .nav-in button[aria-disabled="true"] { color: var(--mist); cursor: default; }
+  .nav-in button[aria-disabled="true"]:hover { color: var(--mist); }
+
+  /* ================= 페이지 골격 ================= */
+
+  .page { margin: 0 auto; max-width: var(--page); padding: 24px 24px 40px; }
+
+  .grid-community { display: grid; grid-template-columns: minmax(0, 1fr) var(--rail); gap: 24px; align-items: start; }
+  .grid-classroom { display: grid; grid-template-columns: var(--curric) minmax(0, 1fr); gap: 24px; align-items: start; }
+
+  .col { display: grid; gap: 14px; min-width: 0; }
+  .rail { display: grid; gap: 14px; position: sticky; top: calc(var(--h-shell) + 24px); }
+
+  @media (max-width: 1040px) {
+    .grid-community, .grid-classroom { grid-template-columns: minmax(0, 1fr); }
+    .rail { position: static; }
+    .grid-classroom .curric-col { order: -1; }
+  }
+
+  /* ================= 카드 ================= */
+
+  .card {
+    border-radius: var(--radius-card); border: 1px solid var(--line);
+    background: var(--surface); box-shadow: var(--shadow-card);
+  }
+
+  .pad { padding: 20px; }
+  .pad-s { padding: 16px 18px; }
+  .card-t { font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .meta { font-size: 12px; color: var(--slate); }
+  .meta-m { font-size: 12px; color: var(--mist); }
+  .hr { height: 1px; background: var(--line); }
+
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--mist);
+  }
+
+  /* ================= 글쓰기 ================= */
+
+  .composer { transition: border-color .15s ease; }
+  .composer.open { border-color: var(--ink); }
+
+  .composer-rest {
+    display: flex; width: 100%; align-items: center; gap: 12px;
+    padding: 18px 20px; text-align: left; font-size: 15px; color: var(--mist); cursor: text;
+  }
+
+  .composer-open { padding: 20px; display: grid; gap: 14px; }
+
+  .ta {
+    width: 100%; min-height: 96px; resize: vertical;
+    border-radius: 16px; border: 1px solid var(--line); background: var(--surface);
+    padding: 12px 14px; font-size: 14px; line-height: 1.65; outline: none;
+  }
+
+  .ta::placeholder { color: var(--mist); }
+  .ta:focus { border-color: var(--ink); }
+
+  .field { display: grid; gap: 7px; }
+  .chiprow { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    border-radius: var(--radius-chip); border: 1px solid var(--line);
+    padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--slate);
+    white-space: nowrap;
+    transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+  }
+
+  .chip:hover { border-color: var(--mist); color: var(--ink); }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+
+  .attach {
+    border-radius: 9px; border: 1px solid var(--line);
+    padding: 6px 10px; font-size: 11px; font-weight: 600; color: var(--slate); cursor: default;
+  }
+
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .grow { flex: 1; }
+
+  .btn-ghost { font-size: 13px; font-weight: 600; color: var(--slate); padding: 8px 6px; }
+
+  .btn-primary {
+    border-radius: var(--radius-chip); background: var(--ink); color: var(--surface);
+    padding: 10px 18px; font-size: 14px; font-weight: 600;
+    transition: transform .18s ease, opacity .15s ease;
+  }
+
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary:not(:disabled):active { transform: scale(.97); }
+  .btn-primary.sm { padding: 8px 14px; font-size: 13px; }
+
+  /* ================= 필터 (게시판 대체) ================= */
+
+  .filterbar {
+    position: sticky; top: var(--h-shell); z-index: 20;
+    background: rgba(250, 250, 251, .94); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    margin: 0 -8px; padding: 12px 8px 10px;
+  }
+
+  .fscroll { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+  .fscroll::-webkit-scrollbar { display: none; }
+  .fscroll .chip { flex: none; }
+
+  .fsep { width: 1px; background: var(--line); flex: none; margin: 2px 4px; }
+
+  .fmeta {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin-top: 10px; font-size: 12px; color: var(--slate);
+  }
+
+  .fmeta .c { color: var(--ink); font-weight: 700; }
+  .sortbtn { font-size: 12px; font-weight: 600; color: var(--mist); }
+  .sortbtn[aria-pressed="true"] { color: var(--ink); }
+  .sortsep { color: var(--line); margin: 0 6px; }
+
+  .activeline { margin-top: 8px; font-size: 12px; color: var(--mist); }
+  .activeline b { color: var(--ink); font-weight: 600; }
+
+  /* ================= 글 카드 ================= */
+
+  .feed { display: grid; gap: 12px; margin-top: 16px; }
+
+  .post { display: grid; gap: 10px; }
+  .post.pinned { border-color: var(--graphite); }
+
+  .post-top { display: flex; align-items: flex-start; gap: 10px; }
+  .post-who { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .post-name { font-size: 13px; font-weight: 700; }
+  .post-sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--mist); }
+
+  .tag {
+    border-radius: var(--radius-chip); border: 1px solid var(--line);
+    padding: 1px 8px; font-size: 11px; font-weight: 600; color: var(--slate); white-space: nowrap;
+  }
+
+  .post-body { display: flex; gap: 16px; align-items: flex-start; }
+  .post-text { flex: 1; min-width: 0; }
+  .post-h { font-size: 16px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .post-x { font-size: 13px; color: var(--slate); margin: 5px 0 0; }
+
+  .thumb {
+    flex: none; width: 116px; aspect-ratio: 4 / 3; border-radius: 12px;
+    border: 1px dashed var(--line); background: var(--cloud);
+    display: grid; place-items: center; font-size: 10px; color: var(--mist); text-align: center;
+  }
+
+  .post-foot { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--mist); }
+  .like { font-size: 12px; font-weight: 600; color: var(--mist); transition: color .15s ease; }
+  .like:hover { color: var(--slate); }
+  .like[aria-pressed="true"] { color: var(--ink); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: var(--radius-chip); padding: 3px 9px;
+    font-size: 11px; font-weight: 600; white-space: nowrap; flex: none;
+  }
+
+  .b-ontime { background: var(--ink); color: var(--surface); }
+  .b-live { border: 1px solid var(--graphite); color: var(--graphite); }
+  .b-late { border: 1px solid rgba(194, 102, 10, .4); color: var(--late); }
+  .b-none { border: 1px solid var(--line); color: var(--mist); }
+  .b-pin { border: 1px solid var(--graphite); color: var(--graphite); }
+
+  .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex: none; }
+  .sq { width: 8px; height: 8px; border-radius: 2px; border: 1px solid rgba(194, 102, 10, .5); flex: none; }
+
+  .empty {
+    border-radius: var(--radius-card); border: 1px dashed var(--line);
+    padding: 40px 20px; text-align: center; font-size: 13px; color: var(--slate);
+  }
+
+  /* ================= 우측 레일 ================= */
+
+  .rail-banner {
+    height: 78px; border-radius: 15px; background: var(--cloud);
+    border: 1px dashed var(--line); display: grid; place-items: center;
+    font-size: 11px; color: var(--mist);
+  }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; }
+  .stat { background: var(--surface); padding: 10px 8px; text-align: center; }
+  .stat dt { font-size: 10px; letter-spacing: .06em; color: var(--mist); }
+  .stat dd { margin: 2px 0 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+
+  .avarow { display: flex; }
+  .avarow .ava { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface); }
+  .avarow .ava:first-child { margin-left: 0; }
+
+  .ribbon { display: flex; gap: 4px; }
+  .rcell { height: 22px; flex: 1; border-radius: 5px; }
+  .r-ontime { background: var(--ink); }
+  .r-late { border: 1px solid rgba(194, 102, 10, .5); background: var(--surface); color: var(--late); }
+  .r-none { background: var(--cloud); border: 1px solid var(--line); }
+  .r-future { border: 1px dashed var(--line); }
+
+  .bignum { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1; }
+  .midnum { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1; }
+
+  .track { height: 4px; border-radius: 999px; background: var(--cloud); overflow: hidden; }
+  .fill { height: 100%; border-radius: 999px; background: var(--ink); transition: width .25s ease; }
+
+  .seg { display: flex; gap: 2px; border-radius: var(--radius-chip); background: var(--cloud); padding: 2px; }
+
+  .seg button {
+    flex: 1; border-radius: var(--radius-chip); padding: 6px 8px;
+    font-size: 12px; font-weight: 600; color: var(--slate);
+    transition: color .15s ease, background-color .15s ease;
+  }
+
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(10, 10, 11, .06); }
+
+  .lb { list-style: none; margin: 0; padding: 0; }
+  .lb li { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .lb li:first-child { border-top: 0; }
+  .lb .rk { font-family: var(--font-display); font-size: 12px; font-weight: 700; color: var(--mist); width: 15px; flex: none; }
+  .lb li[data-top="true"] .rk { color: var(--ink); }
+  .lb .nm { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb .pt { font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--slate); flex: none; }
+
+  .mine {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border-radius: 12px; background: var(--cloud); padding: 9px 12px; font-size: 12px;
+  }
+
+  .mine b { font-family: var(--font-display); font-size: 14px; }
+
+  /* ================= 강의 목록 (Classroom 인덱스) ================= */
+
+  .pagehead { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .pagehead h1 { font-size: 22px; font-weight: 700; letter-spacing: -.03em; margin: 0; }
+
+  /* 강의 4개가 한 줄을 정확히 채우도록 4열. 마지막 카드가 혼자 남지 않는다. */
+  .courses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+
+  @media (max-width: 1040px) { .courses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 680px) { .courses { grid-template-columns: minmax(0, 1fr); } }
+
+  .course {
+    display: block; width: 100%; text-align: left; overflow: hidden; padding: 0;
+    transition: transform .18s ease;
+  }
+
+  .course[data-open="true"]:hover { transform: translateY(-2px); }
+  .course[data-open="false"] { border-style: dashed; box-shadow: none; cursor: default; }
+
+  .course-cover {
+    aspect-ratio: 16 / 9; background: var(--cloud); border-bottom: 1px solid var(--line);
+    display: grid; place-items: center; font-size: 11px; color: var(--mist); text-align: center; padding: 12px;
+  }
+
+  .course[data-open="false"] .course-cover { background: transparent; border-bottom-style: dashed; }
+
+  .course-in { padding: 16px 18px; display: grid; gap: 11px; }
+  .course-t { font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .course-d { font-size: 12px; color: var(--slate); margin: 0; }
+  .course-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--mist); }
+  .course-pct { font-family: var(--font-display); font-weight: 700; color: var(--ink); }
+
+  .crumb { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 14px; }
+  .crumb button { font-size: 12px; font-weight: 600; color: var(--slate); }
+  .crumb button:hover { color: var(--ink); }
+  .crumb .sep { color: var(--mist); }
+  .crumb .cur { color: var(--ink); font-weight: 600; }
+
+  /* ================= 강의 상세 ================= */
+
+  .curric { position: sticky; top: calc(var(--h-shell) + 24px); }
+
+  @media (max-width: 1040px) { .curric { position: static; } }
+
+  .pctpill {
+    display: inline-flex; align-items: center; border-radius: var(--radius-chip);
+    background: var(--ink); color: var(--surface); padding: 2px 9px;
+    font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  }
+
+  .secblock { border-top: 1px solid var(--line); }
+
+  .sechead {
+    display: flex; width: 100%; align-items: center; gap: 8px;
+    padding: 12px 0; text-align: left; font-size: 13px; font-weight: 700;
+  }
+
+  .sechead .n { font-size: 11px; color: var(--mist); font-weight: 600; }
+  .sechead .grow { flex: 1; }
+  .sechead svg { color: var(--mist); transition: transform .2s ease; flex: none; }
+  .sechead[aria-expanded="false"] svg { transform: rotate(-90deg); }
+
+  .lessons { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 2px; }
+
+  .lesson {
+    display: flex; align-items: center; gap: 9px;
+    border-radius: 11px; padding: 8px 10px; position: relative;
+  }
+
+  .lesson:hover { background: var(--cloud); }
+  .lesson[data-cur="true"] { background: var(--cloud); }
+
+  .lesson[data-cur="true"]::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 2px; border-radius: 2px; background: var(--ink);
+  }
+
+  .lesson .t { flex: 1; min-width: 0; font-size: 13px; color: var(--slate); text-align: left; }
+  .lesson[data-cur="true"] .t { color: var(--ink); font-weight: 700; }
+  .lesson .d { font-family: var(--font-display); font-size: 11px; color: var(--mist); flex: none; }
+
+  .check {
+    display: grid; place-items: center; width: 18px; height: 18px; flex: none;
+    border-radius: 999px; border: 1.5px solid var(--line); color: transparent;
+    transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+  }
+
+  .check:hover { border-color: var(--mist); }
+  .check[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+  .lesson[data-done="true"] .t { color: var(--mist); text-decoration: line-through; }
+
+  .video {
+    border-radius: 15px; border: 1px dashed var(--line); background: var(--cloud);
+    aspect-ratio: 16 / 9; display: grid; place-items: center; gap: 4px;
+    font-size: 12px; color: var(--mist); text-align: center; padding: 16px;
+  }
+
+  .lessonhead { display: flex; align-items: flex-start; gap: 14px; }
+
+  .prose { font-size: 14px; line-height: 1.75; color: var(--slate); }
+  .prose h4 { font-size: 14px; font-weight: 700; color: var(--ink); margin: 22px 0 8px; }
+  .prose p { margin: 0 0 12px; }
+  .prose ol, .prose ul { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 5px; }
+  .prose strong { color: var(--ink); font-weight: 600; }
+  .prose code { font-family: var(--font-display); font-size: 13px; background: var(--cloud); border-radius: 5px; padding: 1px 5px; color: var(--ink); }
+
+  .quote {
+    border-radius: 14px; background: var(--cloud); padding: 14px 16px;
+    font-size: 13px; color: var(--slate); margin: 0 0 12px;
+  }
+
+  .quote b { color: var(--ink); font-weight: 600; }
+
+  /* ================= 스펙 시트 ================= */
+
+  .sheet { border-top: 1px solid var(--line); background: var(--surface); padding: 44px 24px 72px; }
+  .sheet-in { margin: 0 auto; max-width: 840px; }
+  .sheet h2 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .sheet h3 { font-size: 13px; font-weight: 700; margin: 30px 0 0; }
+  .sheet p.lead { font-size: 13px; color: var(--slate); margin: 8px 0 0; max-width: 62ch; }
+
+  .tablescroll { overflow-x: auto; margin-top: 14px; }
+  .mt { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+
+  .mt th {
+    text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--mist); padding: 0 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+
+  .mt td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .mt td:first-child { font-family: var(--font-display); font-weight: 600; white-space: nowrap; width: 34px; }
+  .mt td:nth-child(2) { font-weight: 600; white-space: nowrap; }
+  .mt td:last-child { color: var(--slate); }
+
+  .mt tr[data-new="true"] td:nth-child(2)::after {
+    content: "신규"; margin-left: 7px; border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 6px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--slate);
+  }
+
+  .note { margin-top: 18px; border-radius: 14px; background: var(--cloud); padding: 16px 18px; font-size: 12px; color: var(--slate); }
+  .note b { color: var(--ink); font-weight: 600; }
+  .note ul { margin: 8px 0 0; padding-left: 17px; display: grid; gap: 5px; }
+  .note code { font-family: var(--font-display); font-size: 11px; background: var(--surface); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+
+  .arrow { color: var(--mist); }
+</style>
+
+<!-- ==================== 상단바 ==================== -->
+<header class="topbar">
+  <div class="topbar-in">
+    <span class="brand"><span class="brand-mark" aria-hidden="true">프</span>프드프</span>
+
+    <button type="button" class="lounge-btn" id="loungeBtn" aria-expanded="false">
+      <span>2026 돈 되는 릴스 라운지</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
+    <div class="searchbox">
+      <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" class="search-field" id="searchField" autocomplete="off"
+             placeholder="이 라운지에서 검색 — 글, 강의, 교안, 멤버" aria-label="라운지 통합 검색">
+      <div class="search-panel" id="searchPanel" hidden></div>
+    </div>
+
+    <div class="topbar-right">
+      <button type="button" class="btn-sec">내 서재</button>
+      <span class="who"><span class="ava ava-ink" aria-hidden="true">박</span><span>박현종</span></span>
+    </div>
+  </div>
+
+  <div class="lounge-menu" id="loungeMenu" hidden>
+    <button type="button" aria-current="true">2026 돈 되는 릴스 라운지 <span class="now">지금</span></button>
+    <button type="button">올인원 AI 라운지</button>
+    <button type="button">전자책 수익화 라운지</button>
+  </div>
+</header>
+
+<!-- ==================== 탭 네비 ==================== -->
+<nav class="nav">
+  <div class="nav-in">
+    <button type="button" id="tabCommunity" aria-current="true">커뮤니티</button>
+    <button type="button" id="tabClassroom" aria-current="false">강의실</button>
+    <button type="button" aria-disabled="true">멤버</button>
+    <button type="button" aria-disabled="true">리더보드</button>
+    <button type="button" aria-disabled="true">챌린지</button>
+    <button type="button" aria-disabled="true">안내</button>
+  </div>
+</nav>
+
+<!-- ==================== 커뮤니티 ==================== -->
+<div class="page rise" id="screenCommunity">
+  <div class="grid-community">
+
+    <!-- 메인 -->
+    <div class="col">
+
+      <!-- 글쓰기 -->
+      <div class="card composer" id="composer">
+        <button type="button" class="composer-rest" id="composerRest">
+          <span class="ava ava-34" aria-hidden="true">박</span>
+          오늘 뭐 배우셨어요? 여기 바로 쓰면 됩니다
+        </button>
+
+        <div class="composer-open" id="composerOpen" hidden>
+          <textarea class="ta" id="ta" placeholder="첫 줄이 제목이 됩니다. 3회차 과제라고 쓰고 릴스 링크만 붙여도 됩니다."></textarea>
+
+          <div class="field">
+            <span class="kicker">카테고리</span>
+            <div class="chiprow" id="catChips">
+              <button type="button" class="chip" aria-pressed="true">과제</button>
+              <button type="button" class="chip" aria-pressed="false">릴스 피드백</button>
+              <button type="button" class="chip" aria-pressed="false">후킹 아이디어</button>
+              <button type="button" class="chip" aria-pressed="false">수익 인증</button>
+              <button type="button" class="chip" aria-pressed="false">자유</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="kicker">회차</span>
+            <div class="chiprow" id="wkChips">
+              <button type="button" class="chip" aria-pressed="true"><span class="disp">3</span>회차</button>
+              <button type="button" class="chip" aria-pressed="false"><span class="disp">2</span>회차</button>
+              <button type="button" class="chip" aria-pressed="false"><span class="disp">1</span>회차</button>
+              <button type="button" class="chip" aria-pressed="false">해당 없음</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <span class="attach">사진</span>
+            <span class="attach">링크</span>
+            <span class="attach">영상</span>
+            <span class="attach">GIF</span>
+            <span class="grow"></span>
+            <button type="button" class="btn-ghost" id="composerCancel">취소</button>
+            <button type="button" class="btn-primary" id="composerPost" disabled>게시하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 상단 고정: 명예의 전당 -->
+      <article class="card pad-s post pinned">
+        <div class="post-top">
+          <span class="ava ava-34" aria-hidden="true">프</span>
+          <div class="post-who">
+            <span class="post-name">프드프 관리자</span>
+            <span class="post-sub"><span class="tag">공지</span><span>·</span><span>계속 누적</span></span>
+          </div>
+          <span class="badge b-pin">상단 고정</span>
+        </div>
+        <div class="post-body">
+          <div class="post-text">
+            <h3 class="post-h">명예의 전당 — 이번 달 뽑힌 결과물</h3>
+            <p class="post-x">강사님이 고른 결과물을 이 글 하나에 계속 쌓습니다. 별도 메뉴 없이 최상단 고정.</p>
+          </div>
+        </div>
+        <div class="post-foot">
+          <button type="button" class="like" id="pinLike" aria-pressed="false">좋아요 <span class="tnum">48</span></button>
+          <span>댓글 <span class="tnum">12</span></span>
+          <span>조회 <span class="tnum">1,204</span></span>
+        </div>
+      </article>
+
+      <!-- 필터 — 게시판 이동을 대체한다 -->
+      <div>
+        <div class="filterbar">
+          <div class="fscroll" id="catFilter" role="group" aria-label="카테고리 필터">
+            <button type="button" class="chip" aria-pressed="true" data-cat="전체">전체</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="과제">과제</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="릴스 피드백">릴스 피드백</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="후킹 아이디어">후킹 아이디어</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="수익 인증">수익 인증</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="자유">자유</button>
+            <button type="button" class="chip" aria-pressed="false" data-cat="공지">공지</button>
+          </div>
+
+          <div class="fscroll" style="margin-top:8px" id="subFilter" role="group" aria-label="보기 · 회차 필터">
+            <button type="button" class="chip" aria-pressed="false" data-view="mine">내 글</button>
+            <button type="button" class="chip" aria-pressed="false" data-view="liked">좋아요한 글</button>
+            <span class="fsep" aria-hidden="true"></span>
+            <button type="button" class="chip" aria-pressed="true" data-wk="0">전체 회차</button>
+            <button type="button" class="chip" aria-pressed="false" data-wk="3"><span class="disp">3</span>회차</button>
+            <button type="button" class="chip" aria-pressed="false" data-wk="2"><span class="disp">2</span>회차</button>
+            <button type="button" class="chip" aria-pressed="false" data-wk="1"><span class="disp">1</span>회차</button>
+          </div>
+
+          <div class="fmeta">
+            <span><span class="c tnum" id="resultCount">0</span>개</span>
+            <span>
+              <button type="button" class="sortbtn" id="sortNew" aria-pressed="true">최신순</button>
+              <span class="sortsep" aria-hidden="true">|</span>
+              <button type="button" class="sortbtn" id="sortLike" aria-pressed="false">좋아요순</button>
+            </span>
+          </div>
+
+          <p class="activeline" id="activeLine"></p>
+        </div>
+
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+
+    <!-- 우측 레일 -->
+    <aside class="rail">
+
+      <section class="card pad-s" style="display:grid;gap:12px">
+        <div class="rail-banner">라운지 배너 자리 · 2026 돈 되는 릴스</div>
+        <div>
+          <h2 class="card-t">2026 돈 되는 릴스 라운지</h2>
+          <p class="meta" style="margin:5px 0 0">강의 듣기 전에 여기 먼저 들르는 곳. 과제도 피드백도 수익 인증도 이 안에서 끝냅니다.</p>
+        </div>
+        <dl class="stats">
+          <div class="stat"><dt>멤버</dt><dd class="tnum">24</dd></div>
+          <div class="stat"><dt>온라인</dt><dd class="tnum">7</dd></div>
+          <div class="stat"><dt>기수</dt><dd class="tnum">3</dd></div>
+        </dl>
+        <div class="avarow" aria-label="최근 활동 멤버">
+          <span class="ava ava-24">이</span>
+          <span class="ava ava-24">정</span>
+          <span class="ava ava-24">박</span>
+          <span class="ava ava-24">김</span>
+          <span class="ava ava-24">최</span>
+          <span class="ava ava-24">한</span>
+          <span class="ava ava-24">외</span>
+        </div>
+      </section>
+
+      <section class="card pad-s" style="display:grid;gap:12px">
+        <div class="row">
+          <span class="kicker grow">이번 주 과제 · <span class="disp">3</span>회차</span>
+          <span class="badge b-none">미제출</span>
+        </div>
+        <div>
+          <h2 class="card-t">릴스 1편 올리고 후킹 3안 같이 쓰기</h2>
+          <p class="meta" style="margin:5px 0 0">정시 마감까지 · 금 18:00</p>
+          <p class="midnum tnum" id="countdown" style="margin:8px 0 0">--:--:--</p>
+        </div>
+        <div>
+          <div class="track"><div class="fill" style="width:71%"></div></div>
+          <p class="meta-m" style="margin:6px 0 0"><span class="tnum">24</span>명 중 <span class="tnum">17</span>명 제출</p>
+        </div>
+        <button type="button" class="btn-primary sm" id="toCourseBtn">강의 이어보기</button>
+      </section>
+
+      <section class="card pad-s" style="display:grid;gap:10px">
+        <div class="row">
+          <span class="kicker grow">8주 완주 현황</span>
+          <span class="meta-m"><span class="tnum">2</span>/<span class="tnum">8</span></span>
+        </div>
+        <div class="ribbon" aria-label="8주 완주 현황">
+          <div class="rcell r-ontime" title="1회차 · 정시 제출"></div>
+          <div class="rcell r-late hatch" title="2회차 · 지각 제출"></div>
+          <div class="rcell r-none" title="3회차 · 미제출"></div>
+          <div class="rcell r-future" title="4회차 · 예정"></div>
+          <div class="rcell r-future" title="5회차 · 예정"></div>
+          <div class="rcell r-future" title="6회차 · 예정"></div>
+          <div class="rcell r-future" title="7회차 · 예정"></div>
+          <div class="rcell r-future" title="8회차 · 예정"></div>
+        </div>
+        <p class="meta-m">정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span> · 남은 회차 <span class="tnum">5</span></p>
+      </section>
+
+      <section class="card pad-s" style="display:grid;gap:12px">
+        <span class="kicker">활동량 리더보드</span>
+        <div class="seg" id="lbSeg" role="group" aria-label="리더보드 기간">
+          <button type="button" aria-pressed="true" data-lb="7">7일</button>
+          <button type="button" aria-pressed="false" data-lb="30">30일</button>
+          <button type="button" aria-pressed="false" data-lb="all">전체</button>
+        </div>
+        <ul class="lb" id="lbList"></ul>
+        <div class="mine">
+          <span>내 순위</span>
+          <span>상위 <b class="tnum" id="myPct">12</b>%</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<!-- ==================== 강의 목록 ==================== -->
+<div class="page rise" id="screenCourses" hidden>
+  <div class="pagehead">
+    <h1>강의실</h1>
+    <span class="meta">2026 돈 되는 릴스 라운지 · 강의 <span class="tnum">4</span>개</span>
+  </div>
+
+  <div class="courses">
+    <button type="button" class="card course" data-open="false" aria-disabled="true">
+      <div class="course-cover">커버 자리</div>
+      <div class="course-in">
+        <div>
+          <h2 class="course-t">릴스 시작 세팅</h2>
+          <p class="course-d" style="margin-top:4px">계정 정리부터 촬영 장비까지. 첫 편을 올리기 전에 한 번만.</p>
+        </div>
+        <div class="track"><div class="fill" style="width:100%"></div></div>
+        <div class="course-foot">
+          <span><span class="course-pct">100%</span> · 레슨 <span class="tnum">5</span>개</span>
+          <span class="badge b-ontime">완료</span>
+        </div>
+      </div>
+    </button>
+
+    <button type="button" class="card course" data-open="true" id="openCourse">
+      <div class="course-cover">커버 자리 · 2026 돈 되는 릴스</div>
+      <div class="course-in">
+        <div>
+          <h2 class="course-t">2026 돈 되는 릴스</h2>
+          <p class="course-d" style="margin-top:4px">후킹부터 수익화까지 8주. 매주 한 편씩 올리면서 갑니다.</p>
+        </div>
+        <div class="track"><div class="fill" id="courseFill" style="width:38%"></div></div>
+        <div class="course-foot">
+          <span><span class="course-pct" id="coursePct">38%</span> · <span class="disp">3</span>회차 진행 중</span>
+          <span class="badge b-live"><span class="dot"></span>진행중</span>
+        </div>
+      </div>
+    </button>
+
+    <button type="button" class="card course" data-open="false" aria-disabled="true">
+      <div class="course-cover">커버 자리</div>
+      <div class="course-in">
+        <div>
+          <h2 class="course-t">후킹 문구 라이브러리</h2>
+          <p class="course-d" style="margin-top:4px">먹힌 후킹만 모아둔 상시 자료. 회차와 상관없이 열려 있습니다.</p>
+        </div>
+        <div class="track"><div class="fill" style="width:0%"></div></div>
+        <div class="course-foot">
+          <span>상시 자료 · 항목 <span class="tnum">42</span>개</span>
+          <span class="badge b-none">자료</span>
+        </div>
+      </div>
+    </button>
+
+    <button type="button" class="card course" data-open="false" aria-disabled="true">
+      <div class="course-cover">5회차부터 공개</div>
+      <div class="course-in">
+        <div>
+          <h2 class="course-t">릴스 수익화 심화</h2>
+          <p class="course-d" style="margin-top:4px">협찬 단가 협상과 자체 상품 연결. 5회차를 마치면 열립니다.</p>
+        </div>
+        <div class="track"><div class="fill" style="width:0%"></div></div>
+        <div class="course-foot">
+          <span>레슨 <span class="tnum">6</span>개</span>
+          <span class="badge b-none">예정</span>
+        </div>
+      </div>
+    </button>
+  </div>
+
+  <p class="meta-m" style="margin-top:16px">이 프로토타입에서는 <b style="color:var(--ink)">2026 돈 되는 릴스</b>만 열립니다. 나머지 세 개는 목록에서 어떻게 보이는지 확인용입니다.</p>
+</div>
+
+<!-- ==================== 강의 상세 ==================== -->
+<div class="page rise" id="screenClassroom" hidden>
+  <nav class="crumb" aria-label="위치">
+    <button type="button" id="crumbCourses">강의실</button>
+    <span class="sep" aria-hidden="true">/</span>
+    <span class="cur">2026 돈 되는 릴스</span>
+  </nav>
+
+  <div class="grid-classroom">
+
+    <!-- 좌측 커리큘럼 -->
+    <div class="curric-col">
+      <div class="card pad-s curric" style="display:grid;gap:12px">
+        <div>
+          <span class="kicker">2026 돈 되는 릴스 · <span class="disp">3</span>회차</span>
+          <h2 class="card-t" style="margin-top:4px">3초 안에 붙잡는 후킹</h2>
+        </div>
+
+        <div>
+          <div class="row" style="justify-content:space-between;margin-bottom:7px">
+            <span class="pctpill tnum" id="pctPill">38%</span>
+            <span class="meta-m">퀘스트 <span class="tnum" id="qDone">3</span>/<span class="tnum" id="qAll">8</span></span>
+          </div>
+          <div class="track"><div class="fill" id="pctFill" style="width:38%"></div></div>
+          <p class="meta-m" style="margin:7px 0 0">재생 시간이 아니라 스스로 체크한 퀘스트가 %를 채웁니다.</p>
+        </div>
+
+        <div id="curric"></div>
+      </div>
+    </div>
+
+    <!-- 우측 콘텐츠 -->
+    <div class="col">
+      <article class="card pad" style="display:grid;gap:16px">
+        <div class="lessonhead">
+          <div class="grow" style="min-width:0">
+            <span class="kicker" id="lessonKicker">강의 · <span class="disp">02</span></span>
+            <h1 class="card-t" style="font-size:20px;margin-top:5px" id="lessonTitle">3초 후킹 설계하기</h1>
+          </div>
+          <button type="button" class="chip" id="lessonDone" aria-pressed="false">완료로 표시</button>
+        </div>
+
+        <div class="video">
+          <span>영상 자리 · 4:20</span>
+          <span style="font-size:11px">정적 프로토타입이라 재생되지 않습니다</span>
+        </div>
+
+        <div class="prose">
+          <p>이 강의는 <strong>4~5분 단위</strong>로 쪼개져 있습니다. 위에 영상, 아래에 교안이 같이 놓입니다. 교안이 본문으로 올라가 있으니 검색만으로 이 강의에 바로 닿습니다.</p>
+
+          <h4>교안 — 후킹은 첫 프레임이 아니라 첫 문장이다</h4>
+          <ol>
+            <li>3초 안에 <strong>이 영상이 나에게 무슨 이득인지</strong>가 나와야 합니다. 인사와 자기소개는 그 뒤입니다.</li>
+            <li>후킹은 반드시 <strong>세 개를 써 놓고 고릅니다.</strong> 하나만 쓰면 그게 최선인지 알 수 없습니다.</li>
+            <li>고른 후킹을 첫 3초 자막으로 그대로 박습니다. 소리 없이 보는 사람이 절반입니다.</li>
+          </ol>
+
+          <h4>먹히는 후킹 세 유형</h4>
+          <ul>
+            <li><strong>결과 먼저</strong> — 끝에 나올 장면을 맨 앞에 붙입니다.</li>
+            <li><strong>반대 주장</strong> — 다들 아는 상식을 뒤집고 시작합니다.</li>
+            <li><strong>구체 숫자</strong> — 범위가 아니라 숫자 하나로 말합니다.</li>
+          </ul>
+
+          <div class="quote">
+            <b>자주 막히는 지점</b><br>
+            후킹 세 개를 만들어놓고 고르지 않은 채 촬영으로 넘어가는 경우가 많습니다. 고르는 데 5분을 쓰는 편이 다시 찍는 것보다 훨씬 쌉니다.
+          </div>
+
+          <h4>이번 강의에서 보는 지표</h4>
+          <ul>
+            <li><code>3초 시청률</code> — 후킹이 먹혔는지 판단하는 유일한 숫자</li>
+            <li><code>시청 완료율</code> — 대본 길이가 맞는지</li>
+            <li><code>저장 수</code> — 다시 볼 만한 정보였는지</li>
+          </ul>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="row">
+          <button type="button" class="btn-sec" id="prevLesson">이전 강의</button>
+          <span class="grow"></span>
+          <button type="button" class="btn-primary sm" id="nextLesson">다음 강의</button>
+        </div>
+      </article>
+
+      <article class="card pad-s" style="display:grid;gap:12px">
+        <div>
+          <span class="kicker">과제 제시</span>
+          <h2 class="card-t" style="margin-top:5px">커뮤니티에 <span style="color:var(--ink)">3회차 과제</span>라고 쓰고, 만든 릴스와 후킹 3안을 같이 올리세요.</h2>
+          <p class="meta" style="margin:5px 0 0">별도 제출 양식이 없습니다. 라운지 첫 화면에서 그대로 쓰면 그게 제출입니다.</p>
+        </div>
+        <div class="row">
+          <button type="button" class="btn-primary sm" id="toWriteBtn">라운지에서 바로 쓰기</button>
+          <span class="meta-m">마감까지 <span class="tnum" id="countdown2">--:--:--</span></span>
+        </div>
+      </article>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 스펙 시트 ==================== -->
+<section class="sheet">
+  <div class="sheet-in">
+    <h2>이 프로토타입이 무엇을 증명하는가</h2>
+    <p class="lead">기획안 8장의 P1 여덟 개를 <b>2026 돈 되는 릴스 라운지</b> 하나에 담아 웹 화면으로 옮긴 것입니다. 레이아웃 골격은 Skool 커뮤니티·강의실과 프드프 현재 라운지를, 디자인 토큰과 컴포넌트 규칙은 aistudy(AI눈높이 LMS)를 따랐습니다.</p>
+
+    <h3>먼저 라운지를 강의별로 쪼갠다</h3>
+    <p class="lead">기획안 7장의 To-be는 &lsquo;강의별로 라운지가 있어야 함&rsquo;입니다. 현재 프드프는 라운지가 하나뿐이라 좌측 사이드바에 모든 강의의 게시판이 섞여 있습니다. 그 사이드바를 없애기 전에 라운지부터 한 주제로 좁혔습니다.</p>
+    <div class="tablescroll">
+      <table class="mt">
+        <thead><tr><th>구분</th><th>현재 (라운지 1개 + 게시판 3개)</th><th>프로토타입</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>라운지 1개에 전 강의가 섞임</td><td>강의별 라운지로 분리 — 이 화면은 릴스 라운지 하나. 다른 라운지는 상단 토글로 이동</td></tr>
+          <tr><td>2</td><td>릴스 피드백 게시판</td><td>카테고리 칩 &lsquo;릴스 피드백&rsquo;</td></tr>
+          <tr><td>3</td><td>자유 커뮤니티 게시판</td><td>카테고리 칩 &lsquo;자유&rsquo;</td></tr>
+          <tr><td>4</td><td>올인원 AI 피드백 게시판</td><td>이 라운지에서 빠짐 — 올인원 AI 라운지로 이동</td></tr>
+          <tr><td>5</td><td>내 글 보기</td><td>보기 칩 &lsquo;내 글&rsquo; — 카테고리와 겹쳐 쓸 수 있음</td></tr>
+          <tr><td>6</td><td>내가 좋아요한 글</td><td>보기 칩 &lsquo;좋아요한 글&rsquo; — 카테고리와 겹쳐 쓸 수 있음</td></tr>
+          <tr data-new="true"><td>7</td><td>(없음)</td><td>회차 칩 · &lsquo;후킹 아이디어&rsquo; · &lsquo;수익 인증&rsquo; — 라운지가 한 주제로 좁아지니 비로소 만들 수 있는 축</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>핵심 차이</b> 게시판은 한 번에 하나만 고르고 화면이 바뀝니다. 필터는 <b>카테고리 + 보기 + 회차 + 정렬</b>을 동시에 걸 수 있고 화면이 바뀌지 않습니다. 좌측 사이드바가 사라진 만큼 피드가 넓어지고, 라운지가 좁아진 만큼 분류가 구체적으로 바뀝니다.
+    </div>
+
+    <h3>강의실은 목록 → 상세 두 단계</h3>
+    <p class="lead">Skool 은 Classroom 을 누르면 먼저 강의가 카드로 깔리고, 그중 하나를 눌러야 커리큘럼과 영상이 나옵니다. 같은 두 단계로 만들었습니다.</p>
+    <div class="tablescroll">
+      <table class="mt">
+        <thead><tr><th>단계</th><th>화면</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>강의 목록</td><td>커버 · 제목 · 설명 · 진행률 · 상태(완료 / 진행중 / 자료 / 예정) 카드 그리드</td></tr>
+          <tr><td>2</td><td>강의 상세</td><td>좌측 커리큘럼(진행률 + 접히는 섹션 + 레슨별 자체 체크) + 우측 영상 · 교안 · 과제</td></tr>
+          <tr><td>3</td><td>건너뛰기</td><td>우측 레일 &lsquo;강의 이어보기&rsquo; 는 목록을 지나치고 보던 레슨으로 바로 — 매일 오는 사람은 목록을 볼 이유가 없다</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>P1 항목이 화면 어디에 놓였는가</h3>
+    <div class="tablescroll">
+      <table class="mt">
+        <thead><tr><th>번호</th><th>P1 항목</th><th>프로토타입에서</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>마지막 라운지로 랜딩</td><td>상단바 라운지명이 현재 위치. 전환 목록에서 현재 라운지에 &lsquo;지금&rsquo; 표시</td></tr>
+          <tr><td>2</td><td>첫 화면이 글쓰기</td><td>메인 컬럼 최상단, 스크롤 없이 닿는 자리에 입력창</td></tr>
+          <tr><td>3</td><td>클릭 한 번에 즉시 작성</td><td>입력창을 누르면 그 자리에서 펼쳐짐. 페이지 이동 없음</td></tr>
+          <tr><td>4</td><td>창은 하나, 카테고리만 토글</td><td>펼친 입력창 안의 카테고리 · 회차 칩</td></tr>
+          <tr data-new="true"><td>5</td><td>게시판 대신 필터</td><td>피드 위 두 줄 필터 바. 좌측 사이드바를 없앤 자리</td></tr>
+          <tr><td>6</td><td>라운지에서 강의로 바로</td><td>탭 네비 &lsquo;강의실&rsquo;(목록) + 우측 레일 &lsquo;강의 이어보기&rsquo;(상세로 직행)</td></tr>
+          <tr><td>7</td><td>라운지 간 이동 토글</td><td>상단바 라운지명 옆 토글</td></tr>
+          <tr><td>8</td><td>통합 검색</td><td>상단바 중앙 검색. 글 · 강의 · 교안 · 멤버가 한 결과에</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>디자인 시스템 준수와 이탈</h3>
+    <div class="note">
+      <b>그대로 지킨 것</b>
+      <ul>
+        <li>토큰은 <code>aistudy/app/globals.css</code>의 <code>@theme</code>를 그대로 옮겼습니다. 강조색을 새로 만들지 않았고, 의미색은 지각(late)에만 외곽선+텍스트로 썼습니다.</li>
+        <li>상태는 색이 아니라 채움 농도와 형태로 구분합니다. 정시=솔리드, 진행중=외곽선+점, 지각=앰버 외곽선+해치, 미제출=옅은 외곽선.</li>
+        <li>8주 완주 리본, 상태 배지, 세그먼트 탭(리더보드 기간), 카드 · 버튼 · 인풋 조합은 DESIGN.md 문자열을 따랐습니다.</li>
+        <li>UI에 이모지를 쓰지 않았습니다. 아이콘은 인라인 SVG, 아바타는 이니셜입니다.</li>
+        <li>한글은 Pretendard, 숫자는 Space Grotesk. 한글에 display 페이스를 쓰지 않았습니다.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <b>의도적으로 벗어난 것</b>
+      <ul>
+        <li><b>460px 모바일 컬럼 → 웹 그리드.</b> DESIGN.md 레이아웃 표는 모바일 기준이라 웹 골격이 없습니다. 커뮤니티는 <code>1fr + 300px</code>, 강의실은 <code>320px + 1fr</code>, 페이지 폭 <code>1160px</code>으로 새로 정했습니다. 1040px 아래에서는 한 컬럼으로 접힙니다.</li>
+        <li><b>검정 반전 면을 쓰지 않았습니다.</b> DESIGN.md 원칙 5는 히어로 하나를 두라고 하지만, 이 프로토타입은 전부 흰 카드로 균질하게 가기로 했습니다. 마감 카운트다운은 우측 레일의 흰 카드 안 숫자로 처리했습니다.</li>
+        <li><b>필터 칩은 세그먼트 트랙 대신 개별 알약입니다.</b> 항목이 6개라 <code>bg-cloud</code> 트랙에 담기 어렵고, 가로 스크롤이 필요합니다. 활성은 <code>bg-ink</code>, 비활성은 <code>border-line</code>으로 기존 버튼 어휘를 씁니다.</li>
+      </ul>
+    </div>
+
+    <h3>프로토타입이라서 다른 점</h3>
+    <div class="note">
+      <ul>
+        <li>동작하는 것 — 글쓰기 펼침·게시, 카테고리·보기·회차 필터 조합, 정렬, 통합 검색, 좋아요, 커뮤니티↔강의 목록↔강의 상세 이동, 커리큘럼 섹션 접기, 레슨 전환, 퀘스트 체크와 진도율(강의 목록 카드까지 같이 갱신).</li>
+        <li>표시만 하는 것 — 라운지 전환 목록, 첨부 버튼, 내 서재, 멤버 · 리더보드 · 챌린지 · 안내 탭(회색으로 비활성), 강의 목록의 나머지 강의 3개, 영상과 커버(점선 자리).</li>
+        <li>피드 · 검색 · 리더보드 데이터는 예시입니다. 사람 이름과 수치는 실제 값이 아닙니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function initial(name) { return name.slice(0, 1); }
+
+  /* ================= 데이터 (예시) ================= */
+
+  var POSTS = [
+    { cat: "과제", wk: 3, author: "이서준", when: "2시간 전", state: "ontime", likes: 9, comments: 4, views: 61, thumb: true, mine: false, liked: true,
+      title: "3회차 과제 — 후킹 3안 만들고 A안으로 찍었습니다",
+      body: "결과를 맨 앞에 던지는 A안이 제일 반응이 좋았습니다. 3초 시청률 62퍼센트 나왔어요." },
+    { cat: "릴스 피드백", wk: 3, author: "정민아", when: "4시간 전", state: null, likes: 3, comments: 7, views: 44, thumb: true, mine: false, liked: false,
+      title: "첫 3초가 늘어지는 것 같은데 컷 좀 봐주세요",
+      body: "인트로를 두 번 줄였는데도 아직 느립니다. 어디를 더 쳐내야 할지 모르겠어요." },
+    { cat: "과제", wk: 3, author: "박현종", when: "6시간 전", state: "late", likes: 5, comments: 2, views: 38, thumb: false, mine: true, liked: false,
+      title: "3회차 과제 — 늦었지만 올립니다",
+      body: "후킹 3안 중에 고르는 데 시간을 다 썼습니다. 다음엔 5분 안에 정하려고요." },
+    { cat: "공지", wk: 0, author: "프드프 관리자", when: "어제", state: null, likes: 14, comments: 1, views: 210, thumb: false, mine: false, liked: true,
+      title: "4회차는 수요일 10시에 열립니다",
+      body: "이번 회차부터 교안이 강의 아래에 같이 올라갑니다. 검색으로 바로 찾을 수 있습니다." },
+    { cat: "수익 인증", wk: 2, author: "김도현", when: "어제", state: null, likes: 22, comments: 9, views: 187, thumb: true, mine: false, liked: true,
+      title: "첫 협찬 문의가 들어왔습니다",
+      body: "팔로워 2,400명에서 브랜드 쪽이 먼저 연락을 줬습니다. 단가 어떻게 부르는 게 맞을까요." },
+    { cat: "후킹 아이디어", wk: 0, author: "최윤서", when: "2일 전", state: null, likes: 18, comments: 6, views: 156, thumb: false, mine: false, liked: false,
+      title: "이번 주에 먹힌 후킹 문구 모아봤습니다",
+      body: "숫자로 시작하는 게 제일 강했습니다. 범위로 말하면 바로 넘기더라고요." },
+    { cat: "과제", wk: 2, author: "박현종", when: "3일 전", state: "ontime", likes: 7, comments: 3, views: 55, thumb: false, mine: true, liked: false,
+      title: "2회차 과제 — 대본을 세 문장으로 줄였습니다",
+      body: "군더더기를 걷어내니 촬영이 훨씬 빨라졌습니다. 한 편에 20분이면 끝납니다." },
+    { cat: "릴스 피드백", wk: 1, author: "한지우", when: "5일 전", state: null, likes: 2, comments: 6, views: 40, thumb: false, mine: false, liked: false,
+      title: "자막 폰트가 너무 큰가요?",
+      body: "세로 화면에서 두 줄이 넘어가는데 이대로 둬도 괜찮은지 모르겠습니다." },
+    { cat: "자유", wk: 0, author: "오세진", when: "6일 전", state: null, likes: 8, comments: 2, views: 77, thumb: false, mine: false, liked: false,
+      title: "1회차 마치고 남기는 짧은 후기",
+      body: "생각보다 준비할 게 적어서 좋았습니다. 이 정도 부담이면 8주 완주할 것 같습니다." },
+    { cat: "릴스 피드백", wk: 1, author: "이서준", when: "1주 전", state: null, likes: 16, comments: 5, views: 134, thumb: true, mine: false, liked: false,
+      title: "커버 두 가지 중에 어느 쪽이 나을까요",
+      body: "A는 얼굴을 크게 넣었고 B는 문구를 크게 넣었습니다." }
+  ];
+
+  var SEARCH = [
+    { g: "글",   t: "3회차 과제 — 후킹 3안 만들고 A안으로 찍었습니다", m: "이서준" },
+    { g: "글",   t: "첫 3초가 늘어지는 것 같은데 컷 좀 봐주세요",       m: "정민아" },
+    { g: "글",   t: "첫 협찬 문의가 들어왔습니다",                      m: "김도현" },
+    { g: "강의", t: "3회차 · 3초 후킹 설계하기",                        m: "4:20" },
+    { g: "강의", t: "3회차 · 대본 3문장 공식",                          m: "4:55" },
+    { g: "강의", t: "2회차 · 컷 호흡과 자막 타이밍",                    m: "4:05" },
+    { g: "교안", t: "3회차 교안 · 먹히는 후킹 세 유형",                 m: "본문 포함" },
+    { g: "교안", t: "3회차 교안 · 3초 시청률 보는 법",                  m: "본문 포함" },
+    { g: "교안", t: "2회차 교안 · 촬영 세팅값",                         m: "본문 포함" },
+    { g: "멤버", t: "이서준",                                           m: "3기" },
+    { g: "멤버", t: "정민아",                                           m: "3기" },
+    { g: "멤버", t: "김도현",                                           m: "2기" }
+  ];
+
+  var LB = {
+    "7":   [["이서준", "1,935"], ["정민아", "1,555"], ["김도현", "1,094"], ["박현종", "820"], ["최윤서", "640"]],
+    "30":  [["이서준", "11,161"], ["김도현", "8,396"], ["정민아", "7,526"], ["최윤서", "5,140"], ["박현종", "4,902"]],
+    "all": [["김도현", "46,282"], ["이서준", "37,652"], ["한지우", "36,140"], ["정민아", "31,088"], ["박현종", "24,510"]]
+  };
+
+  var MY_PCT = { "7": 12, "30": 21, "all": 34 };
+
+  var CURRIC = [
+    { name: "시작하기 전 봐야 할 것", open: true, items: [
+      { t: "이번 강의 소개", d: "1:40", done: true },
+      { t: "촬영 · 편집 툴 세팅", d: "3:10", done: true }
+    ] },
+    { name: "강의 · 4~5분 단위", open: true, items: [
+      { t: "3초 후킹 설계하기", d: "4:20", done: true, cur: true },
+      { t: "대본 3문장 공식", d: "4:55", done: false },
+      { t: "컷 호흡과 자막 타이밍", d: "4:05", done: false },
+      { t: "업로드 시간과 해시태그", d: "3:30", done: false }
+    ] },
+    { name: "과제 & 자료", open: true, items: [
+      { t: "3회차 과제 올리기", d: "과제", done: false },
+      { t: "남의 릴스 3개 보고 좋아요 1개", d: "퀘스트", done: false }
+    ] }
+  ];
+
+  /* ================= 카운트다운 ================= */
+
+  var target = Date.now() + (2 * 24 + 6) * 3600e3 + 12 * 60e3 + 5e3;
+  var cds = [$("countdown"), $("countdown2")];
+
+  function tick() {
+    var s = Math.floor(Math.max(0, target - Date.now()) / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    var txt = p(h) + ":" + p(m) + ":" + p(ss);
+    cds.forEach(function (n) { if (n) n.textContent = txt; });
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  /* ================= 라운지 전환 (P1-7) ================= */
+
+  var loungeBtn = $("loungeBtn"), loungeMenu = $("loungeMenu");
+
+  loungeBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var open = loungeMenu.hidden;
+    loungeMenu.hidden = !open;
+    loungeBtn.setAttribute("aria-expanded", String(open));
+  });
+
+  /* ================= 통합 검색 (P1-8) ================= */
+
+  var searchField = $("searchField"), searchPanel = $("searchPanel");
+
+  function renderSearch() {
+    var q = searchField.value.trim().toLowerCase();
+    var hits = q
+      ? SEARCH.filter(function (r) { return (r.t + " " + r.m).toLowerCase().indexOf(q) > -1; })
+      : SEARCH;
+
+    searchPanel.textContent = "";
+
+    if (!hits.length) {
+      searchPanel.appendChild(el("p", "res-empty", "“" + searchField.value.trim() + "” 결과가 없습니다"));
+      return;
+    }
+
+    ["글", "강의", "교안", "멤버"].forEach(function (g) {
+      var rows = hits.filter(function (r) { return r.g === g; });
+      if (!rows.length) return;
+      searchPanel.appendChild(el("div", "res-group", g + " " + rows.length));
+      rows.forEach(function (r) {
+        var row = el("div", "res-row");
+        row.appendChild(el("span", "t", r.t));
+        row.appendChild(el("span", "m", r.m));
+        searchPanel.appendChild(row);
+      });
+    });
+  }
+
+  function openSearch() { renderSearch(); searchPanel.hidden = false; }
+  searchField.addEventListener("focus", openSearch);
+  searchField.addEventListener("input", openSearch);
+
+  document.addEventListener("click", function (e) {
+    if (!loungeMenu.hidden && !loungeMenu.contains(e.target) && !loungeBtn.contains(e.target)) {
+      loungeMenu.hidden = true;
+      loungeBtn.setAttribute("aria-expanded", "false");
+    }
+    if (!searchPanel.hidden && !searchPanel.contains(e.target) && e.target !== searchField) {
+      searchPanel.hidden = true;
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    loungeMenu.hidden = true;
+    loungeBtn.setAttribute("aria-expanded", "false");
+    searchPanel.hidden = true;
+  });
+
+  /* ================= 글쓰기 (P1-2 · 3 · 4) ================= */
+
+  var composer = $("composer"), rest = $("composerRest"), openBox = $("composerOpen");
+  var ta = $("ta"), postBtn = $("composerPost"), cancelBtn = $("composerCancel");
+
+  function setComposer(on) {
+    composer.classList.toggle("open", on);
+    rest.hidden = on;
+    openBox.hidden = !on;
+    if (on) ta.focus();
+  }
+
+  rest.addEventListener("click", function () { setComposer(true); });
+  cancelBtn.addEventListener("click", function () {
+    ta.value = ""; postBtn.disabled = true; setComposer(false);
+  });
+  ta.addEventListener("input", function () { postBtn.disabled = !ta.value.trim(); });
+
+  function exclusive(container) {
+    var buttons = Array.prototype.slice.call(container.querySelectorAll("button"));
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+      });
+    });
+    return function () {
+      return buttons.filter(function (b) { return b.getAttribute("aria-pressed") === "true"; })[0] || buttons[0];
+    };
+  }
+
+  var pickCat = exclusive($("catChips"));
+  var pickWk = exclusive($("wkChips"));
+
+  postBtn.addEventListener("click", function () {
+    var text = ta.value.trim();
+    if (!text) return;
+
+    var lines = text.split("\n");
+    var wk = parseInt(pickWk().textContent.trim(), 10);
+
+    POSTS.unshift({
+      cat: pickCat().textContent.trim(),
+      wk: isNaN(wk) ? 0 : wk,
+      author: "박현종",
+      when: "방금",
+      state: "live",
+      likes: 0, comments: 0, views: 1,
+      thumb: false, mine: true, liked: false,
+      title: lines[0].slice(0, 70),
+      body: lines.slice(1).join(" ").slice(0, 160)
+    });
+
+    ta.value = "";
+    postBtn.disabled = true;
+    setComposer(false);
+    render();
+  });
+
+  /* ================= 필터 (P1-5) ================= */
+
+  var state = { cat: "전체", wk: 0, mine: false, liked: false, sort: "new" };
+
+  Array.prototype.slice.call($("catFilter").querySelectorAll("button")).forEach(function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.slice.call($("catFilter").querySelectorAll("button")).forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      state.cat = b.getAttribute("data-cat");
+      render();
+    });
+  });
+
+  var wkButtons = Array.prototype.slice.call($("subFilter").querySelectorAll("[data-wk]"));
+
+  wkButtons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      wkButtons.forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+      state.wk = parseInt(b.getAttribute("data-wk"), 10);
+      render();
+    });
+  });
+
+  Array.prototype.slice.call($("subFilter").querySelectorAll("[data-view]")).forEach(function (b) {
+    b.addEventListener("click", function () {
+      var key = b.getAttribute("data-view");
+      state[key] = !state[key];
+      b.setAttribute("aria-pressed", String(state[key]));
+      render();
+    });
+  });
+
+  var sortNew = $("sortNew"), sortLike = $("sortLike");
+
+  sortNew.addEventListener("click", function () {
+    state.sort = "new";
+    sortNew.setAttribute("aria-pressed", "true");
+    sortLike.setAttribute("aria-pressed", "false");
+    render();
+  });
+
+  sortLike.addEventListener("click", function () {
+    state.sort = "like";
+    sortLike.setAttribute("aria-pressed", "true");
+    sortNew.setAttribute("aria-pressed", "false");
+    render();
+  });
+
+  /* ================= 피드 렌더 ================= */
+
+  var BADGE = {
+    ontime: { cls: "b-ontime", label: "정시", mark: null },
+    live:   { cls: "b-live",   label: "진행중", mark: "dot" },
+    late:   { cls: "b-late",   label: "지각", mark: "sq" }
+  };
+
+  function badge(key) {
+    var d = BADGE[key];
+    if (!d) return null;
+    var b = el("span", "badge " + d.cls);
+    if (d.mark === "dot") b.appendChild(el("span", "dot"));
+    if (d.mark === "sq") b.appendChild(el("span", "sq hatch"));
+    b.appendChild(document.createTextNode(d.label));
+    return b;
+  }
+
+  var feed = $("feed"), resultCount = $("resultCount"), activeLine = $("activeLine");
+
+  function describe() {
+    var parts = [];
+    if (state.cat !== "전체") parts.push(state.cat);
+    if (state.wk !== 0) parts.push(state.wk + "회차");
+    if (state.mine) parts.push("내 글");
+    if (state.liked) parts.push("좋아요한 글");
+    return parts;
+  }
+
+  function render() {
+    var rows = POSTS.filter(function (p) {
+      if (state.cat !== "전체" && p.cat !== state.cat) return false;
+      if (state.wk !== 0 && p.wk !== state.wk) return false;
+      if (state.mine && !p.mine) return false;
+      if (state.liked && !p.liked) return false;
+      return true;
+    });
+
+    if (state.sort === "like") {
+      rows = rows.slice().sort(function (a, b) { return b.likes - a.likes; });
+    }
+
+    resultCount.textContent = String(rows.length);
+
+    var parts = describe();
+    activeLine.textContent = "";
+    if (parts.length) {
+      activeLine.appendChild(document.createTextNode("걸린 조건 "));
+      parts.forEach(function (t, i) {
+        if (i) activeLine.appendChild(el("span", "arrow", " + "));
+        activeLine.appendChild(el("b", null, t));
+      });
+      activeLine.appendChild(document.createTextNode(" — 화면은 그대로, 목록만 바뀝니다"));
+    } else {
+      activeLine.appendChild(document.createTextNode("조건 없음 — 게시판을 고르지 않고 전체를 봅니다"));
+    }
+
+    feed.textContent = "";
+
+    if (!rows.length) {
+      feed.appendChild(el("p", "empty", "이 조건에 맞는 글이 아직 없습니다."));
+      return;
+    }
+
+    rows.forEach(function (p) {
+      var card = el("article", "card pad-s post");
+
+      var top = el("div", "post-top");
+      top.appendChild(el("span", "ava ava-34" + (p.mine ? " ava-ink" : ""), initial(p.author)));
+
+      var who = el("div", "post-who");
+      who.appendChild(el("span", "post-name", p.author));
+      var sub = el("span", "post-sub");
+      sub.appendChild(el("span", "tag", p.cat));
+      if (p.wk) {
+        sub.appendChild(el("span", null, "·"));
+        var wkEl = el("span");
+        wkEl.appendChild(el("span", "disp", String(p.wk)));
+        wkEl.appendChild(document.createTextNode("회차"));
+        sub.appendChild(wkEl);
+      }
+      sub.appendChild(el("span", null, "·"));
+      sub.appendChild(el("span", null, p.when));
+      who.appendChild(sub);
+      top.appendChild(who);
+
+      var b = badge(p.state);
+      if (b) top.appendChild(b);
+      card.appendChild(top);
+
+      var body = el("div", "post-body");
+      var text = el("div", "post-text");
+      text.appendChild(el("h3", "post-h", p.title));
+      if (p.body) text.appendChild(el("p", "post-x", p.body));
+      body.appendChild(text);
+      if (p.thumb) body.appendChild(el("div", "thumb", "첨부 이미지 자리"));
+      card.appendChild(body);
+
+      var foot = el("div", "post-foot");
+      var like = el("button", "like");
+      like.type = "button";
+      like.setAttribute("aria-pressed", String(!!p.liked));
+      like.textContent = "좋아요 " + p.likes;
+      like.addEventListener("click", function () {
+        p.liked = !p.liked;
+        p.likes += p.liked ? 1 : -1;
+        like.setAttribute("aria-pressed", String(p.liked));
+        like.textContent = "좋아요 " + p.likes;
+      });
+      foot.appendChild(like);
+      foot.appendChild(el("span", null, "댓글 " + p.comments));
+      foot.appendChild(el("span", null, "조회 " + p.views));
+      card.appendChild(foot);
+
+      feed.appendChild(card);
+    });
+  }
+
+  render();
+
+  /* ================= 고정글 좋아요 ================= */
+
+  (function () {
+    var btn = $("pinLike"), n = 48;
+    btn.addEventListener("click", function () {
+      var on = btn.getAttribute("aria-pressed") === "true";
+      n += on ? -1 : 1;
+      btn.setAttribute("aria-pressed", String(!on));
+      btn.textContent = "좋아요 ";
+      btn.appendChild(el("span", "tnum", String(n)));
+    });
+  })();
+
+  /* ================= 리더보드 ================= */
+
+  var lbList = $("lbList"), myPct = $("myPct");
+
+  function renderLb(key) {
+    lbList.textContent = "";
+    LB[key].forEach(function (row, i) {
+      var li = document.createElement("li");
+      if (i < 3) li.setAttribute("data-top", "true");
+      li.appendChild(el("span", "rk", String(i + 1)));
+      li.appendChild(el("span", "ava ava-24" + (row[0] === "박현종" ? " ava-ink" : ""), initial(row[0])));
+      li.appendChild(el("span", "nm", row[0]));
+      li.appendChild(el("span", "pt", row[1]));
+      lbList.appendChild(li);
+    });
+    myPct.textContent = String(MY_PCT[key]);
+  }
+
+  Array.prototype.slice.call($("lbSeg").querySelectorAll("button")).forEach(function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.slice.call($("lbSeg").querySelectorAll("button")).forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      renderLb(b.getAttribute("data-lb"));
+    });
+  });
+
+  renderLb("7");
+
+  /* ================= 화면 전환 (P1-6) ================= */
+
+  var community = $("screenCommunity");
+  var courses = $("screenCourses");
+  var lesson = $("screenClassroom");
+  var tabC = $("tabCommunity"), tabR = $("tabClassroom");
+
+  function show(which) {
+    community.hidden = which !== "community";
+    courses.hidden = which !== "courses";
+    lesson.hidden = which !== "lesson";
+    tabC.setAttribute("aria-current", String(which === "community"));
+    tabR.setAttribute("aria-current", String(which !== "community"));
+    window.scrollTo(0, 0);
+  }
+
+  tabC.addEventListener("click", function () { show("community"); });
+  tabR.addEventListener("click", function () { show("courses"); });
+
+  // 강의 목록에서 코스를 고르면 상세로
+  $("openCourse").addEventListener("click", function () { show("lesson"); });
+  $("crumbCourses").addEventListener("click", function () { show("courses"); });
+
+  // 우측 레일 '강의 이어보기' 는 목록을 건너뛰고 보던 레슨으로 바로 (P1-6)
+  $("toCourseBtn").addEventListener("click", function () { show("lesson"); });
+
+  $("toWriteBtn").addEventListener("click", function () {
+    show("community");
+    setComposer(true);
+  });
+
+  /* ================= 커리큘럼 + 진도율 ================= */
+
+  var curric = $("curric");
+  var pctPill = $("pctPill"), pctFill = $("pctFill"), qDone = $("qDone"), qAll = $("qAll");
+  var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle"), lessonDone = $("lessonDone");
+
+  var flat = [];
+  CURRIC.forEach(function (sec) { sec.items.forEach(function (it) { flat.push(it); }); });
+
+  var curIndex = flat.findIndex(function (it) { return it.cur; });
+  if (curIndex < 0) curIndex = 0;
+
+  var coursePct = $("coursePct"), courseFill = $("courseFill");
+
+  function updateProgress() {
+    var done = flat.filter(function (it) { return it.done; }).length;
+    var value = Math.round((done / flat.length) * 100);
+    pctPill.textContent = value + "%";
+    pctFill.style.width = value + "%";
+    qDone.textContent = String(done);
+    qAll.textContent = String(flat.length);
+    // 강의 목록 카드의 진행률도 같은 값을 쓴다
+    coursePct.textContent = value + "%";
+    courseFill.style.width = value + "%";
+  }
+
+  var checkPath = "M20 6 9 17l-5-5";
+
+  function checkIcon() {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "11");
+    svg.setAttribute("height", "11");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "3.5");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", checkPath);
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function selectLesson(item) {
+    flat.forEach(function (it) { it.cur = it === item; });
+    curIndex = flat.indexOf(item);
+    var n = String(curIndex + 1).padStart(2, "0");
+    lessonKicker.textContent = "";
+    lessonKicker.appendChild(document.createTextNode("강의 · "));
+    lessonKicker.appendChild(el("span", "disp", n));
+    lessonTitle.textContent = item.t;
+    lessonDone.setAttribute("aria-pressed", String(!!item.done));
+    lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
+    renderCurric();
+  }
+
+  function renderCurric() {
+    curric.textContent = "";
+
+    CURRIC.forEach(function (sec) {
+      var block = el("div", "secblock");
+
+      var head = el("button", "sechead");
+      head.type = "button";
+      head.setAttribute("aria-expanded", String(sec.open));
+      head.appendChild(el("span", "grow", sec.name));
+      var doneN = sec.items.filter(function (i) { return i.done; }).length;
+      head.appendChild(el("span", "n", doneN + "/" + sec.items.length));
+      var chev = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      chev.setAttribute("width", "12");
+      chev.setAttribute("height", "12");
+      chev.setAttribute("viewBox", "0 0 24 24");
+      chev.setAttribute("fill", "none");
+      chev.setAttribute("stroke", "currentColor");
+      chev.setAttribute("stroke-width", "2.5");
+      chev.setAttribute("stroke-linecap", "round");
+      chev.setAttribute("stroke-linejoin", "round");
+      chev.setAttribute("aria-hidden", "true");
+      var cp = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      cp.setAttribute("d", "m6 9 6 6 6-6");
+      chev.appendChild(cp);
+      head.appendChild(chev);
+      head.addEventListener("click", function () { sec.open = !sec.open; renderCurric(); });
+      block.appendChild(head);
+
+      if (sec.open) {
+        var ul = el("ul", "lessons");
+        sec.items.forEach(function (item) {
+          var li = document.createElement("li");
+          li.className = "lesson";
+          li.setAttribute("data-cur", String(!!item.cur));
+          li.setAttribute("data-done", String(!!item.done));
+
+          var chk = el("button", "check");
+          chk.type = "button";
+          chk.setAttribute("aria-pressed", String(!!item.done));
+          chk.setAttribute("aria-label", item.t + " 완료 표시");
+          chk.appendChild(checkIcon());
+          chk.addEventListener("click", function (e) {
+            e.stopPropagation();
+            item.done = !item.done;
+            if (item.cur) {
+              lessonDone.setAttribute("aria-pressed", String(item.done));
+              lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
+            }
+            updateProgress();
+            renderCurric();
+          });
+          li.appendChild(chk);
+
+          var t = el("button", "t", item.t);
+          t.type = "button";
+          t.addEventListener("click", function () { selectLesson(item); });
+          li.appendChild(t);
+
+          li.appendChild(el("span", "d", item.d));
+          ul.appendChild(li);
+        });
+        block.appendChild(ul);
+      }
+
+      curric.appendChild(block);
+    });
+  }
+
+  lessonDone.addEventListener("click", function () {
+    var item = flat[curIndex];
+    item.done = !item.done;
+    lessonDone.setAttribute("aria-pressed", String(item.done));
+    lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
+    updateProgress();
+    renderCurric();
+  });
+
+  $("prevLesson").addEventListener("click", function () {
+    if (curIndex > 0) selectLesson(flat[curIndex - 1]);
+  });
+
+  $("nextLesson").addEventListener("click", function () {
+    if (curIndex < flat.length - 1) selectLesson(flat[curIndex + 1]);
+  });
+
+  renderCurric();
+  updateProgress();
+  selectLesson(flat[curIndex]);
+})();
+</script>

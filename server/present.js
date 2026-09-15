@@ -119,7 +119,7 @@ async function loungeData(loungeId, viewerId) {
       cat: p.category,
       wk: p.week || 0,
       author: p.author_name,
-      when: p.is_pinned ? "계속 누적" : when(p.created_at, now),
+      when: when(p.created_at, now),
       likes: p.likes,
       views: p.view_count,
       mine: p.mine,

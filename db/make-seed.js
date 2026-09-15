@@ -44,7 +44,8 @@ function ago(when) {
   if (/어제/.test(when))                   return back(1, "days");
   if ((m = when.match(/(\d+)\s*일 전/)))   return back(m[1], "days");
   if ((m = when.match(/(\d+)\s*주 전/)))   return back(m[1] * 7, "days");
-  return back(30, "days");   // '계속 누적' 같은 고정 공지
+  if ((m = when.match(/(\d+)\s*개월 전/))) return back(m[1] * 30, "days");
+  return back(30, "days");
 }
 
 const days = (d) => d === 0 ? NOW : back(d, "days");

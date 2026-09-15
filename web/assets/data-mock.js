@@ -45,7 +45,7 @@ window.LOUNGE_DATA = {
   ],
 
   posts: [
-    { cat: "공지", wk: 0, author: "프드프 관리자", when: "계속 누적", likes: 48, comments: 12, views: 1204, mine: false, liked: false, pinned: true,
+    { cat: "공지", wk: 0, author: "프드프 관리자", when: "1개월 전", likes: 48, comments: 12, views: 1204, mine: false, liked: false, pinned: true,
       title: "이번 달 명예의 전당에 오른 결과물",
       body: "강사님이 고른 결과물을 이 글 하나에 계속 쌓습니다. 별도 메뉴 없이 최상단 고정." },
 

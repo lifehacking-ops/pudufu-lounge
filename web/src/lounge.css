@@ -376,6 +376,10 @@
   .intro-head .card-t { flex: 1; min-width: 0; font-size: 17px; }
   .intro-x { margin: 0; font-size: 13px; line-height: 1.7; color: var(--slate);
              white-space: pre-wrap; }
+  /* 글 수정창의 카테고리 줄 */
+  .edit-cats { display: grid; gap: 6px; margin-top: 4px; }
+  .edit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
   .intro-edit { display: grid; gap: 8px; }
   .intro-edit .ta { min-height: 76px; }
 

@@ -9,6 +9,10 @@ const account = require("./account");
 
 const ATTACH_MAX = 10;   // 한 글에 붙일 수 있는 사진 장수
 
+/* id 비교는 언제나 이걸로 한다. bigint 는 드라이버가 문자열로 주므로
+   === 로 비교하면 소유 판정이 조용히 전부 거짓이 된다. */
+const same = (a, b) => Number(a) === Number(b);
+
 class Denied extends Error {
   constructor(msg) { super(msg); this.code = 403; }
 }
@@ -146,14 +150,33 @@ async function createPost(loungeId, userId, input) {
 async function editPost(loungeId, userId, postId, input) {
   const me = await membership(loungeId, userId);
   const p = await one(
-    `SELECT id, user_id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`,
+    `SELECT p.id, p.user_id, c.name AS cat, c.pass_required, c.is_system
+       FROM post p JOIN category c ON c.id = p.category_id
+      WHERE p.id = $1 AND p.lounge_id = $2 AND p.deleted_at IS NULL`,
     [postId, loungeId]);
   if (!p) throw new Missing();
-  if (p.user_id !== userId) throw new Denied("내 글만 고칠 수 있습니다");
+  // bigint 는 드라이버가 문자열로 준다. '26' !== 26 이라 그냥 비교하면 늘 남의 글이 된다.
+  if (!same(p.user_id, userId)) throw new Denied("내 글만 고칠 수 있습니다");
+
+  /* 카테고리를 옮길 수 있게 하되, 옮기는 것으로 관문을 피할 수는 없게 한다.
+     · 피드백권 카테고리로 옮기기 = 권을 안 쓰고 피드백을 받는 길이다
+     · 과제는 주차 양식과 묶여 있다. 옮기면 답변이 갈 곳을 잃는다 */
+  let move = null;
+  if (input.cat && input.cat !== p.cat) {
+    if (p.cat === "과제" || p.pass_required) {
+      throw new Denied(`'${p.cat}' 글은 카테고리를 옮길 수 없습니다`);
+    }
+    const c = await writable(loungeId, me, input.cat);
+    if (c.pass_required) throw new Denied(`'${c.name}' 으로는 옮길 수 없습니다. 새로 써야 합니다`);
+    if (c.name === "과제") throw new Denied("과제는 강의실에서 냅니다");
+    move = c.id;
+  }
 
   await rows(
-    `UPDATE post SET title = $1, body = $2, edited_at = now() WHERE id = $3`,
-    [input.title, input.body || null, postId]);
+    `UPDATE post SET title = $1, body = $2, category_id = coalesce($4, category_id),
+            edited_at = now()
+      WHERE id = $3`,
+    [input.title, input.body || null, postId, move]);
   return { id: postId };
 }
 
@@ -204,7 +227,7 @@ async function deleteComment(loungeId, userId, commentId) {
        JOIN post p ON p.id = cm.post_id
       WHERE cm.id = $1 AND p.lounge_id = $2 AND cm.deleted_at IS NULL`, [commentId, loungeId]);
   if (!c) throw new Missing();
-  if (c.user_id !== userId && me.role !== "admin") throw new Denied("내 댓글만 지울 수 있습니다");
+  if (!same(c.user_id, userId) && me.role !== "admin") throw new Denied("내 댓글만 지울 수 있습니다");
 
   await rows(`UPDATE comment SET deleted_at = now(), deleted_by = $1 WHERE id = $2`,
     [userId, commentId]);
@@ -714,7 +737,7 @@ async function reportPost(loungeId, userId, postId, reason) {
     `SELECT id, user_id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`,
     [postId, loungeId]);
   if (!p) throw new Missing();
-  if (Number(p.user_id) === Number(userId)) throw new Denied("내 글은 신고하지 않습니다");
+  if (same(p.user_id, userId)) throw new Denied("내 글은 신고하지 않습니다");
 
   await rows(
     `INSERT INTO post_report (post_id, user_id, reason) VALUES ($1, $2, $3)

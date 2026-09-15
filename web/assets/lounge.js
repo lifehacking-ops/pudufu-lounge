@@ -2032,6 +2032,23 @@
 
   /* 내 글 수정. 상세 본문 자리를 그대로 편집 화면으로 바꾼다.
      과제 글이면 미션 칸을, 보통 글이면 제목과 본문을 연다. */
+  /* 이 카테고리가 피드백권을 쓰는가. PASSES 는 '내가 가진 권' 이라 스태프에게는
+     비어 있다. 카테고리의 성질은 CATEGORIES 에서 봐야 한다. */
+  function passOf(name) {
+    var c = categoryOf(name);
+    return !!(c && c.pass);
+  }
+
+  /* 옮겨 갈 수 있는 곳 — 내가 쓸 수 있고, 권이 안 붙고, 과제가 아닌 것.
+     지금 있는 자리는 언제나 목록에 둔다. 어디에 있는지가 먼저 보여야 한다. */
+  function moveTargets(now) {
+    var list = writableCats().filter(function (n) {
+      return n !== "과제" && !passOf(n);
+    });
+    if (list.indexOf(now) < 0) list.unshift(now);
+    return list;
+  }
+
   function editPost(p) {
     detailBody.textContent = "";
     detailBody.appendChild(el("span", "kicker", "글 수정"));
@@ -2042,6 +2059,37 @@
     title.value = p.title;
     title.placeholder = "제목";
     detailBody.appendChild(title);
+
+    /* 카테고리를 잘못 골라 올리는 일이 잦다. 고칠 때 같이 옮길 수 있어야 한다.
+       다만 옮기는 것으로 관문을 피할 수는 없다 — 과제와 피드백권 카테고리는
+       양식과 권에 묶여 있어서 그대로 둔다. 서버도 같은 것을 다시 본다. */
+    var movable = p.cat !== "과제" && !passOf(p.cat);
+    var newCat = p.cat;
+
+    if (movable) {
+      var pickRow = el("div", "edit-cats");
+      pickRow.appendChild(el("span", "kicker", "카테고리"));
+
+      var chips = el("div", "edit-chips");
+      moveTargets(p.cat).forEach(function (name) {
+        var b = el("button", "chip", name);
+        b.type = "button";
+        b.setAttribute("aria-pressed", String(name === newCat));
+        b.addEventListener("click", function () {
+          newCat = name;
+          [].forEach.call(chips.children, function (x) {
+            x.setAttribute("aria-pressed", String(x.textContent === newCat));
+          });
+        });
+        chips.appendChild(b);
+      });
+      pickRow.appendChild(chips);
+      detailBody.appendChild(pickRow);
+    } else {
+      detailBody.appendChild(el("p", "sec-note",
+        p.cat === "과제" ? "과제는 주차 양식에 묶여 있어 카테고리를 옮길 수 없습니다"
+                         : "피드백권을 쓴 글은 카테고리를 옮길 수 없습니다"));
+    }
 
     var save = el("button", "btn-primary sm", "저장");
     save.type = "button";
@@ -2073,13 +2121,16 @@
     detailBody.appendChild(row);
 
     save.addEventListener("click", function () {
+      var was = p.cat;
       var t = title.value.trim();
       if (t) p.title = t;
       if (form) p.mission = form.answers();
       else p.body = body.value.trim();
+      if (movable) p.cat = newCat;
       p.when = "방금 수정함";
 
-      send("PATCH", "/posts/" + p.id, { title: p.title, body: p.body || "" }).catch(failed);
+      send("PATCH", "/posts/" + p.id, { title: p.title, body: p.body || "", cat: p.cat })
+        .catch(function (e) { p.cat = was; render(); failed(e); });
 
       render();
       openPost(p);

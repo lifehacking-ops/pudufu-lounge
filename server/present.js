@@ -133,9 +133,8 @@ async function loungeData(loungeId, viewerId) {
     if (p.reactions) out.reactions = p.reactions;
     if (p.answers) out.mission = p.answers.map((a) => ({ q: a.q, a: a.a }));
     if (p.attach) {
-      out.attach = p.attach.kind === "image"
-        ? { type: "image", label: p.attach.label }
-        : { type: p.attach.kind, url: p.attach.url, title: p.attach.label };
+      out.attach = { type: p.attach.kind, url: p.attach.url || null,
+                     title: p.attach.label, label: p.attach.label };
     }
     return out;
   });

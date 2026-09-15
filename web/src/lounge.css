@@ -1201,7 +1201,25 @@
   .cmt .bubble { transition: background-color .4s ease; }
   .cmt-hit > .cmt-main > .bubble { background: var(--late-bg); }
 
-  .pinned-on { color: var(--brand); font-weight: 600; }
+  .att-real {
+    display: block; width: 100%; max-height: 420px; object-fit: cover;
+    border-radius: var(--radius-card); background: var(--cloud);
+  }
+
+  .att-compact .att-real { max-height: 180px; }
+
+  /* 케밥 메뉴 — 세로 점 셋. 자주 안 쓰는 조작을 한 겹 접어 둔다. */
+  .kebab { position: relative; display: inline-flex; flex: none; }
+
+  .kebab-btn {
+    width: 24px; height: 24px; border-radius: 6px; color: var(--mist);
+    font-size: 15px; line-height: 1; display: inline-flex;
+    align-items: center; justify-content: center;
+  }
+
+  .kebab-btn:hover, .kebab-btn[aria-expanded="true"] { background: var(--cloud); color: var(--ink); }
+  .kebab-menu { min-width: 132px; top: calc(100% + 4px); }
+  .kebab-menu .del { color: var(--danger); }
 
   /* 붙인 파일 한 줄. 이름과 떼기만 있으면 된다. */
   .attach-now {

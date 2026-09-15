@@ -1391,6 +1391,16 @@
     var box = el("div", "att" + (compact ? " att-compact" : ""));
 
     if (a.type === "image") {
+      // 실제로 올린 파일이면 그대로 보여준다. 프로토타입에는 주소가 없어 자리만 잡는다.
+      if (a.url) {
+        var real = document.createElement("img");
+        real.className = "att-real";
+        real.src = a.url;
+        real.alt = a.label || a.title || "첨부 이미지";
+        real.loading = "lazy";
+        box.appendChild(real);
+        return box;
+      }
       var img = el("div", "att-img");
       img.appendChild(el("span", null, "이미지 첨부 자리"));
       if (a.label) img.appendChild(el("span", null, a.label));
@@ -1503,29 +1513,25 @@
       meta.appendChild(el("span", "grow"));
       if (p.pinned) meta.appendChild(pinIcon());
 
-      // 관리자는 글에 들어가지 않고 피드에서 바로 지운다
-      if (can("delete")) {
-        var feedGate = el("div", "gate");
-        feedGate.hidden = true;
-        feedGate.style.marginTop = "10px";
+      /* 수정 · 고정 · 삭제는 케밥 메뉴 안에 둔다. 셋을 늘어놓으면
+         조작 버튼이 본문보다 먼저 눈에 든다. */
+      var feedGate = el("div", "gate");
+      feedGate.hidden = true;
+      feedGate.style.marginTop = "10px";
 
-        meta.appendChild(pinButton(p));
-
-        var delBtn = el("button", "footlink del", "삭제");
-        delBtn.type = "button";
-        delBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          if (!feedGate.hidden) { feedGate.hidden = true; return; }
+      var menu = postMenu(p, {
+        onEdit: function () { openPost(p); editPost(p); },
+        onDelete: function () {
           feedGate.textContent = "";
           feedGate.appendChild(deleteGate(p, function () { feedGate.hidden = true; }));
           feedGate.hidden = false;
-        });
-        meta.appendChild(delBtn);
-        card.appendChild(meta);
-        card.appendChild(feedGate);
-      } else {
-        card.appendChild(meta);
-      }
+        }
+      });
+      if (menu) meta.appendChild(menu);
+
+      card.appendChild(meta);
+      card.appendChild(feedGate);
+
 
       var top = el("div", "post-top");
       top.appendChild(el("span", "ava ava-34" + (p.mine ? " ava-ink" : ""), initial(p.author)));
@@ -1606,23 +1612,13 @@
     meta.appendChild(el("span", "grow"));
     if (p.pinned) meta.appendChild(pinIcon());
 
-    // 내 글은 여기서 바로 고친다. 글쓰기 창으로 되돌아갈 일이 없다.
-    if (p.mine) {
-      var edit = el("button", "footlink", "수정");
-      edit.type = "button";
-      edit.addEventListener("click", function () { editPost(p); });
-      meta.appendChild(edit);
-    }
-
-    // 관리자는 남의 글도 여기서 지운다. 확인은 글 맨 아래에서 받는다.
-    if (can("delete")) {
-      meta.appendChild(pinButton(p, function () { openPost(p); }));
-
-      var del = el("button", "footlink del", "삭제");
-      del.type = "button";
-      del.addEventListener("click", function () { askDelete(p); });
-      meta.appendChild(del);
-    }
+    // 피드와 같은 메뉴를 쓴다. 자리가 달라도 할 수 있는 일은 같아야 한다.
+    var dmenu = postMenu(p, {
+      onEdit: function () { editPost(p); },
+      onDelete: function () { askDelete(p); },
+      after: function () { openPost(p); }
+    });
+    if (dmenu) meta.appendChild(dmenu);
 
     detailBody.appendChild(meta);
 
@@ -3513,28 +3509,77 @@
      매일 하는 일에 화면 이동이 하나 붙는다. */
   var PIN_MAX = 3;
 
-  function pinButton(p, after) {
-    var b = el("button", "footlink" + (p.pinned ? " pinned-on" : ""),
-      p.pinned ? "고정 해제" : "고정");
-    b.type = "button";
-    b.addEventListener("click", function (e) {
-      e.stopPropagation();
+  function togglePin(p, after) {
+    if (!p.pinned && POSTS.filter(function (x) { return x.pinned; }).length >= PIN_MAX) {
+      failed(new Error("고정은 " + PIN_MAX + "개까지입니다. 하나를 먼저 내리세요"));
+      return;
+    }
+    var was = !!p.pinned;
+    p.pinned = !was;
+    render();
+    if (after) after();
 
-      if (!p.pinned && POSTS.filter(function (x) { return x.pinned; }).length >= PIN_MAX) {
-        failed(new Error("고정은 " + PIN_MAX + "개까지입니다. 하나를 먼저 내리세요"));
-        return;
-      }
-
-      var was = !!p.pinned;
-      p.pinned = !was;
-      render();
-      if (after) after();
-
-      send("PUT", "/posts/" + p.id + "/pinned", { pinned: p.pinned })
-        .catch(function (err) { p.pinned = was; render(); if (after) after(); failed(err); });
-    });
-    return b;
+    send("PUT", "/posts/" + p.id + "/pinned", { pinned: p.pinned })
+      .catch(function (err) { p.pinned = was; render(); if (after) after(); failed(err); });
   }
+
+  /* 케밥 메뉴. 글마다 수정 · 고정 · 삭제를 늘어놓으면 조작 버튼이 본문보다
+     먼저 눈에 든다. 자주 하는 일이 아니므로 한 겹 접어 둔다.
+     onDelete 는 어디서 열었느냐에 따라 확인창 자리가 달라서 밖에서 넘긴다. */
+  function postMenu(p, opts) {
+    opts = opts || {};
+    var wrap = el("div", "kebab");
+
+    var btn = el("button", "kebab-btn");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "이 글 관리");
+    btn.setAttribute("aria-expanded", "false");
+    btn.textContent = "⋮";
+    wrap.appendChild(btn);
+
+    var menu = el("div", "pick-menu kebab-menu");
+    menu.hidden = true;
+
+    function item(label, danger, run) {
+      var b = el("button", danger ? "del" : null, label);
+      b.type = "button";
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        close();
+        run();
+      });
+      menu.appendChild(b);
+    }
+
+    function close() { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); }
+
+    if (p.mine) item("수정", false, function () { opts.onEdit(); });
+    if (can("delete")) item(p.pinned ? "고정 해제" : "상단 고정", false, function () { togglePin(p, opts.after); });
+    if (can("delete")) item("삭제", true, function () { opts.onDelete(); });
+
+    if (!menu.children.length) return null;
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = menu.hidden;
+      closeKebabs();
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+    });
+
+    wrap.appendChild(menu);
+    return wrap;
+  }
+
+  function closeKebabs() {
+    Array.prototype.forEach.call(document.querySelectorAll(".kebab-menu"), function (m) {
+      m.hidden = true;
+      var b = m.parentNode.querySelector(".kebab-btn");
+      if (b) b.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  document.addEventListener("click", closeKebabs);
 
   /* 삭제 확인은 어디서 눌렀든 같은 모양으로, 누른 자리 바로 아래에 뜬다.
      브라우저 confirm 은 쓰지 않는다. */

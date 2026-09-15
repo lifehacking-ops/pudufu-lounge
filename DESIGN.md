@@ -8,6 +8,22 @@ computed style 을 빈도순으로 집계했으므로, 선언된 의도가 아�
 
 ---
 
+## 0. 코드에서는
+
+이 토큰들은 `web/src/lounge.css` 의 `@theme` 에 Tailwind 이름으로 등록돼 있다.
+값은 거기 한 곳에만 있고, 기존 CSS 가 쓰는 짧은 이름(`var(--brand)`)은 별칭으로
+잇는다.
+
+| 여기 | 코드 | 유틸리티 |
+|---|---|---|
+| `--brand` | `--color-brand` | `bg-brand` `text-brand` |
+| `--slate` | `--color-slate` | `text-slate` |
+| 카드 반경 12px | `--radius-card` | `rounded-card` |
+| sm 그림자 | `--shadow-card` | `shadow-card` |
+| 컨테이너 1280px | `--container-page` | `max-w-page` |
+
+---
+
 ## 1. 컬러
 
 ### 브랜드

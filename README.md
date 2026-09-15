@@ -6,7 +6,8 @@
 | 파일 | 내용 |
 |---|---|
 | `lounge-web-prototype.html` | **프로토타입.** 커뮤니티 · 강의 목록 · 강의 상세 · 관리 4화면 |
-| `web/assets/lounge.css` | 스타일. **프로토타입과 앱이 같은 파일을 쓴다** |
+| `web/src/lounge.css` | 스타일 **원본**. Tailwind 토큰 + 컴포넌트 |
+| `web/assets/lounge.css` | 빌드 결과. **프로토타입과 앱이 같은 파일을 쓴다** |
 | `web/assets/lounge.js` | 화면과 동작. 〃 |
 | `web/assets/data-mock.js` | 예시 데이터. 앱에서는 서버가 같은 모양으로 채운다 |
 | `db/schema.sql` | 스키마. 라운지 12개 + 프드프 캐시 8개 |
@@ -33,8 +34,29 @@
 예시 데이터를 고쳤으면 시드를 다시 만든다.
 
 ```
-node db/make-seed.js > db/seed.sql
+npm run seed
 ```
+
+## 스타일 — Tailwind
+
+3.0 이 Tailwind 를 쓰므로 같은 어휘를 쓴다. `DESIGN.md` 의 토큰을 `@theme` 에
+등록해 두었으므로 `bg-brand` `text-slate` `rounded-card` `tablet:` `max-w-page`
+같은 유틸리티가 그대로 나온다.
+
+`.post` `.chip` `.seg` 처럼 **이름이 있는 컴포넌트는 클래스로 둔다.** 유틸리티로
+풀면 마크업만 지저분해진다. 레이아웃 미세조정과 새로 붙이는 것은 유틸리티로 쓴다.
+
+```
+npm install
+npm run css          한 번 빌드
+npm run css:watch    고칠 때마다
+```
+
+빌드 결과(`web/assets/lounge.css`)를 저장소에 같이 넣는다. 프로토타입이
+스테이징이라 **파일만 열면 돈다**를 지켜야 하기 때문이다. 빌드는 고치는
+사람만 돌린다. 3.0 도 번들러 없이 Tailwind 를 쓰므로 운용 방식이 같다.
+
+> 빌드한 뒤 화면이 그대로면 브라우저 캐시다. 강력 새로고침(`⌘⇧R`).
 
 ## 어디에 만드나
 

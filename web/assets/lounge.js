@@ -266,13 +266,13 @@
     // 과제는 주차마다 한 편이다. 덮어쓰기는 앞의 것을 지우고 새로 쓴다.
     send("POST", "/posts", {
       cat: "과제", wk: wk, title: name, body: "", mission: answers,
-      attach: attach || null, overwrite: !!(overwrite && exist)
+      attach: attach || [], overwrite: !!(overwrite && exist)
     }).then(function (r) {
       if (overwrite && exist) {
         exist.mission = answers;
         exist.when = "방금 수정함";
         exist.title = name;
-        if (attach) exist.attach = attach;
+        if (attach && attach.length) exist.attach = attach;
         if (r) exist.id = r.id;
       } else {
         POSTS.unshift({
@@ -282,7 +282,7 @@
           views: 1, mine: true,
           reactions: {}, myReact: null, thread: [],
           title: name, body: "", mission: answers,
-          attach: attach || undefined
+          attach: attach && attach.length ? attach : undefined
         });
       }
       render();
@@ -304,6 +304,9 @@
     // 댓글 수는 따로 들고 있지 않는다. 실제 댓글에서 센다.
     if (!p.thread) p.thread = [];
     delete p.comments;
+
+    // 첨부는 여러 장이 될 수 있다. 한 장짜리 예시 데이터도 배열로 맞춘다.
+    if (p.attach && !Array.isArray(p.attach)) p.attach = [p.attach];
 
     // "2시간 전" 같은 문자열만으로는 '어제 몇 건'을 셀 수 없다. 숫자로 바꿔 둔다.
     p.daysAgo = parseDays(p.when);
@@ -634,7 +637,11 @@
     main.appendChild(foot);
 
     row.appendChild(main);
-    if (p.attach) row.appendChild(el("div", "sr-shot", p.attach.type === "youtube" ? "영상 첨부" : "첨부 자료"));
+    if (p.attach && p.attach.length) {
+      row.appendChild(el("div", "sr-shot",
+        p.attach[0].type === "youtube" ? "영상 첨부"
+          : p.attach.length > 1 ? "첨부 " + p.attach.length + "개" : "첨부 자료"));
+    }
     return row;
   }
 
@@ -872,7 +879,7 @@
     ta.value = "";
     autoGrow(ta);
     if (missionForm) missionForm.clear();
-    draft.attach = null;
+    draft.attach = [];
     paintAttach();
     draft.cat = DEFAULT_CAT;
     draft.wk = CURRENT_WK;
@@ -890,17 +897,26 @@
 
   var fileInput = $("fileInput"), fileBtn = $("fileBtn"), attachNow = $("attachNow");
 
+  var ATTACH_MAX = 10;
+
   function paintAttach() {
     attachNow.textContent = "";
-    attachNow.hidden = !draft.attach;
-    if (!draft.attach) return;
+    attachNow.hidden = !draft.attach.length;
 
-    attachNow.appendChild(el("b", null, draft.attach.name || "첨부"));
-    var x = el("button", null, "×");
-    x.type = "button";
-    x.setAttribute("aria-label", "첨부 떼기");
-    x.addEventListener("click", function () { draft.attach = null; paintAttach(); updatePostBtn(); });
-    attachNow.appendChild(x);
+    draft.attach.forEach(function (a, i) {
+      var chip = el("span", "att-chip");
+      chip.appendChild(el("b", null, a.name || "첨부"));
+      var x = el("button", null, "×");
+      x.type = "button";
+      x.setAttribute("aria-label", (a.name || "첨부") + " 떼기");
+      x.addEventListener("click", function () {
+        draft.attach.splice(i, 1);
+        paintAttach();
+        updatePostBtn();
+      });
+      chip.appendChild(x);
+      attachNow.appendChild(chip);
+    });
   }
 
   if (fileBtn) fileBtn.addEventListener("click", function () { fileInput.click(); });
@@ -924,13 +940,34 @@
   }
 
   if (fileInput) fileInput.addEventListener("change", function () {
-    var f = fileInput.files && fileInput.files[0];
+    var files = [].slice.call(fileInput.files || []);
     fileInput.value = "";
-    if (!f) return;
+    if (!files.length) return;
 
-    uploadFile(f, function (p) { draft.attach = p; paintAttach(); })
-      .then(function (a) { draft.attach = a; paintAttach(); })
-      .catch(function (err) { draft.attach = null; paintAttach(); failed(err); });
+    var room = ATTACH_MAX - draft.attach.length;
+    if (room <= 0) { failed(new Error("사진은 " + ATTACH_MAX + "장까지 붙일 수 있습니다")); return; }
+    if (files.length > room) { files = files.slice(0, room); }
+
+    /* 고른 자리를 먼저 잡아 두고 올라온 것으로 바꾼다. 그래야 여러 장을
+       같이 올릴 때 순서가 엎치락뒤치락하지 않는다. */
+    files.forEach(function (f) {
+      var slot = { name: f.name, uploading: true };
+      draft.attach.push(slot);
+      paintAttach();
+
+      uploadFile(f)
+        .then(function (a) {
+          var i = draft.attach.indexOf(slot);
+          if (i > -1) draft.attach[i] = a;
+          paintAttach();
+        })
+        .catch(function (err) {
+          var i = draft.attach.indexOf(slot);
+          if (i > -1) draft.attach.splice(i, 1);
+          paintAttach();
+          failed(err);
+        });
+    });
   });
 
   /* 글쓰기 상태. 주차는 사용자가 고르는 값이 아니라 맥락이 정하는 값이다.
@@ -944,7 +981,7 @@
     return open[0] || writableCats()[0] || DEFAULT_CAT;
   }
 
-  var draft = { cat: DEFAULT_CAT, wk: CURRENT_WK };
+  var draft = { cat: DEFAULT_CAT, wk: CURRENT_WK, attach: [] };
 
   function syncComposer() { paintCat(); syncWkLine(); syncGate(); syncMission(); }
 
@@ -1174,12 +1211,13 @@
       mission: answers
     };
 
-    // 서버가 받아 준 뒤에 화면에 올린다. 권한과 피드백권은 서버가 다시 본다.
-    if (draft.attach) post.attach = draft.attach;
+    // 올라가는 중인 것은 주소가 없다. 다 올라온 것만 붙인다.
+    var ready = draft.attach.filter(function (a) { return !a.uploading; });
+    if (ready.length) post.attach = ready;
 
     send("POST", "/posts", {
       cat: post.cat, wk: post.wk || null, title: post.title,
-      body: post.body, mission: answers, attach: draft.attach || null
+      body: post.body, mission: answers, attach: ready
     }).then(function (r) {
       if (r) post.id = r.id;
       POSTS.unshift(post);
@@ -1190,7 +1228,7 @@
       wTitle.value = "";
       ta.value = "";
       autoGrow(ta);
-      draft.attach = null;
+      draft.attach = [];
       paintAttach();
       if (missionForm) missionForm.clear();
       draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
@@ -1392,7 +1430,166 @@
     return String(url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
   }
 
-  function attachment(a, compact) {
+  /* 사진이 여러 장이면 세로로 쌓지 않고 옆으로 넘긴다. 세로로 쌓으면
+     사진 넉 장짜리 글 하나가 피드 한 화면을 다 먹는다. */
+  function attachments(list, compact) {
+    var all = [].concat(list || []).filter(Boolean);
+    if (!all.length) return null;
+
+    /* 피드에서는 첫 장만 보여 준다. 목록은 훑는 자리고, 다 보려면 글로 들어온다.
+       몇 장인지만 숫자로 알린다. */
+    if (compact) {
+      var one = attachment(all[0], true, all);
+      if (one && all.length > 1) {
+        one.appendChild(el("span", "shot-n", all.length + "장"));
+        one.classList.add("att-many");
+      }
+      return one;
+    }
+
+    if (all.length === 1) return attachment(all[0], compact, all);
+
+    var strip = el("div", "shots");
+    all.forEach(function (a) {
+      var cell = el("div", "shot");
+      var box = attachment(a, compact, all);
+      if (box) cell.appendChild(box);
+      strip.appendChild(cell);
+    });
+
+    var wrap = el("div", "shotwrap");
+    wrap.appendChild(strip);
+
+    // 화살표는 넘길 데가 있을 때만 쓴다. 없는데 떠 있으면 눌러 보게 된다.
+    ["prev", "next"].forEach(function (dir) {
+      var b = el("button", "shot-nav shot-" + dir);
+      b.type = "button";
+      b.setAttribute("aria-label", dir === "prev" ? "이전" : "다음");
+      b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
+        (dir === "prev" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7") + '"/></svg>';
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        strip.scrollBy({ left: (dir === "prev" ? -1 : 1) * strip.clientWidth * 0.8, behavior: "smooth" });
+      });
+      wrap.appendChild(b);
+    });
+
+    function paintNav() {
+      var room = strip.scrollWidth - strip.clientWidth;
+      wrap.querySelector(".shot-prev").hidden = strip.scrollLeft <= 4;
+      wrap.querySelector(".shot-next").hidden = strip.scrollLeft >= room - 4;
+    }
+    strip.addEventListener("scroll", paintNav);
+    setTimeout(paintNav, 0);
+
+    wrap.appendChild(el("span", "shot-n", all.length + "개"));
+    return wrap;
+  }
+
+  /* 사진·영상은 눌러서 크게 본다. 다만 피드에서는 아니다 — 208px 짜리 칸에서
+     재생해 봐야 보이지 않는다. 목록에서 누르면 글로 들어가고, 재생은 글 안에서 한다.
+     단추로 감싸면 글을 여는 클릭과 부딪히지 않는다 — 본문 클릭은 button 을 건너뛴다. */
+  function zoom(inner, a, siblings, compact) {
+    if (compact) return inner;   // 피드에서는 그냥 그림이다. 누르면 글이 열린다.
+
+    var b = el("button", "att-zoom");
+    b.type = "button";
+    b.setAttribute("aria-label", (a.label || a.title || "첨부") + " 크게 보기");
+    b.appendChild(inner);
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var list = ([].concat(siblings || [a])).filter(function (x) {
+        return x && (x.type === "image" || x.type === "video") && x.url;
+      });
+      if (!list.length) return;
+      openViewer(list, Math.max(0, list.indexOf(a)));
+    });
+    return b;
+  }
+
+  /* ---- 확대 뷰어 ----
+     사진과 영상을 같은 자리에서 본다. 좌우로 넘기고, ESC 나 바깥을 누르면 닫힌다. */
+  var viewer = null, viewerList = [], viewerAt = 0;
+
+  function buildViewer() {
+    var v = el("div", "viewer");
+    v.hidden = true;
+
+    var stage = el("div", "viewer-stage");
+    v.appendChild(stage);
+
+    var close = el("button", "viewer-x", "×");
+    close.type = "button";
+    close.setAttribute("aria-label", "닫기");
+    close.addEventListener("click", closeViewer);
+    v.appendChild(close);
+
+    var count = el("span", "viewer-n");
+    v.appendChild(count);
+
+    ["prev", "next"].forEach(function (dir) {
+      var b = el("button", "viewer-nav viewer-" + dir);
+      b.type = "button";
+      b.setAttribute("aria-label", dir === "prev" ? "이전" : "다음");
+      b.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
+        (dir === "prev" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7") + '"/></svg>';
+      b.addEventListener("click", function () { step(dir === "prev" ? -1 : 1); });
+      v.appendChild(b);
+    });
+
+    v.addEventListener("click", function (e) { if (e.target === v || e.target === stage) closeViewer(); });
+
+    document.body.appendChild(v);
+    return { el: v, stage: stage, count: count };
+  }
+
+  function paintViewer() {
+    var a = viewerList[viewerAt];
+    viewer.stage.textContent = "";
+
+    if (a.type === "video") {
+      var vd = document.createElement("video");
+      vd.src = a.url;
+      vd.controls = true;
+      vd.autoplay = true;
+      vd.playsInline = true;
+      viewer.stage.appendChild(vd);
+    } else {
+      var im = document.createElement("img");
+      im.src = a.url;
+      im.alt = a.label || a.title || "첨부";
+      viewer.stage.appendChild(im);
+    }
+
+    viewer.count.textContent = viewerList.length > 1 ? (viewerAt + 1) + " / " + viewerList.length : "";
+    viewer.el.querySelector(".viewer-prev").hidden = viewerList.length < 2;
+    viewer.el.querySelector(".viewer-next").hidden = viewerList.length < 2;
+  }
+
+  function step(d) {
+    viewerAt = (viewerAt + d + viewerList.length) % viewerList.length;
+    paintViewer();
+  }
+
+  function openViewer(list, at) {
+    if (!viewer) viewer = buildViewer();
+    viewerList = list;
+    viewerAt = at || 0;
+    paintViewer();
+    viewer.el.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeViewer() {
+    if (!viewer || viewer.el.hidden) return;
+    viewer.stage.textContent = "";   // 영상이 남아서 소리를 내지 않게
+    viewer.el.hidden = true;
+    document.body.style.overflow = postModal && !postModal.hidden ? "hidden" : "";
+  }
+
+  function viewerOpen() { return !!(viewer && !viewer.el.hidden); }
+
+  function attachment(a, compact, siblings) {
     if (!a) return null;
 
     var box = el("div", "att" + (compact ? " att-compact" : ""));
@@ -1405,13 +1602,30 @@
         real.src = a.url;
         real.alt = a.label || a.title || "첨부 이미지";
         real.loading = "lazy";
-        box.appendChild(real);
+        box.appendChild(zoom(real, a, siblings, compact));
         return box;
       }
       var img = el("div", "att-img");
       img.appendChild(el("span", null, "이미지 첨부 자리"));
       if (a.label) img.appendChild(el("span", null, a.label));
       box.appendChild(img);
+      return box;
+    }
+
+    /* 올린 영상은 사진과 같은 자리에 같은 크기로 선다. 목록에서는 첫 프레임만
+       세워 두고, 재생은 뷰어에서 한다 — 피드에서 네 개가 동시에 돌면 안 된다. */
+    if (a.type === "video") {
+      var v = document.createElement("video");
+      v.className = "att-real";
+      v.src = a.url;
+      v.preload = "metadata";
+      v.muted = true;
+      v.playsInline = true;
+
+      var hold = el("div", "att-vid");
+      hold.appendChild(v);
+      hold.appendChild(el("span", "att-play", "▶"));
+      box.appendChild(zoom(hold, a, siblings, compact));
       return box;
     }
 
@@ -1494,6 +1708,26 @@
     return wrap;
   }
 
+  /* 본문은 두 줄만 보이고 나머지는 접는다. 접힌 줄이 있을 때만 '더보기' 를 단다 —
+     짧은 글에까지 붙으면 누를 것이 없는 단추가 된다. 몇 줄이 접혔는지는
+     그려 봐야 알기 때문에, 단추는 일단 숨겨 두고 render 끝에서 한 번에 잰다. */
+  function bodyBlock(body) {
+    var box = el("div", "post-xw");
+    var x = el("p", "post-x clamp2", body);
+
+    var more = el("button", "morelink", "더보기");
+    more.type = "button";
+    more.hidden = true;
+    more.addEventListener("click", function () {
+      var folded = x.classList.toggle("clamp2");
+      more.textContent = folded ? "더보기" : "접기";
+    });
+
+    box.appendChild(x);
+    box.appendChild(more);
+    return box;
+  }
+
   function render() {
     var rows = POSTS.filter(function (p) {
       if (state.cat !== "전체" && p.cat !== state.cat) return false;
@@ -1564,7 +1798,7 @@
       h.appendChild(titleBtn);
       text.appendChild(h);
 
-      if (p.body) text.appendChild(el("p", "post-x clamp2", p.body));
+      if (p.body) text.appendChild(bodyBlock(p.body));
       if (p.mission) text.appendChild(missionAnswers(p.mission));
       body.appendChild(text);
 
@@ -1573,7 +1807,7 @@
         if (e.target.closest("button, a")) return;
         openPost(p);
       });
-      var att = attachment(p.attach, true);
+      var att = attachments(p.attach, true);
       if (att) body.appendChild(att);
       card.appendChild(body);
 
@@ -1590,6 +1824,14 @@
 
       feed.appendChild(card);
     });
+
+    /* 접힌 줄이 실제로 있는지는 그려 봐야 안다. 다 그린 뒤 한 번에 잰다.
+       화면이 숨어 있으면 높이가 0 이라 잴 수 없으니 그때는 건드리지 않는다. */
+    if (feed.clientHeight) {
+      [].forEach.call(feed.querySelectorAll(".post-x"), function (x) {
+        if (x.nextSibling) x.nextSibling.hidden = x.scrollHeight <= x.clientHeight + 1;
+      });
+    }
   }
 
   render();
@@ -1606,6 +1848,7 @@
     /* 숨기기만 하면 유튜브 재생기가 그대로 남아 소리가 계속 난다.
        보이지 않는 곳에서 나는 소리는 끌 방법도 없다. 재생기를 먼저 걷는다. */
     [].forEach.call(postModal.querySelectorAll("iframe"), function (f) { f.remove(); });
+    [].forEach.call(postModal.querySelectorAll("video"), function (v) { v.pause(); });
     postModal.hidden = true;
     openRef = null;
     document.body.style.overflow = "";
@@ -1650,7 +1893,7 @@
     detailBody.appendChild(el("h2", "detail-title", p.title));
     if (p.body) detailBody.appendChild(el("p", "detail-text", p.body));
     if (p.mission) detailBody.appendChild(missionAnswers(p.mission, true));
-    var detailAtt = attachment(p.attach, false);
+    var detailAtt = attachments(p.attach, false);
     if (detailAtt) detailBody.appendChild(detailAtt);
     detailBody.appendChild(reactionBar(p));
 
@@ -1960,8 +2203,25 @@
   });
 
   document.addEventListener("keydown", function (e) {
+    /* 뷰어가 열려 있으면 뷰어가 먼저다. 확대해서 보다가 ESC 를 눌렀는데
+       글까지 닫히면 보던 자리를 잃는다. */
+    if (viewerOpen()) {
+      if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowLeft") step(-1);
+      if (e.key === "ArrowRight") step(1);
+      return;
+    }
     if (e.key === "Escape" && !postModal.hidden) closePost();
   });
+
+  /* ?p=<id> 로 들어오면 그 글을 바로 편다. 케밥의 '링크 복사' 가 만드는 주소다.
+     필터에 걸려 피드에 없더라도 연다 — 받은 사람은 그 글을 보러 온 것이다. */
+  (function openFromUrl() {
+    var want = (location.search.match(/[?&]p=(\d+)/) || [])[1];
+    if (!want) return;
+    var hit = POSTS.filter(function (p) { return String(p.id) === want; })[0];
+    if (hit) openPost(hit);
+  })();
 
   /* ================= 리더보드 ================= */
 
@@ -2349,12 +2609,14 @@
     // 이미 제출했다면 그때 쓴 답변을 그대로 불러온다
     if (posted) form.fill(posted.mission.map(function (a) { return a.a; }));
 
-    /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많다. */
-    var cmAttach = null;
+    /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많고,
+       전후 비교처럼 두 장이 있어야 말이 되는 것도 있다. */
+    var cmAttach = [];
     var cmFile = document.createElement("input");
     cmFile.type = "file";
     cmFile.hidden = true;
-    cmFile.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf";
+    cmFile.multiple = true;
+    cmFile.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime";
 
     var cmRow = el("div", "row cm-attach");
     var cmBtn = el("button", "fadd-btn", "+ 파일 첨부");
@@ -2365,31 +2627,40 @@
 
     function paintCm() {
       cmNow.textContent = "";
-      cmNow.hidden = !cmAttach;
-      cmBtn.hidden = !!cmAttach;
-      if (!cmAttach) return;
-      cmNow.appendChild(el("b", null, cmAttach.name || "첨부"));
-      var x = el("button", null, "×");
-      x.type = "button";
-      x.setAttribute("aria-label", "첨부 떼기");
-      x.addEventListener("click", function () { cmAttach = null; paintCm(); });
-      cmNow.appendChild(x);
+      cmNow.hidden = !cmAttach.length;
+      cmBtn.hidden = cmAttach.length >= ATTACH_MAX;
+
+      cmAttach.forEach(function (a, i) {
+        var chip = el("span", "att-chip");
+        chip.appendChild(el("b", null, a.name || "첨부"));
+        var x = el("button", null, "×");
+        x.type = "button";
+        x.setAttribute("aria-label", (a.name || "첨부") + " 떼기");
+        x.addEventListener("click", function () { cmAttach.splice(i, 1); paintCm(); });
+        chip.appendChild(x);
+        cmNow.appendChild(chip);
+      });
     }
 
     cmFile.addEventListener("change", function () {
-      var f = cmFile.files && cmFile.files[0];
+      var files = [].slice.call(cmFile.files || []).slice(0, ATTACH_MAX - cmAttach.length);
       cmFile.value = "";
-      if (!f) return;
-      uploadFile(f, function (p) { cmAttach = p; paintCm(); })
-        .then(function (a) { cmAttach = a; paintCm(); })
-        .catch(function (err) { cmAttach = null; paintCm(); failed(err); });
+
+      files.forEach(function (f) {
+        var slot = { name: f.name, uploading: true };
+        cmAttach.push(slot);
+        paintCm();
+        uploadFile(f)
+          .then(function (a) { var i = cmAttach.indexOf(slot); if (i > -1) cmAttach[i] = a; paintCm(); })
+          .catch(function (err) { var i = cmAttach.indexOf(slot); if (i > -1) cmAttach.splice(i, 1); paintCm(); failed(err); });
+      });
     });
 
     cmRow.appendChild(cmFile);
     cmRow.appendChild(cmBtn);
     cmRow.appendChild(cmNow);
     // 이미 낸 과제에 붙어 있던 파일은 그대로 이어 받는다
-    if (posted && posted.attach) { cmAttach = posted.attach; paintCm(); }
+    if (posted && posted.attach) { cmAttach = posted.attach.slice(); paintCm(); }
 
     var confirmBox = el("div", "gate cm-confirm");
     confirmBox.hidden = true;
@@ -2451,7 +2722,7 @@
   var ADM_TABS = [
     { key: "dash",    label: "대시보드",   need: "dashboard" },
     { key: "course",  label: "강의 게시",   need: "manage" },
-    { key: "roles",   label: "권한 관리",   need: "manage" },
+    { key: "roles",   label: "수강생 관리",   need: "manage" },
     { key: "filters", label: "필터 관리",   need: "manage" },
     { key: "posts",   label: "게시물 관리", need: "manage" }
   ];
@@ -3051,6 +3322,24 @@
     rail.appendChild(yesterdayCats());
   }
 
+  /* 대시보드에서 글로 건너뛴다. 모달을 닫았을 때 뒤에 전체 목록이 깔려 있으면
+     방금 본 글이 어디에 서 있었는지 알 수 없다. 그 글이 선 자리로 데려다 놓는다. */
+  function jumpTo(p) {
+    var L = lounge();
+    var inShow = L.show.indexOf(p.cat) > -1, inMore = L.more.indexOf(p.cat) > -1;
+
+    // 이 라운지에 없는 칩이면 누를 칩도 없다. 그때만 전체로 둔다.
+    state.cat = inShow || inMore ? p.cat : "전체";
+    if (inMore) moreOpen = true;
+    state.mine = false;     // 켜져 있으면 건너뛴 글이 도리어 걸러진다
+    state.liked = false;
+
+    renderFilters();
+    show("community");   // 그리기 전에 띄운다 — 숨은 화면은 높이를 잴 수 없다
+    render();
+    openPost(p);
+  }
+
   /* 피드백권으로 온 요청은 따로 세운다. 과제 답글은 선의지만 이건 약속이다.
      답이 안 가면 수강생 입장에서는 권만 없어진 셈이 된다. */
   function feedbackCard(fb) {
@@ -3069,7 +3358,7 @@
       b.appendChild(el("span", "badge " + (p.daysAgo >= 3 ? "b-late" : "b-none"), wait));
       b.appendChild(el("span", "qrow-t", p.title));
       b.appendChild(el("span", "qrow-m", p.author));
-      b.addEventListener("click", function () { show("community"); openPost(p); });
+      b.addEventListener("click", function () { jumpTo(p); });
       c.appendChild(b);
     });
     return c;
@@ -3094,7 +3383,7 @@
       b.appendChild(el("span", "ava ava-24", initial(p.author)));
       b.appendChild(el("span", "qrow-t", p.title));
       b.appendChild(el("span", "qrow-m", p.when));
-      b.addEventListener("click", function () { show("community"); openPost(p); });
+      b.addEventListener("click", function () { jumpTo(p); });
       return b;
     }), "밀린 글이 없습니다");
 
@@ -3650,7 +3939,7 @@
 
     var row = el("div", "row");
     row.style.marginTop = "10px";
-    row.appendChild(el("span", "sec-note", "새 카테고리는 모든 역할이 쓸 수 있게 시작합니다. 권한 관리에서 좁힐 수 있습니다."));
+    row.appendChild(el("span", "sec-note", "새 카테고리는 모든 역할이 쓸 수 있게 시작합니다. 수강생 관리에서 좁힐 수 있습니다."));
     row.appendChild(el("span", "grow"));
 
     var cancel = el("button", "btn-sec", "취소");
@@ -3767,6 +4056,28 @@
   /* 케밥 메뉴. 글마다 수정 · 고정 · 삭제를 늘어놓으면 조작 버튼이 본문보다
      먼저 눈에 든다. 자주 하는 일이 아니므로 한 겹 접어 둔다.
      onDelete 는 어디서 열었느냐에 따라 확인창 자리가 달라서 밖에서 넘긴다. */
+  function postLink(p) {
+    return location.origin + location.pathname + "?p=" + p.id;
+  }
+
+  function copyLink(p, near) {
+    var url = postLink(p);
+
+    function told(text) {
+      var tip = el("span", "copied", text);
+      (near.parentNode || document.body).appendChild(tip);
+      setTimeout(function () { tip.remove(); }, 1600);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(function () { told("링크를 복사했습니다"); })
+        .catch(function () { told(url); });
+      return;
+    }
+    told(url);   // 복사를 막는 브라우저에서는 주소를 보여 주고 직접 집게 한다
+  }
+
   function postMenu(p, opts) {
     opts = opts || {};
     var wrap = el("div", "kebab");
@@ -3793,6 +4104,10 @@
     }
 
     function close() { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); }
+
+    /* 남에게 글 하나를 건네려면 주소가 있어야 한다. 카톡으로 보내는 일이
+       실제로 가장 잦다. 눌러 본 자리에서 바로 복사되게 둔다. */
+    if (p.id) item("링크 복사", false, function () { copyLink(p, btn); });
 
     if (p.mine) item("수정", false, function () { opts.onEdit(); });
 

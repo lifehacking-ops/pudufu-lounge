@@ -142,8 +142,8 @@ async function loungeData(loungeId, viewerId) {
     if (p.reactions) out.reactions = p.reactions;
     if (p.answers) out.mission = p.answers.map((a) => ({ q: a.q, a: a.a }));
     if (p.attach) {
-      out.attach = { type: p.attach.kind, url: p.attach.url || null,
-                     title: p.attach.label, label: p.attach.label };
+      out.attach = p.attach.map((a) => ({ type: a.kind, url: a.url || null,
+                                          title: a.label, label: a.label }));
     }
     return out;
   });

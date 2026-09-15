@@ -7,6 +7,8 @@
 const { rows, one, pool } = require("./db");
 const account = require("./account");
 
+const ATTACH_MAX = 10;   // 한 글에 붙일 수 있는 사진 장수
+
 class Denied extends Error {
   constructor(msg) { super(msg); this.code = 403; }
 }
@@ -103,11 +105,15 @@ async function createPost(loungeId, userId, input) {
         [id, i + 1, a.q, a.a]);
     }
 
-    if (input.attach) {
-      const a = input.attach;
-      await client.query(
-        `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
-        [id, a.type, a.url || "", a.title || a.label || null]);
+    /* 사진은 여러 장 붙는다. 한 장만 받으면 '전후 비교' 같은 글을 쓸 수 없다.
+       링크·영상 카드는 성질상 하나다 — 본문에서 처음 나온 주소 하나만 편다. */
+    const files = [].concat(input.attach || []).filter(Boolean).slice(0, ATTACH_MAX);
+    if (files.length) {
+      for (const [i, a] of files.entries()) {
+        await client.query(
+          `INSERT INTO attachment (post_id, kind, url, label, sort) VALUES ($1, $2, $3, $4, $5)`,
+          [id, a.type, a.url || "", a.title || a.label || null, i]);
+      }
     } else {
       /* 첨부를 따로 고르지 않았어도 주소가 있으면 카드로 만든다.
          사람은 링크를 '첨부'한다고 생각하지 않고 그냥 붙여넣는다.

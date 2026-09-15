@@ -32,9 +32,14 @@ function creds() {
 
 const OK_TYPES = {
   "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif",
-  "image/webp": "webp", "application/pdf": "pdf"
+  "image/webp": "webp", "application/pdf": "pdf",
+  // 과제로 내는 영상. 브라우저가 코덱 없이 바로 트는 것만 받는다.
+  "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov"
 };
-const MAX = 10 * 1024 * 1024;
+
+/* 영상은 사진과 자릿수가 다르다. 1분짜리 화면 녹화가 이미 10MB 를 넘는다. */
+const MAX_IMAGE = 10 * 1024 * 1024;
+const MAX_VIDEO = 200 * 1024 * 1024;
 
 /* 브라우저가 바로 올릴 수 있는 주소를 만든다. 한 번 쓰고 마는 주소다. */
 async function signUpload(userId, mime, size) {
@@ -43,8 +48,13 @@ async function signUpload(userId, mime, size) {
     throw Object.assign(new Error("파일 보관소가 아직 연결되지 않았습니다"), { code: 503 });
   }
   const ext = OK_TYPES[mime];
-  if (!ext) throw Object.assign(new Error("이미지와 PDF 만 올릴 수 있습니다"), { code: 403 });
-  if (size > MAX) throw Object.assign(new Error("10MB 까지 올릴 수 있습니다"), { code: 403 });
+  if (!ext) throw Object.assign(new Error("이미지 · 영상 · PDF 만 올릴 수 있습니다"), { code: 403 });
+
+  const video = mime.startsWith("video/");
+  const cap = video ? MAX_VIDEO : MAX_IMAGE;
+  if (size > cap) {
+    throw Object.assign(new Error((video ? "영상은 200MB" : "10MB") + " 까지 올릴 수 있습니다"), { code: 403 });
+  }
 
   const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const path = `${userId}/${name}`;
@@ -61,7 +71,7 @@ async function signUpload(userId, mime, size) {
     uploadUrl: c.base + "/storage/v1" + j.url,
     path: path,
     url: `${c.base}/storage/v1/object/public/${BUCKET}/${path}`,
-    kind: mime === "application/pdf" ? "link" : "image"
+    kind: mime === "application/pdf" ? "link" : video ? "video" : "image"
   };
 }
 

@@ -55,8 +55,9 @@ const posts = (loungeId, viewerId) =>
                    GROUP BY r.emoji) e) AS reactions,
                (SELECT json_agg(json_build_object('seq', a.seq, 'q', a.question, 'a', a.answer) ORDER BY a.seq)
                   FROM post_answer a WHERE a.post_id = p.id) AS answers,
-               (SELECT json_build_object('kind', t.kind, 'url', t.url, 'label', t.label)
-                  FROM attachment t WHERE t.post_id = p.id ORDER BY t.sort LIMIT 1) AS attach,
+               (SELECT json_agg(json_build_object('kind', t.kind, 'url', t.url, 'label', t.label)
+                                 ORDER BY t.sort)
+                  FROM attachment t WHERE t.post_id = p.id) AS attach,
                (SELECT count(*)::int FROM post_report pr WHERE pr.post_id = p.id) AS reports,
                EXISTS (SELECT 1 FROM post_report pr WHERE pr.post_id = p.id AND pr.user_id = $2) AS reported
           FROM post p JOIN category c ON c.id = p.category_id

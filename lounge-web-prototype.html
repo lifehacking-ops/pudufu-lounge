@@ -109,8 +109,8 @@
             <div class="attach-row">
               <!-- 링크 · 유튜브는 버튼을 두지 않는다. 본문에 붙여넣으면 서버가
                    알아서 카드로 만든다 — 사람은 링크를 '첨부'한다고 생각하지 않는다. -->
-              <input type="file" id="fileInput" hidden
-                     accept="image/png,image/jpeg,image/gif,image/webp,application/pdf">
+              <input type="file" id="fileInput" hidden multiple
+                     accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime">
               <button type="button" class="attach-btn" id="fileBtn" title="파일 첨부" aria-label="파일 첨부">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>
               </button>
@@ -503,7 +503,7 @@
           <tr><td>3</td><td>낸 과제에 답이 없어도 아무도 모름</td><td>&lsquo;답이 안 달린 과제&rsquo;. 행을 누르면 그 글로 바로 간다</td></tr>
           <tr><td>4</td><td>조용해진 사람을 놓침</td><td>&lsquo;7일 이상 조용한 사람&rsquo; + &lsquo;이번 주 과제를 안 낸 사람&rsquo; 명단</td></tr>
           <tr><td>5</td><td>어제 무슨 일이 있었는지 세어볼 수 없음</td><td>&lsquo;어제 올라온 글&rsquo; 카테고리별 건수. <b>9장 카톡 요약과 같은 출처</b>라 그대로 이어진다</td></tr>
-          <tr><td>6</td><td>공지를 아무나 씀</td><td>권한 관리의 카테고리 &times; 역할 표. 끄면 그 역할의 글쓰기 창에서 즉시 사라진다</td></tr>
+          <tr><td>6</td><td>공지를 아무나 씀</td><td>수강생 관리의 카테고리 &times; 역할 표. 끄면 그 역할의 글쓰기 창에서 즉시 사라진다</td></tr>
           <tr><td>7</td><td>라운지마다 다른 필터를 둘 수 없음</td><td>필터 관리에서 기본 노출 / 더보기 / 미사용 세 칸으로 옮긴다. 기본 노출은 7개까지만</td></tr>
           <tr><td>8</td><td>게시물 삭제 수단이 없음</td><td>피드 카드 &middot; 글 상세 &middot; 게시물 관리 세 곳의 <code>삭제</code>. 브라우저 팝업 대신 누른 자리 아래에서 확인받는다</td></tr>
           <tr><td>9</td><td>댓글은 한번 묻히면 못 찾음</td><td>검색에 <b>댓글 탭</b>. 찾은 댓글을 누르면 원글이 열리고 그 댓글 자리로 내려가 잠깐 표시된다</td></tr>
@@ -552,7 +552,7 @@
     </div>
 
     <div class="note">
-      <b>멤버 정보는 프드프 계정에서 온다</b> 라운지는 회원 정보를 따로 갖지 않고 계정을 그대로 따릅니다. 그래서 권한 관리 표에서 <b>고칠 수 있는 것은 역할 하나뿐</b>입니다.
+      <b>멤버 정보는 프드프 계정에서 온다</b> 라운지는 회원 정보를 따로 갖지 않고 계정을 그대로 따릅니다. 그래서 수강생 관리 표에서 <b>고칠 수 있는 것은 역할 하나뿐</b>입니다.
       <ul>
         <li><b>닉네임</b> &mdash; 프드프 계정의 닉네임. 라운지에서 바꾸지 않습니다.</li>
         <li><b>기수</b> &mdash; <b>강의 구매 데이터</b>가 정합니다. 같은 강의를 언제 샀는지로 갈립니다. 옆의 &lsquo;가입&rsquo; 열이 그 근거를 보여줍니다.</li>
@@ -564,7 +564,7 @@
       <b>권한은 계정이 아니라 라운지에 붙는다</b> 학원마케팅 라운지의 관리자가 옆의 올인원 AI 라운지를 만질 수 있으면 안 됩니다. 그래서 역할은 <b>&lsquo;어느 라운지의 관리자인가&rsquo;</b>까지가 한 벌입니다.
       <ul>
         <li>관리 탭은 <b>지금 보고 있는 라운지를 맡은 사람</b>에게만 열립니다. 역할이 관리자라도 담당이 아니면 탭 자체가 없습니다.</li>
-        <li>권한 관리 표의 <b>담당 라운지</b> 열이 그 범위입니다. 여기서 역할을 올리면 <b>이 라운지에 대해서만</b> 올라갑니다.</li>
+        <li>수강생 관리 표의 <b>담당 라운지</b> 열이 그 범위입니다. 여기서 역할을 올리면 <b>이 라운지에 대해서만</b> 올라갑니다.</li>
         <li>필터 관리도 이 라운지 하나만 만집니다. 다른 강의의 필터는 그 라운지 담당자 몫입니다.</li>
       </ul>
     </div>
@@ -583,9 +583,9 @@
       <ul>
         <li><b>수강생</b> &mdash; 관리 탭 없음. 글쓰기 창에 공지 &middot; 챌린지 없음</li>
         <li><b>강사</b> &mdash; 관리 탭에 대시보드 한 장. 공지 &middot; 챌린지를 쓸 수 있음</li>
-        <li><b>관리자</b> &mdash; 대시보드 &middot; 권한 관리 &middot; 필터 관리 &middot; 게시물 관리 네 탭. 피드에서 바로 남의 글을 지울 수 있음</li>
+        <li><b>관리자</b> &mdash; 대시보드 &middot; 수강생 관리 &middot; 필터 관리 &middot; 게시물 관리 네 탭. 피드에서 바로 남의 글을 지울 수 있음</li>
       </ul>
-      강사 &middot; 관리자로 바꾸면 <b>지금 보고 있는 라운지</b>의 담당이 됩니다. 라운지 전환 토글은 아직 표시만 하는 상태라, &lsquo;다른 라운지로 넘어가면 관리 탭이 사라지는&rsquo; 쪽은 화면에서 확인할 수 없습니다. 규칙은 권한 관리 표의 담당 라운지 열에서 봅니다.
+      강사 &middot; 관리자로 바꾸면 <b>지금 보고 있는 라운지</b>의 담당이 됩니다. 라운지 전환 토글은 아직 표시만 하는 상태라, &lsquo;다른 라운지로 넘어가면 관리 탭이 사라지는&rsquo; 쪽은 화면에서 확인할 수 없습니다. 규칙은 수강생 관리 표의 담당 라운지 열에서 봅니다.
     </div>
 
     <h3>P1 항목이 화면 어디에 놓였는가</h3>
@@ -602,7 +602,7 @@
           <tr><td>7</td><td>라운지 간 이동 토글</td><td>상단바 라운지명 옆 토글</td></tr>
           <tr><td>8</td><td>통합 검색</td><td>상단바 중앙 검색. 글 · <b>댓글</b> · 강의 · 교안 · 멤버가 한 결과에</td></tr>
           <tr data-new="true"><td>—</td><td>운영 대시보드</td><td>관리 탭 &rsaquo; 대시보드. 오늘 챙길 사람 명단 · 주차별 이탈 퍼널 · 어제 요약 (해당 라운지 담당 강사 · 관리자)</td></tr>
-          <tr data-new="true"><td>—</td><td>카테고리 권한</td><td>관리 탭 &rsaquo; 권한 관리. 라운지 단위 역할 변경 + 카테고리 &times; 역할 표</td></tr>
+          <tr data-new="true"><td>—</td><td>카테고리 권한</td><td>관리 탭 &rsaquo; 수강생 관리. 라운지 단위 역할 변경 + 카테고리 &times; 역할 표</td></tr>
           <tr data-new="true"><td>—</td><td>라운지별 필터 설정</td><td>관리 탭 &rsaquo; 필터 관리. 5번을 이 라운지 담당자가 직접 조정하고, 카테고리 자체를 더하고 빼는 자리</td></tr>
           <tr data-new="true"><td>—</td><td>어제 커뮤니티 요약</td><td>관리 탭 &rsaquo; 대시보드. 9장 기획을 화면에. 복사해서 오픈채팅방에 붙여넣는다</td></tr>
           <tr data-new="true"><td>—</td><td>게시물 삭제</td><td>피드 카드 · 글 상세 · 관리 탭 &rsaquo; 게시물 관리(검색해서 지우기)</td></tr>

@@ -32,7 +32,7 @@ DROP FUNCTION IF EXISTS touch_updated_at CASCADE;
 
 CREATE TYPE lounge_role     AS ENUM ('student', 'instructor', 'admin');
 CREATE TYPE chip_placement  AS ENUM ('show', 'more');
-CREATE TYPE attachment_kind AS ENUM ('image', 'link', 'youtube');
+CREATE TYPE attachment_kind AS ENUM ('image', 'link', 'youtube', 'video');
 CREATE TYPE reaction_target AS ENUM ('post', 'comment');
 CREATE TYPE pass_period     AS ENUM ('week', 'month');
 

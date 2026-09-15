@@ -66,6 +66,12 @@ async function handler(req, res) {
 
     if (p === "/health") return send(res, 200, "ok");
 
+    /* 브라우저가 항상 찾는다. 없으면 콘솔에 404 가 남는다. */
+    if (p === "/favicon.ico") {
+      res.writeHead(204);
+      return res.end();
+    }
+
     /* 화면이 쓰는 데이터를 그대로 본다. 디버깅과 검증용. */
     if (p === "/l/data.json") {
       const data = await present.loungeData(config.loungeId, viewer(req));

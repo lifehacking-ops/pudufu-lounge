@@ -14,6 +14,13 @@ const lounges = () =>
                  WHERE lc.lounge_id = l.id AND c.deleted_at IS NULL) AS chips
           FROM lounge l ORDER BY l.id`);
 
+/* 이 사람이 이 라운지를 볼 수 있는가. 수강이 끝났어도 읽기는 열어 둔다 —
+   만료는 강의 시청을 막는 것이지 지난 대화를 지우는 것이 아니다. */
+const memberOf = (loungeId, userId) =>
+  one(`SELECT m.role, u.nickname FROM lounge_member m
+         JOIN ext_user u ON u.id = m.user_id
+        WHERE m.lounge_id = $1 AND m.user_id = $2`, [loungeId, userId]);
+
 const members = (loungeId) =>
   rows(`SELECT m.user_id, u.nickname, m.role, m.cohort, m.week,
                m.joined_at, m.expires_at, m.last_seen_at, m.muted_until, m.muted_reason,
@@ -131,5 +138,5 @@ const topPosts = (loungeId, days) =>
 const weekFlags = (loungeId) =>
   rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
 
-module.exports = { lounge, lounges, members, categories, categoryRights,
+module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
                    posts, comments, received, topPosts, weekFlags };

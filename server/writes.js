@@ -618,12 +618,24 @@ async function grantPass(loungeId, userId, targetUserId, n) {
 
 /* ---------- 라운지 소개 ---------- */
 
+/* 보낸 칸만 고친다. 소개글만 고치러 왔는데 배너가 같이 지워지면 안 된다. */
 async function setLounge(loungeId, userId, input) {
   await admin(loungeId, userId);
-  await rows(
-    `UPDATE lounge SET name = coalesce($2, name), intro = $3, banner_url = $4 WHERE id = $1`,
-    [loungeId, (input.name || "").trim() || null,
-     (input.intro || "").trim() || null, (input.banner || "").trim() || null]);
+
+  const cols = { name: "name", intro: "intro", banner: "banner_url" };
+  const sets = [], vals = [loungeId];
+
+  for (const key of Object.keys(cols)) {
+    if (!(key in input)) continue;
+    const v = String(input[key] || "").trim();
+    if (key === "name" && !v) throw new Denied("라운지 이름은 비울 수 없습니다");
+    if (v.length > 2000) throw new Denied("소개글이 너무 깁니다");
+    vals.push(v || null);
+    sets.push(`${cols[key]} = $${vals.length}`);
+  }
+  if (!sets.length) return { ok: true };
+
+  await rows(`UPDATE lounge SET ${sets.join(", ")} WHERE id = $1`, vals);
   return { ok: true };
 }
 

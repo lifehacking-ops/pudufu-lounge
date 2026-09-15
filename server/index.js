@@ -16,6 +16,7 @@ const writes = require("./writes");
 const { unfurl } = require("./unfurl");
 const storage = require("./storage");
 const { pool } = require("./db");
+const Q = require("./queries");
 
 const ROOT = path.join(__dirname, "..");
 const TYPES = { ".css": "text/css", ".js": "text/javascript",
@@ -26,6 +27,14 @@ const TYPES = { ".css": "text/css", ".js": "text/javascript",
    user_id 를 얻은 뒤 세션에 담는다. docs/API.md 1부 ①. */
 function viewer(req) {
   return config.devUserId;
+}
+
+/* 라운지를 볼 수 있는 사람인지. 쓰기는 writes.js 가 따로 또 본다 —
+   읽기 문 하나로 쓰기까지 믿지 않는다. */
+async function allowed(req) {
+  const id = viewer(req);
+  if (!id) return false;
+  return !!(await Q.memberOf(config.loungeId, id));
 }
 
 function send(res, code, body, type) {
@@ -74,6 +83,7 @@ async function handler(req, res) {
 
     /* 화면이 쓰는 데이터를 그대로 본다. 디버깅과 검증용. */
     if (p === "/l/data.json") {
+      if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });
       const data = await present.loungeData(config.loungeId, viewer(req));
       return send(res, 200, JSON.stringify(data, null, 1), "application/json; charset=utf-8");
     }
@@ -182,6 +192,10 @@ async function handler(req, res) {
     }
 
     if (p === "/" || p === "/l" || p.startsWith("/l/")) {
+      /* 글 주소(?p=12)는 밖으로 돌아다닌다. 링크를 받았다고 들어올 수 있으면
+         강의를 사지 않은 사람이 남의 과제와 피드백을 다 읽게 된다. */
+      if (!(await allowed(req))) return send(res, 403, render.locked(), "text/html; charset=utf-8");
+
       const data = await present.loungeData(config.loungeId, viewer(req));
       return send(res, 200, render.page(data), "text/html; charset=utf-8");
     }

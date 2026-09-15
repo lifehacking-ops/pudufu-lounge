@@ -860,6 +860,62 @@
     $("intro").hidden = true;
   });
 
+  /* ----- 라운지 소개 -----
+     라운지마다 다른 글이고, 운영하면서 계속 손보는 글이다. 마크업에 박아
+     두면 고칠 때마다 배포해야 한다. 데이터에서 읽고 자리에서 고친다. */
+  var introHead = document.querySelector(".intro-head");
+  var introText = document.querySelector(".intro-x");
+
+  function paintIntro() {
+    if (!D.lounge) return;   // 프로토타입에는 없다. 마크업의 예시 문장을 그대로 둔다.
+    introHead.querySelector(".card-t").textContent = D.lounge.name;
+    introText.textContent = D.lounge.intro || "아직 소개글이 없습니다.";
+  }
+  paintIntro();
+
+  function introEditor() {
+    if (!(API && can("manage"))) return;
+
+    var edit = el("button", "btn-ghost", "수정");
+    edit.type = "button";
+    introHead.insertBefore(edit, $("introClose"));
+
+    edit.addEventListener("click", function () {
+      var box = el("div", "intro-edit");
+      var ta2 = document.createElement("textarea");
+      ta2.className = "ta";
+      ta2.value = (D.lounge && D.lounge.intro) || "";
+      ta2.setAttribute("aria-label", "라운지 소개글");
+      box.appendChild(ta2);
+
+      var row = el("div", "row");
+      var save = el("button", "btn-primary sm", "저장");
+      var undo = el("button", "btn-ghost", "취소");
+      save.type = undo.type = "button";
+      row.appendChild(save);
+      row.appendChild(undo);
+      box.appendChild(row);
+
+      introText.hidden = true;
+      edit.hidden = true;
+      introText.parentNode.insertBefore(box, introText.nextSibling);
+      ta2.focus();
+
+      function done() { box.remove(); introText.hidden = false; edit.hidden = false; }
+      undo.addEventListener("click", done);
+
+      save.addEventListener("click", function () {
+        var was = D.lounge.intro;
+        D.lounge.intro = ta2.value.trim();
+        paintIntro();
+        done();
+        send("PUT", "/admin/lounge", { intro: D.lounge.intro })
+          .catch(function (e) { D.lounge.intro = was; paintIntro(); failed(e); });
+      });
+    });
+  }
+  introEditor();
+
   /* ================= 글쓰기 (P1-2 · 3 · 4) ================= */
 
   var composer = $("composer"), rest = $("composerRest"), openBox = $("composerOpen");

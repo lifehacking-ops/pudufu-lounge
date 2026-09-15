@@ -375,6 +375,8 @@
   .intro-head { display: flex; align-items: baseline; gap: 12px; }
   .intro-head .card-t { flex: 1; min-width: 0; font-size: 17px; }
   .intro-x { margin: 0; font-size: 13px; line-height: 1.7; color: var(--slate); }
+  .intro-edit { display: grid; gap: 8px; }
+  .intro-edit .ta { min-height: 76px; }
 
   .todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .todo li { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--slate); }

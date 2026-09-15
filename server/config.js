@@ -1,5 +1,20 @@
 /* 설정 한 곳. 값은 환경 변수로 들어오고 기본값은 로컬 개발용이다. */
 
+/* 로컬에서는 .env 를 읽는다. Vercel 에서는 대시보드의 환경 변수가 들어온다.
+   의존성을 더하지 않으려고 직접 읽는다 — 형식이 단순하다. */
+try {
+  const fs = require("fs"), path = require("path");
+  const f = path.join(__dirname, "..", ".env");
+  if (fs.existsSync(f)) {
+    fs.readFileSync(f, "utf8").split("\n").forEach((line) => {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
+      if (m && !process.env[m[1]]) {
+        process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+      }
+    });
+  }
+} catch (e) { /* 없으면 없는 대로 */ }
+
 const env = process.env;
 
 /* DB 주소가 없으면 데모로 돈다.

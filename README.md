@@ -65,11 +65,45 @@ npm run css:watch    고칠 때마다
 Auth · RLS · 클라이언트 직결은 쓰지 않는다. 그래야 나중에 어디로든 옮길 수 있고,
 `window.LOUNGE_DATA` 이음새도 지켜진다.
 
+### 로컬
+
 ```
 createdb lounge
-psql -d lounge -f db/schema.sql
-psql -d lounge -f db/seed.sql
+npm run db:reset
 ```
+
+### Supabase 연결
+
+1. [supabase.com](https://supabase.com) → **New project**. 리전은 `Northeast Asia (Seoul)`
+2. **Project Settings → Database → Connection string** 에서 두 가지를 가져온다
+
+   | | 포트 | 쓰는 곳 |
+   |---|---|---|
+   | Direct connection | `5432` | 스키마·시드 적용 |
+   | Transaction pooler | `6543` | **Vercel 앱 실행** |
+
+3. `.env.example` 을 `.env` 로 복사하고 **5432** 주소를 넣은 뒤
+
+   ```
+   npm run db:push
+   ```
+
+4. Vercel 환경 변수에 **6543** 주소를 넣는다. 비밀번호가 들어 있으므로
+   직접 넣는다
+
+   ```
+   vercel env add DATABASE_URL production
+   ```
+
+5. 다시 배포하면 데모가 아니라 진짜 DB 를 본다
+
+   ```
+   vercel deploy --prod
+   ```
+
+**포트를 나누는 이유** — 서버리스는 호출마다 인스턴스가 살았다 죽어서 직접
+연결을 쓰면 금세 한도에 닿는다. 풀러(6543)가 그걸 막아 준다. 반대로 마이그레이션은
+트랜잭션이 길어 풀러로는 안 되므로 직접 연결(5432)을 쓴다.
 
 시드는 불러오는 시점 기준 상대 시각으로 들어가므로 며칠 뒤에 넣어도
 &lsquo;어제 올라온 글&rsquo;과 &lsquo;이번 주 미제출&rsquo;이 그대로 말이 된다.

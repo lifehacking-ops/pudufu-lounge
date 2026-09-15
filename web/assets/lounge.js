@@ -1603,6 +1603,9 @@
   var openRef = null;
 
   function closePost() {
+    /* 숨기기만 하면 유튜브 재생기가 그대로 남아 소리가 계속 난다.
+       보이지 않는 곳에서 나는 소리는 끌 방법도 없다. 재생기를 먼저 걷는다. */
+    [].forEach.call(postModal.querySelectorAll("iframe"), function (f) { f.remove(); });
     postModal.hidden = true;
     openRef = null;
     document.body.style.overflow = "";

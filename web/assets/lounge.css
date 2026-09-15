@@ -2905,6 +2905,10 @@
   .cmt-hit > .cmt-main > .bubble {
     background: var(--late-bg);
   }
+  .pinned-on {
+    color: var(--brand);
+    font-weight: 600;
+  }
   .del {
     color: var(--danger);
     font-size: 12px;

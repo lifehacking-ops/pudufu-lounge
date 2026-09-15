@@ -48,11 +48,15 @@ async function loungeData(loungeId, viewerId) {
   const [mem, cats, rights, ps, cms, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
     await Promise.all([
       Q.members(loungeId), Q.categories(), Q.categoryRights(loungeId),
-      Q.posts(loungeId, viewerId), Q.comments(loungeId), Q.lounges(),
+      Q.posts(loungeId, viewerId), Q.comments(loungeId, viewerId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
       Q.leaderboard(loungeId, 7), Q.leaderboard(loungeId, 30), Q.leaderboard(loungeId, null),
       account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
+
+  // 내가 어느 강을 봤는지. 진도율과 체크 표시가 이걸로 살아난다.
+  const seen = new Set((await account.watched(viewerId, L.course_id))
+    .filter((w) => w.is_complete).map((w) => Number(w.lesson_id)));
 
   /* ---- 멤버 ---- */
   const members = mem.map((m) => ({
@@ -96,7 +100,7 @@ async function loungeData(loungeId, viewerId) {
     const node = {
       id: c.id,
       author: c.author_name, when: when(c.created_at, now), text: c.body,
-      up: c.reaction_count, replies: []
+      up: c.reaction_count, mineUp: c.mine_up, replies: []
     };
     if (c.staff) node.staff = true;
     byId.set(c.id, node);
@@ -120,6 +124,7 @@ async function loungeData(loungeId, viewerId) {
       views: p.view_count,
       mine: p.mine,
       liked: p.reacted,
+      myReact: p.my_react || null,
       title: p.title,
       thread: byPost.get(p.id) || []
     };
@@ -137,8 +142,10 @@ async function loungeData(loungeId, viewerId) {
 
   /* ---- 강의 ---- */
   const lessons = course.lessons.map((l) => ({
+    id: Number(l.id),
     wk: l.week, chap: l.chapter, t: l.title, d: l.duration,
-    video: !!l.video_url, doc: l.doc
+    video: !!l.video_url, doc: l.doc,
+    done: seen.has(Number(l.id))
   }));
 
   const missions = {};

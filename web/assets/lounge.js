@@ -357,9 +357,19 @@
 
   /* 강 하나를 커리큘럼 항목으로 바꾼다.
      검색도 LESSONS 가 아니라 이 항목을 보므로 주차·챕터를 같이 들고 있는다. */
+  /* 시청 기록의 원본은 프드프다. 라운지는 남기기만 하고 쌓지 않는다. */
+  function saveWatched(item) {
+    if (!item.id) return;
+    send("PUT", "/lessons/" + item.id + "/done", { done: !!item.done })
+      .catch(function (err) { item.done = !item.done; renderCurric(); updateProgress(); failed(err); });
+  }
+
   function lessonItemOf(l, done) {
-    return { wk: l.wk, chap: l.chap, t: l.t, d: l.video ? l.d : "교안",
-             doc: l.doc, video: l.video, done: !!done };
+    return { id: l.id, wk: l.wk, chap: l.chap, t: l.t, d: l.video ? l.d : "교안",
+             doc: l.doc, video: l.video,
+             /* 서버가 내 시청 기록을 주면 그것을 쓴다. 프로토타입에는 없으므로
+                지난 주차는 다 본 것으로 깔아 둔다. */
+             done: l.done != null ? !!l.done : !!done };
   }
 
   function makeCourse(wk, title, published) {
@@ -370,7 +380,7 @@
 
     // 진행 중인 주차는 첫 강만 듣고 멈춰 있는 상태로 둔다
     if (wk === CURRENT_WK && lessons.length) {
-      lessons[0].done = true;
+      if (lessons[0].done == null) lessons[0].done = true;
       lessons[0].cur = true;
       lessons[0].rich = true;
     } else if (lessons.length) {
@@ -1445,6 +1455,8 @@
         feedGate.hidden = true;
         feedGate.style.marginTop = "10px";
 
+        meta.appendChild(pinButton(p));
+
         var delBtn = el("button", "footlink del", "삭제");
         delBtn.type = "button";
         delBtn.addEventListener("click", function (e) {
@@ -1523,6 +1535,16 @@
     openRef = p;
     detailBody.textContent = "";
 
+    /* 조회는 사람 단위로 한 번만 센다. 서버가 실제 수를 돌려준다. */
+    if (p.id) {
+      send("POST", "/posts/" + p.id + "/view").then(function (r) {
+        if (r && typeof r.views === "number" && r.views !== p.views) {
+          p.views = r.views;
+          if (openRef === p) render();
+        }
+      }).catch(function () { /* 조회수는 실패해도 글 읽기를 막지 않는다 */ });
+    }
+
     var meta = el("div", "post-meta");
     meta.appendChild(el("span", "cat", p.cat));
     meta.appendChild(el("span", "sep", "·"));
@@ -1540,6 +1562,8 @@
 
     // 관리자는 남의 글도 여기서 지운다. 확인은 글 맨 아래에서 받는다.
     if (can("delete")) {
+      meta.appendChild(pinButton(p, function () { openPost(p); }));
+
       var del = el("button", "footlink del", "삭제");
       del.type = "button";
       del.addEventListener("click", function () { askDelete(p); });
@@ -2127,6 +2151,7 @@
           chk.addEventListener("click", function (e) {
             e.stopPropagation();
             item.done = !item.done;
+            saveWatched(item);
             if (item.cur) {
               lessonDone.setAttribute("aria-pressed", String(item.done));
               lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
@@ -2155,6 +2180,7 @@
   lessonDone.addEventListener("click", function () {
     var item = curItem();
     item.done = !item.done;
+    saveWatched(item);
     lessonDone.setAttribute("aria-pressed", String(item.done));
     lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
     updateProgress();
@@ -2425,6 +2451,62 @@
     return f;
   }
 
+  /* 이미 연 주차의 과제 양식을 고친다.
+     이미 낸 과제는 그때의 질문을 스냅샷으로 갖고 있어서 안 바뀐다. */
+  function missionForm2(cr) {
+    var cur = MISSIONS[cr.wk] || { title: "", qs: [] };
+    var f = cForm(cr.wk + "주차 과제 양식");
+
+    var mis = cField("과제 미션 한 줄", "예: 후기 세 개 받아오기");
+    mis.input.value = (cur.title || "").replace(/^\d+주차 미션 · /, "");
+    f.el.appendChild(mis.el);
+
+    var qs = [0, 1, 2].map(function (n) {
+      var q = cField("Q" + (n + 1) + " 질문", "수강생에게 물을 것");
+      var h = cField("Q" + (n + 1) + " 힌트", "칸 안내 문구 · 비워도 됩니다");
+      q.input.value = (cur.qs[n] && cur.qs[n].q) || "";
+      h.input.value = (cur.qs[n] && cur.qs[n].hint) || "";
+      var pair = el("div", "cadd-2");
+      pair.appendChild(q.el);
+      pair.appendChild(h.el);
+      f.el.appendChild(pair);
+      return { q: q, h: h };
+    });
+
+    function close() { f.say(""); f.el.hidden = true; }
+
+    f.foot("양식 저장", function () {
+      if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
+      var list = qs.filter(function (x) { return x.q.val(); })
+                   .map(function (x) { return { q: x.q.val(), hint: x.h.val() }; });
+      if (!list.length) { f.say("질문이 하나는 있어야 합니다."); return; }
+
+      function put(title) {
+        MISSIONS[cr.wk] = { title: title, qs: list };
+        close();
+        if (viewWk === cr.wk) mountClassMission();
+        syncComposer();
+        renderAdmin();
+      }
+
+      var title = cr.wk + "주차 미션 · " + mis.val();
+      if (!API) return put(title);
+
+      send("PUT", "/admin/weeks/" + cr.wk + "/mission", { mission: mis.val(), qs: list })
+        .then(function (r) {
+          put(r.title);
+          if (r.alreadySubmitted) {
+            failed(new Error("이미 제출된 과제 " + r.alreadySubmitted + "건은 그대로 둡니다. 낼 때의 질문이 함께 저장돼 있습니다."));
+          }
+        })
+        .catch(function (err) { f.say(err.message); });
+    }, close);
+
+    f.reset = close;
+    f.focus = function () { mis.input.focus(); };
+    return f;
+  }
+
   /* 새 주차는 과제 양식까지 같이 받는다. 양식 없이 열면 그 주차 과제 칸이 빈 채로 남는다. */
   function weekForm() {
     var wrap = el("div", "fadd");
@@ -2523,6 +2605,10 @@
       add.type = "button";
       row.appendChild(add);
 
+      var mis = el("button", "fadd-btn", "과제 양식");
+      mis.type = "button";
+      row.appendChild(mis);
+
       var pub = el("button", cr.published ? "del" : "fadd-btn", cr.published ? "비공개로" : "게시하기");
       pub.type = "button";
       pub.addEventListener("click", function () {
@@ -2548,12 +2634,19 @@
       f.el.hidden = true;
       forms.push(f);
 
-      add.addEventListener("click", function () {
-        var opening = f.el.hidden;
+      var mf = missionForm2(cr);
+      mf.el.hidden = true;
+      forms.push(mf);
+
+      function toggle(which) {
+        var opening = which.el.hidden;
         forms.forEach(function (x) { x.el.hidden = true; });
-        f.el.hidden = !opening;
-        if (opening) f.focus();
-      });
+        which.el.hidden = !opening;
+        if (opening) which.focus();
+      }
+
+      add.addEventListener("click", function () { toggle(f); });
+      mis.addEventListener("click", function () { toggle(mf); });
     });
 
     c.appendChild(t.el);
@@ -3265,6 +3358,33 @@
   }
 
   /* ---------- 게시물 ---------- */
+
+  /* 고정은 글 옆에서 바로 켠다. 이걸 하려고 관리 화면까지 가게 하면
+     매일 하는 일에 화면 이동이 하나 붙는다. */
+  var PIN_MAX = 3;
+
+  function pinButton(p, after) {
+    var b = el("button", "footlink" + (p.pinned ? " pinned-on" : ""),
+      p.pinned ? "고정 해제" : "고정");
+    b.type = "button";
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+
+      if (!p.pinned && POSTS.filter(function (x) { return x.pinned; }).length >= PIN_MAX) {
+        failed(new Error("고정은 " + PIN_MAX + "개까지입니다. 하나를 먼저 내리세요"));
+        return;
+      }
+
+      var was = !!p.pinned;
+      p.pinned = !was;
+      render();
+      if (after) after();
+
+      send("PUT", "/posts/" + p.id + "/pinned", { pinned: p.pinned })
+        .catch(function (err) { p.pinned = was; render(); if (after) after(); failed(err); });
+    });
+    return b;
+  }
 
   /* 삭제 확인은 어디서 눌렀든 같은 모양으로, 누른 자리 바로 아래에 뜬다.
      브라우저 confirm 은 쓰지 않는다. */

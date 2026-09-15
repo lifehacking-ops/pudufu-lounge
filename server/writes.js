@@ -106,6 +106,16 @@ async function createPost(loungeId, userId, input) {
       await client.query(
         `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
         [id, a.type, a.url || "", a.title || a.label || null]);
+    } else {
+      /* 첨부를 따로 고르지 않았어도 본문에 주소가 있으면 카드로 만든다.
+         사람은 링크를 '첨부'한다고 생각하지 않고 그냥 붙여넣는다. */
+      const found = firstUrl(input.body);
+      if (found) {
+        const card = await unfurl(found);
+        await client.query(
+          `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
+          [id, card.kind, card.url, card.title || null]);
+      }
     }
 
     await client.query("COMMIT");
@@ -361,6 +371,7 @@ module.exports.setRights = setRights;
      여기서 고쳐 봐야 다음 동기화 때 덮인다. */
 
 const config = require("./config");
+const { unfurl, firstUrl } = require("./unfurl");
 
 async function setWeekPublished(loungeId, userId, week, published) {
   await admin(loungeId, userId);
@@ -432,3 +443,127 @@ async function addWeek(loungeId, userId, input) {
 module.exports.setWeekPublished = setWeekPublished;
 module.exports.addLesson = addLesson;
 module.exports.addWeek = addWeek;
+
+/* ---------- 조회 ----------
+   사람 단위로 한 번만 센다. 같은 사람이 다시 열어도 올라가지 않는다. */
+
+async function markView(loungeId, userId, postId) {
+  await membership(loungeId, userId);
+  const p = await one(
+    `SELECT id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`,
+    [postId, loungeId]);
+  if (!p) throw new Missing();
+
+  /* 처음 보는 사람일 때만 하나 올린다.
+     다시 세지 않는 이유 — post_view 는 라운지가 열린 뒤의 기록뿐이라,
+     세어 버리면 그 전에 쌓인 수가 사라진다. */
+  const fresh = await one(
+    `INSERT INTO post_view (post_id, user_id) VALUES ($1, $2)
+     ON CONFLICT (post_id, user_id) DO NOTHING
+     RETURNING post_id`, [postId, userId]);
+
+  const n = fresh
+    ? await one(`UPDATE post SET view_count = view_count + 1 WHERE id = $1 RETURNING view_count`, [postId])
+    : await one(`SELECT view_count FROM post WHERE id = $1`, [postId]);
+
+  return { views: n.view_count };
+}
+
+/* ---------- 강의 시청 ----------
+   원본은 프드프다. local 에서는 비계인 ext_watch 에 직접 쓰고,
+   remote 에서는 프드프에 남긴다(docs/API.md 1부 ⑥). 둘 다 라운지는 쌓지 않는다. */
+
+async function markWatched(loungeId, userId, lessonId, done) {
+  await membership(loungeId, userId);
+
+  if (config.pudufu.mode === "remote") {
+    const res = await fetch(config.pudufu.base + "/api/lounge/watch", {
+      method: "POST",
+      headers: { "content-type": "application/json", "X-Lounge-Key": config.pudufu.key },
+      body: JSON.stringify({ user_id: userId, lesson_id: lessonId, is_complete: !!done })
+    });
+    if (!res.ok) throw new Denied("프드프에 시청 기록을 남기지 못했습니다");
+  } else if (done) {
+    await rows(
+      `INSERT INTO ext_watch (user_id, lesson_id, is_complete, synced_at)
+       VALUES ($1, $2, true, now())
+       ON CONFLICT (user_id, lesson_id)
+       DO UPDATE SET is_complete = true, watched_at = now(), synced_at = now()`,
+      [userId, lessonId]);
+  } else {
+    await rows(`DELETE FROM ext_watch WHERE user_id = $1 AND lesson_id = $2`, [userId, lessonId]);
+  }
+
+  return { ok: true };
+}
+
+module.exports.markView = markView;
+module.exports.markWatched = markWatched;
+
+/* ---------- 상단 고정 ----------
+   고정은 위계가 아니라 순서다. 걸린 필터 안에서만 맨 위로 온다.
+   상한을 두는 이유 — 다섯 개가 고정되면 피드 위쪽이 통째로 공지판이 된다.
+   카테고리 칩 7개 상한과 같은 이유다. */
+
+const PIN_MAX = 3;
+
+async function setPinned(loungeId, userId, postId, pinned) {
+  await admin(loungeId, userId);
+
+  const p = await one(
+    `SELECT id, is_pinned FROM post
+      WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [postId, loungeId]);
+  if (!p) throw new Missing();
+
+  if (pinned && !p.is_pinned) {
+    const n = await one(
+      `SELECT count(*)::int AS n FROM post
+        WHERE lounge_id = $1 AND is_pinned AND deleted_at IS NULL`, [loungeId]);
+    if (n.n >= PIN_MAX) {
+      throw new Denied(`고정은 ${PIN_MAX}개까지입니다. 하나를 먼저 내리세요`);
+    }
+  }
+
+  await rows(`UPDATE post SET is_pinned = $1 WHERE id = $2`, [!!pinned, postId]);
+  return { pinned: !!pinned };
+}
+
+module.exports.setPinned = setPinned;
+module.exports.PIN_MAX = PIN_MAX;
+
+/* ---------- 과제 양식 ----------
+   이미 낸 과제는 post_answer 에 그때의 질문 문구를 스냅샷으로 갖고 있다.
+   그래서 양식을 고쳐도 과거 제출물은 그대로 남는다 — 무엇에 답한 글이었는지가
+   보존된다. 그게 아니면 양식을 못 고칠 뻔했다. */
+
+async function setMission(loungeId, userId, week, input) {
+  await admin(loungeId, userId);
+  onlyLocal();
+
+  const L = await one(
+    `SELECT c.id AS course_id FROM ext_course c JOIN lounge l ON l.course_id = c.id
+      WHERE l.id = $1`, [loungeId]);
+
+  if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
+  if (!input.qs || !input.qs.length) throw new Denied("질문이 하나는 있어야 합니다");
+  if (input.qs.some((q) => !q.q || !q.q.trim())) throw new Denied("빈 질문은 둘 수 없습니다");
+
+  const title = `${week}주차 미션 · ${input.mission}`;
+
+  await rows(`DELETE FROM ext_mission WHERE course_id = $1 AND week = $2`, [L.course_id, week]);
+  for (const [i, q] of input.qs.entries()) {
+    await rows(
+      `INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      [L.course_id, week, title, i + 1, q.q.trim(), (q.hint || "").trim() || null]);
+  }
+
+  const used = await one(
+    `SELECT count(*)::int AS n FROM post p JOIN category c ON c.id = p.category_id
+      WHERE p.lounge_id = $1 AND p.week = $2 AND c.name = '과제' AND p.deleted_at IS NULL`,
+    [loungeId, week]);
+
+  return { week: week, title: title, alreadySubmitted: used.n };
+}
+
+module.exports.setMission = setMission;

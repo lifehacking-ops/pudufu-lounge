@@ -143,6 +143,10 @@ DELETE /l/posts/{id}               이 라운지 관리자만
 POST   /l/posts/{id}/comments      { body, parentId }   답글은 한 단계까지
 DELETE /l/comments/{id}            본인 또는 관리자
 PUT    /l/posts/{id}/reactions     { emoji }            토글
+PUT    /l/posts/{id}/pinned        { pinned }           관리자. 최대 3개
+POST   /l/posts/{id}/view          사람 단위로 한 번만 센다
+PUT    /l/lessons/{id}/done        { done }             시청 기록 → 프드프
+POST   /l/unfurl                   { url }              붙여넣은 주소를 카드로
 PUT    /l/comments/{id}/reactions  { emoji }            토글
 POST   /l/uploads                  이미지 → Supabase Storage (아직)
 ```
@@ -183,6 +187,10 @@ POST   /l/admin/categories                   { name }
 DELETE /l/admin/categories/{id}
 PUT    /l/admin/categories/{id}/placement    { placement: show|more|off }
 PUT    /l/admin/categories/{id}/rights       { student, instructor }
+PUT    /l/admin/weeks/{week}/published        { published }
+PUT    /l/admin/weeks/{week}/mission          { mission, qs[] }
+POST   /l/admin/lessons                       { week, chapter, title, duration, doc }
+POST   /l/admin/weeks                         { title, mission, qs[] }
 GET    /l/admin/digest?date=                 어제 요약 (아직)
 ```
 

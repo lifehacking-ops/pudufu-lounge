@@ -1201,6 +1201,8 @@
   .cmt .bubble { transition: background-color .4s ease; }
   .cmt-hit > .cmt-main > .bubble { background: var(--late-bg); }
 
+  .pinned-on { color: var(--brand); font-weight: 600; }
+
   .del { color: var(--danger); font-size: 12px; font-weight: 600; white-space: nowrap; }
   .del:hover { text-decoration: underline; }
 }

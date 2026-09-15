@@ -45,6 +45,10 @@ const posts = (loungeId, viewerId) =>
                  WHERE r.target_kind = 'post' AND r.target_id = p.id AND r.emoji = '👍') AS likes,
                EXISTS (SELECT 1 FROM reaction r
                         WHERE r.target_kind = 'post' AND r.target_id = p.id AND r.user_id = $2) AS reacted,
+               -- 내가 어떤 이모지를 눌렀는지. 없으면 눌렀던 표시가 새로고침마다 풀린다.
+               (SELECT r.emoji FROM reaction r
+                 WHERE r.target_kind = 'post' AND r.target_id = p.id AND r.user_id = $2
+                 LIMIT 1) AS my_react,
                (SELECT json_object_agg(e.emoji, e.n) FROM (
                   SELECT r.emoji, count(*)::int AS n FROM reaction r
                    WHERE r.target_kind = 'post' AND r.target_id = p.id AND r.emoji <> '👍'
@@ -57,15 +61,18 @@ const posts = (loungeId, viewerId) =>
          WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
          ORDER BY p.created_at DESC`, [loungeId, viewerId]);
 
-const comments = (loungeId) =>
+const comments = (loungeId, viewerId) =>
   rows(`SELECT cm.id, cm.post_id, cm.parent_id, cm.author_name, cm.body,
                cm.reaction_count, cm.created_at,
-               (m.role IN ('instructor','admin')) AS staff
+               (m.role IN ('instructor','admin')) AS staff,
+               EXISTS (SELECT 1 FROM reaction r
+                        WHERE r.target_kind = 'comment' AND r.target_id = cm.id
+                          AND r.user_id = $2) AS mine_up
           FROM comment cm
           JOIN post p ON p.id = cm.post_id
      LEFT JOIN lounge_member m ON m.user_id = cm.user_id AND m.lounge_id = p.lounge_id
          WHERE p.lounge_id = $1 AND cm.deleted_at IS NULL
-         ORDER BY cm.created_at`, [loungeId]);
+         ORDER BY cm.created_at`, [loungeId, viewerId]);
 
 /* 활동량. 글 10점 · 받은 반응 1점 · 단 댓글 3점.
    프로토타입의 고정 숫자를 대신한다 — 근거 있는 값이라야 한다. */

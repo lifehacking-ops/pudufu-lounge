@@ -13,6 +13,7 @@ const present = require("./present");
 const render = require("./render");
 const account = require("./account");
 const writes = require("./writes");
+const { unfurl } = require("./unfurl");
 const { pool } = require("./db");
 
 const ROOT = path.join(__dirname, "..");
@@ -100,6 +101,20 @@ async function handler(req, res) {
         if (req.method === "DELETE" && s[1] === "comments" && s.length === 3)
           return json(res, 200, await writes.deleteComment(L, me, +s[2]));
 
+        /* 글쓰기 창에서 주소를 붙여넣는 순간 미리 보여주기 위한 것.
+           저장은 글을 올릴 때 서버가 다시 한다. */
+        if (req.method === "POST" && s[1] === "unfurl")
+          return json(res, 200, await unfurl(String(input.url || "").slice(0, 2000)));
+
+        if (req.method === "PUT" && s[1] === "posts" && s[3] === "pinned")
+          return json(res, 200, await writes.setPinned(L, me, +s[2], input.pinned));
+
+        if (req.method === "POST" && s[1] === "posts" && s[3] === "view")
+          return json(res, 200, await writes.markView(L, me, +s[2]));
+
+        if (req.method === "PUT" && s[1] === "lessons" && s[3] === "done")
+          return json(res, 200, await writes.markWatched(L, me, +s[2], input.done));
+
         if (req.method === "PUT" && s[3] === "reactions")
           return json(res, 200, await writes.toggleReaction(
             L, me, s[1] === "posts" ? "post" : "comment", +s[2], input.emoji));
@@ -129,6 +144,9 @@ async function handler(req, res) {
 
           if (req.method === "POST" && s[2] === "weeks")
             return json(res, 200, await writes.addWeek(L, me, input));
+
+          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "mission")
+            return json(res, 200, await writes.setMission(L, me, +s[3], input));
         }
       } catch (e) {
         if (e.code === 403 || e.code === 404) return json(res, e.code, { error: e.message });

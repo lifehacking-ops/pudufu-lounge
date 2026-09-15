@@ -70,7 +70,7 @@ window.LOUNGE_DATA = {
       ] },
 
     { cat: "콘텐츠 피드백", wk: 3, author: "정해린", when: "4시간 전", likes: 3, views: 44, mine: false, liked: false,
-      attach: { type: "link", url: "blog.naver.com/mathplan/223...", title: "중계동 수학학원 — 우리 아이가 수학을 포기한 진짜 이유" },
+      attach: { type: "link", url: "https://blog.naver.com/mathplan/223405118826", title: "중계동 수학학원 — 우리 아이가 수학을 포기한 진짜 이유" },
       title: "블로그 글 제목이 아직 밋밋한 것 같은데 봐주세요",
       body: "고민 키워드를 넣긴 했는데 학부모가 클릭할 만한 제목인지 모르겠습니다.",
       thread: [
@@ -118,7 +118,7 @@ window.LOUNGE_DATA = {
     /* 피드백권을 써서 올라온 요청들. 답이 없으면 권만 날아간다 */
 
     { cat: "콘텐츠 피드백", wk: 3, author: "강예린", when: "1일 전", likes: 1, views: 19, mine: false, liked: false,
-      attach: { type: "link", url: "blog.naver.com/mathmia/223...", title: "미아 수학학원 — 중2 수학, 지금 포기하면 늦나요" },
+      attach: { type: "link", url: "https://blog.naver.com/mathmia/223481920374", title: "미아 수학학원 — 중2 수학, 지금 포기하면 늦나요" },
       title: "제목은 고쳤는데 첫 문단이 아직 학원 소개입니다",
       body: "고민 키워드로 제목은 바꿨는데 본문 시작을 어떻게 열어야 할지 모르겠습니다. 봐주세요.",
       thread: [] },

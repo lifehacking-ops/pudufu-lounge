@@ -1388,6 +1388,10 @@
     return m ? "https://www.youtube.com/embed/" + m[1] : url;
   }
 
+  function pretty(url) {
+    return String(url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  }
+
   function attachment(a, compact) {
     if (!a) return null;
 
@@ -1412,10 +1416,20 @@
     }
 
     if (a.type === "link") {
-      box.classList.add("att-link");
-      box.appendChild(el("span", "t", a.title || a.url));
-      box.appendChild(el("span", "u", a.url));
-      return box;
+      /* 카드가 눌리지 않으면 주소를 손으로 옮겨 적어야 한다. 그러라고 붙인 게 아니다.
+         주소가 http(s) 일 때만 링크로 만든다 — 남이 쓴 글에서 오는 값이다. */
+      var safe = /^https?:\/\//i.test(a.url || "");
+      var link = safe ? document.createElement("a") : box;
+      if (safe) {
+        link.className = box.className;
+        link.href = a.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer nofollow ugc";
+      }
+      link.classList.add("att-link");
+      link.appendChild(el("span", "t", a.title || a.url));
+      link.appendChild(el("span", "u", pretty(a.url)));
+      return link;
     }
 
     if (a.type === "youtube") {

@@ -728,7 +728,9 @@
     font-size: 11px; color: var(--mist); text-align: center; line-height: 1.5;
   }
 
-  .att-link { display: grid; gap: 3px; padding: 11px 13px; }
+  .att-link { display: grid; gap: 3px; padding: 11px 13px; text-decoration: none; }
+  a.att-link:hover { background: var(--cloud); }
+  a.att-link:hover .u { text-decoration: underline; }
   .att-link .t { font-size: 13px; font-weight: 600; color: var(--ink); }
   .att-link .u { font-size: 11px; color: var(--brand); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

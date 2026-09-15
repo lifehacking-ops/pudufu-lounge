@@ -427,9 +427,9 @@ INSERT INTO post_answer (post_id, seq, question, answer) VALUES
 -- 첨부
 INSERT INTO attachment (post_id, kind, url, label, sort) VALUES
   (2, 'image', '', '블로그 글 캡처 · 중계동 학부모님이 가장 많이 하신 질문', 0),
-  (3, 'link', 'blog.naver.com/mathplan/223...', '중계동 수학학원 — 우리 아이가 수학을 포기한 진짜 이유', 0),
+  (3, 'link', 'https://blog.naver.com/mathplan/223405118826', '중계동 수학학원 — 우리 아이가 수학을 포기한 진짜 이유', 0),
   (6, 'youtube', 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '플레이스 세팅 전후 비교 화면', 0),
-  (9, 'link', 'blog.naver.com/mathmia/223...', '미아 수학학원 — 중2 수학, 지금 포기하면 늦나요', 0),
+  (9, 'link', 'https://blog.naver.com/mathmia/223481920374', '미아 수학학원 — 중2 수학, 지금 포기하면 늦나요', 0),
   (10, 'image', '', '인스타 프로필 화면 캡처', 0);
 
 -- 댓글. 답글은 한 단계까지만.

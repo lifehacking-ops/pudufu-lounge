@@ -50,9 +50,13 @@ async function loungeData(loungeId, viewerId) {
       Q.members(loungeId), Q.categories(), Q.categoryRights(loungeId),
       Q.posts(loungeId, viewerId), Q.comments(loungeId, viewerId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
-      Q.leaderboard(loungeId, 7), Q.leaderboard(loungeId, 30), Q.leaderboard(loungeId, null),
+      Q.received(loungeId, 7), Q.received(loungeId, 30), Q.received(loungeId, null),
       account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
+
+  const [tp7, tp30, tpAll] = await Promise.all([
+    Q.topPosts(loungeId, 7), Q.topPosts(loungeId, 30), Q.topPosts(loungeId, null)
+  ]);
 
   // 내가 어느 강을 봤는지. 진도율과 체크 표시가 이걸로 살아난다.
   const seen = new Set((await account.watched(viewerId, L.course_id))
@@ -183,7 +187,21 @@ async function loungeData(loungeId, viewerId) {
           note: `주 ${pass.quota_per}회 · 관리자 지급` } }
     : {};
 
-  const fmt = (r) => [r.name, Number(r.score).toLocaleString("ko-KR")];
+  /* 순위는 동점을 같은 등수로 본다. 받은 수가 같은데 등수가 다르면 설명할 수 없다. */
+  function ranked(list) {
+    let rank = 0, prev = null;
+    return list.map((r, i) => {
+      if (r.total !== prev) { rank = i + 1; prev = r.total; }
+      return {
+        rank: rank, name: r.name, wk: r.week, cohort: r.cohort || 0,
+        total: r.total,
+        emojis: (r.emojis || []).map((x) => [x.e, x.n])
+      };
+    });
+  }
+
+  const top5 = (list) => list.filter((r) => r.total > 0).slice(0, 5)
+    .map((r) => [r.name, Number(r.total).toLocaleString("ko-KR")]);
 
   return {
     members, posts, lessons, weeks, weekPublished, missions, categories, lounges, passes,
@@ -192,7 +210,9 @@ async function loungeData(loungeId, viewerId) {
           when: liveWhen(live.starts_at),
           days: Math.max(0, Math.ceil((new Date(live.starts_at) - now) / 86400000)) }
       : { title: "예정된 라이브가 없습니다", when: "", days: 0 },
-    leaderboard: { "7": lb7.map(fmt), "30": lb30.map(fmt), all: lbAll.map(fmt) },
+    leaderboard: { "7": top5(lb7), "30": top5(lb30), all: top5(lbAll) },
+    ranking: { "7": ranked(lb7), "30": ranked(lb30), all: ranked(lbAll) },
+    topPosts: { "7": tp7, "30": tp30, all: tpAll },
     lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro },
     me: (function () {
       const m = mem.find((x) => Number(x.user_id) === Number(viewerId));

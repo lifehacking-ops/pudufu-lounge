@@ -1980,10 +1980,11 @@
     { key: "community", el: "screenCommunity", tab: "tabCommunity" },
     { key: "courses",   el: "screenCourses",   tab: "tabClassroom" },
     { key: "lesson",    el: "screenClassroom", tab: "tabClassroom" },
+    { key: "ranking",   el: "screenRanking",   tab: "tabRanking" },
     { key: "admin",     el: "screenAdmin",     tab: "tabAdmin" }
   ];
 
-  var TABS = ["tabCommunity", "tabClassroom", "tabAdmin"];
+  var TABS = ["tabCommunity", "tabClassroom", "tabRanking", "tabAdmin"];
   var screenNow = "community";
 
   function show(which) {
@@ -2001,11 +2002,13 @@
     });
 
     if (which === "admin") renderAdmin();
+    if (which === "ranking") renderRanking();
     window.scrollTo(0, 0);
   }
 
   $("tabCommunity").addEventListener("click", function () { show("community"); });
   $("tabClassroom").addEventListener("click", function () { show("courses"); });
+  $("tabRanking").addEventListener("click", function () { show("ranking"); });
   $("tabAdmin").addEventListener("click", function () { show("admin"); });
 
   // 강의 목록에서 코스를 고르면 상세로
@@ -2751,6 +2754,114 @@
 
     c.appendChild(weekForm());
     host.appendChild(c);
+  }
+
+  /* ================= 랭킹 =================
+     받은 이모지만 센다. 글을 몇 개 썼는지는 보지 않는다 — 많이 쓴 사람이 아니라
+     남에게 가닿은 사람이 위로 온다.
+
+     순위를 '내가 몇 등인지' 만 보여주면 따라갈 수가 없다. 위와 나의 간격,
+     그리고 어떤 글이 가닿았는지를 같이 둔다. */
+
+  var rankWin = "7";
+  var RANK_WINS = [["7", "7일"], ["30", "30일"], ["all", "전체"]];
+
+  function renderRanking() {
+    var seg = $("rankSeg"), main = $("rankMain"), rail = $("rankRail");
+    var list = (D.ranking && D.ranking[rankWin]) || [];
+    var tops = (D.topPosts && D.topPosts[rankWin]) || [];
+
+    seg.textContent = "";
+    RANK_WINS.forEach(function (w) {
+      var b = el("button", null, w[1]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(rankWin === w[0]));
+      b.addEventListener("click", function () { rankWin = w[0]; renderRanking(); });
+      seg.appendChild(b);
+    });
+
+    main.textContent = "";
+    rail.textContent = "";
+
+    var got = list.filter(function (r) { return r.total > 0; });
+    var c = admCard("받은 이모지", got.length + "명이 받았습니다");
+
+    if (!got.length) {
+      c.appendChild(el("p", "adm-empty", "이 기간에 받은 이모지가 없습니다"));
+      main.appendChild(c);
+      return;
+    }
+
+    var top = got[0].total;
+    got.forEach(function (r) {
+      var row = el("div", "rank" + (r.name === ME.name ? " rank-me" : ""));
+
+      var no = el("span", "rank-no" + (r.rank <= 3 ? " rank-top" : ""), String(r.rank));
+      row.appendChild(no);
+      row.appendChild(el("span", "ava ava-24", initial(r.name)));
+
+      var who = el("div", "rank-who");
+      who.appendChild(el("span", "rank-name", r.name));
+      who.appendChild(el("span", "rank-sub", (r.cohort ? r.cohort + "기 · " : "") + r.wk + "주차"));
+      row.appendChild(who);
+
+      /* 무엇을 받았는지까지 보여준다. 숫자 하나만 두면 '이모지 기준' 이
+         말로만 남는다. */
+      var ems = el("div", "rank-ems");
+      r.emojis.slice(0, 4).forEach(function (e) {
+        var pill = el("span", "rank-em");
+        pill.appendChild(el("span", "rank-em-i", e[0]));
+        pill.appendChild(el("span", null, String(e[1])));
+        ems.appendChild(pill);
+      });
+      row.appendChild(ems);
+
+      var bar = el("div", "rank-bar");
+      var fill = el("div", "rank-fill");
+      fill.style.width = (r.total / top) * 100 + "%";
+      bar.appendChild(fill);
+      row.appendChild(bar);
+
+      row.appendChild(el("span", "rank-total", String(r.total)));
+      c.appendChild(row);
+    });
+    main.appendChild(c);
+
+    /* 내 자리 — 목록 밖에 있어도 보여야 한다 */
+    var me = list.filter(function (r) { return r.name === ME.name; })[0];
+    if (me) {
+      var mc = admCard("내 자리");
+      var big = el("p", "rank-mine");
+      big.appendChild(el("b", null, me.total ? me.rank + "위" : "아직 없음"));
+      big.appendChild(el("span", null, me.total + "개 받음"));
+      mc.appendChild(big);
+
+      var ahead = got.filter(function (r) { return r.rank < me.rank; }).pop();
+      mc.appendChild(el("p", "sec-note", !me.total
+        ? "글을 올리고 반응을 받으면 여기에 자리가 생깁니다."
+        : ahead
+          ? ahead.rank + "위 " + ahead.name + "까지 " + (ahead.total - me.total) + "개 남았습니다."
+          : "맨 위입니다."));
+      rail.appendChild(mc);
+    }
+
+    if (tops.length) {
+      var tc = admCard("가장 많이 받은 글");
+      tops.forEach(function (p) {
+        var b = el("button", "qrow");
+        b.type = "button";
+        b.appendChild(el("span", "badge b-live", String(p.got)));
+        b.appendChild(el("span", "qrow-t", p.title));
+        b.appendChild(el("span", "qrow-m", p.author_name));
+        b.addEventListener("click", function () {
+          var hit = POSTS.filter(function (x) { return String(x.id) === String(p.id); })[0];
+          show("community");
+          if (hit) openPost(hit);
+        });
+        tc.appendChild(b);
+      });
+      rail.appendChild(tc);
+    }
   }
 
   /* ---------- 대시보드 ----------

@@ -76,33 +76,59 @@ const comments = (loungeId, viewerId) =>
          WHERE p.lounge_id = $1 AND cm.deleted_at IS NULL
          ORDER BY cm.created_at`, [loungeId, viewerId]);
 
-/* 활동량. 글 10점 · 받은 반응 1점 · 단 댓글 3점.
-   프로토타입의 고정 숫자를 대신한다 — 근거 있는 값이라야 한다. */
-const leaderboard = (loungeId, days) =>
-  rows(`SELECT u.nickname AS name, SUM(s.score)::int AS score FROM (
-          SELECT p.user_id, 10 * count(*) AS score
-            FROM post p WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
-             AND ($2::int IS NULL OR p.created_at >= now() - ($2 || ' days')::interval)
-           GROUP BY p.user_id
-          UNION ALL
-          SELECT p.user_id, count(*) AS score
-            FROM reaction r JOIN post p ON p.id = r.target_id AND r.target_kind = 'post'
-           WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
-             AND ($2::int IS NULL OR r.created_at >= now() - ($2 || ' days')::interval)
-           GROUP BY p.user_id
-          UNION ALL
-          SELECT cm.user_id, 3 * count(*) AS score
-            FROM comment cm JOIN post p ON p.id = cm.post_id
-           WHERE p.lounge_id = $1 AND cm.deleted_at IS NULL
-             AND ($2::int IS NULL OR cm.created_at >= now() - ($2 || ' days')::interval)
-           GROUP BY cm.user_id) s
-        JOIN ext_user u ON u.id = s.user_id
-        JOIN lounge_member m ON m.user_id = s.user_id AND m.lounge_id = $1
-       WHERE m.role = 'student'
-       GROUP BY u.nickname ORDER BY score DESC LIMIT 5`, [loungeId, days]);
+/* ---------- 랭킹 ----------
+   받은 이모지만 센다. 글을 몇 개 썼는지 · 댓글을 몇 개 달았는지는 안 본다.
+   많이 쓴 사람이 아니라 남에게 가닿은 사람이 위로 온다.
+
+   · 글에 달린 반응과 댓글에 달린 반응을 같이 센다. 둘 다 '받은 것'이다.
+   · 자기 글에 자기가 누른 것은 빼다. 혼자 올릴 수 있으면 순위가 아니다.
+   · 수강생만 센다. 강사 공지에 반응이 몰리면 순위가 뒤집힌다.
+   · days 가 null 이면 전체 기간. */
+const received = (loungeId, days) =>
+  rows(`
+    WITH got AS (
+      SELECT p.user_id AS who, r.emoji, r.created_at
+        FROM reaction r
+        JOIN post p ON p.id = r.target_id AND r.target_kind = 'post'
+       WHERE p.lounge_id = $1 AND p.deleted_at IS NULL AND r.user_id <> p.user_id
+      UNION ALL
+      SELECT c.user_id, r.emoji, r.created_at
+        FROM reaction r
+        JOIN comment c ON c.id = r.target_id AND r.target_kind = 'comment'
+        JOIN post p2 ON p2.id = c.post_id
+       WHERE p2.lounge_id = $1 AND c.deleted_at IS NULL AND r.user_id <> c.user_id
+    )
+    SELECT u.nickname AS name, m.week, m.cohort,
+           coalesce(sum(cnt.n), 0)::int AS total,
+           coalesce(json_agg(json_build_object('e', cnt.emoji, 'n', cnt.n)
+                             ORDER BY cnt.n DESC) FILTER (WHERE cnt.emoji IS NOT NULL), '[]') AS emojis
+      FROM lounge_member m
+      JOIN ext_user u ON u.id = m.user_id
+ LEFT JOIN (
+      SELECT who, emoji, count(*)::int AS n FROM got
+       WHERE ($2::int IS NULL OR created_at >= now() - ($2 || ' days')::interval)
+       GROUP BY who, emoji
+    ) cnt ON cnt.who = m.user_id
+     WHERE m.lounge_id = $1 AND m.role = 'student'
+     GROUP BY u.nickname, m.week, m.cohort
+     ORDER BY total DESC, u.nickname`, [loungeId, days]);
+
+/* 기간 안에 이모지를 가장 많이 받은 글. 누가 아니라 무엇이 가닿았는지. */
+const topPosts = (loungeId, days) =>
+  rows(`
+    SELECT p.id, p.title, p.author_name, c.name AS category,
+           count(*)::int AS got
+      FROM reaction r
+      JOIN post p ON p.id = r.target_id AND r.target_kind = 'post'
+      JOIN category c ON c.id = p.category_id
+     WHERE p.lounge_id = $1 AND p.deleted_at IS NULL AND r.user_id <> p.user_id
+       AND ($2::int IS NULL OR r.created_at >= now() - ($2 || ' days')::interval)
+     GROUP BY p.id, p.title, p.author_name, c.name
+     ORDER BY got DESC, p.created_at DESC
+     LIMIT 5`, [loungeId, days]);
 
 const weekFlags = (loungeId) =>
   rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
 
 module.exports = { lounge, lounges, members, categories, categoryRights,
-                   posts, comments, leaderboard, weekFlags };
+                   posts, comments, received, topPosts, weekFlags };

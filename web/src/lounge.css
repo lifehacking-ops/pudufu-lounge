@@ -1208,6 +1208,60 @@
 
   .att-compact .att-real { max-height: 180px; }
 
+  /* ================= 랭킹 =================
+     한 줄에 순위 · 사람 · 받은 이모지 · 막대 · 합계. 막대는 1등 대비 길이다. */
+
+  .rank {
+    display: grid; grid-template-columns: 26px 24px minmax(0, 1fr) auto 90px 38px;
+    align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--hair);
+  }
+
+  .rank:last-child { border-bottom: 0; }
+
+  .rank-me {
+    margin: 0 -10px; padding-left: 10px; padding-right: 10px;
+    border-radius: var(--radius-ctl); background: var(--brand-tint);
+  }
+
+  .rank-no {
+    font-size: 13px; font-weight: 700; color: var(--mist);
+    text-align: center; font-variant-numeric: tabular-nums;
+  }
+
+  .rank-top { color: var(--brand); }
+  .rank-who { min-width: 0; display: grid; }
+  .rank-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-sub { font-size: 11px; color: var(--mist); }
+
+  .rank-ems { display: flex; gap: 4px; }
+
+  .rank-em {
+    display: inline-flex; align-items: center; gap: 3px;
+    border-radius: var(--radius-chip); background: var(--cloud);
+    padding: 2px 7px; font-size: 11px; font-weight: 600; color: var(--slate);
+  }
+
+  .rank-em-i { font-size: 12px; line-height: 1; }
+
+  .rank-bar { height: 6px; border-radius: 999px; background: var(--cloud); overflow: hidden; }
+  .rank-fill { height: 100%; border-radius: 999px; background: var(--brand); }
+
+  .rank-total {
+    font-size: 13px; font-weight: 700; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rank-mine { display: grid; gap: 2px; margin-top: 12px; }
+  .rank-mine b { font-size: 26px; font-weight: 700; line-height: 1.2; }
+  .rank-mine span { font-size: 12px; color: var(--slate); }
+
+  /* 좁아지면 이모지 내역과 막대를 접는다. 순위와 합계가 먼저다. */
+  @media (max-width: 900px) {
+    .rank { grid-template-columns: 26px 24px minmax(0, 1fr) 38px; }
+    .rank-ems, .rank-bar { display: none; }
+  }
+
   /* 케밥 메뉴 — 세로 점 셋. 자주 안 쓰는 조작을 한 겹 접어 둔다. */
   .kebab { position: relative; display: inline-flex; flex: none; }
 

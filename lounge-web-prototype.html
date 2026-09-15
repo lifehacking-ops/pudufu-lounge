@@ -52,7 +52,7 @@
   <div class="nav-in">
     <button type="button" id="tabCommunity" aria-current="true">커뮤니티</button>
     <button type="button" id="tabClassroom" aria-current="false">강의</button>
-    <button type="button" aria-disabled="true">랭킹</button>
+    <button type="button" id="tabRanking" aria-current="false">랭킹</button>
     <button type="button" id="tabAdmin" aria-current="false" hidden>관리</button>
   </div>
 </nav>
@@ -335,6 +335,21 @@
         </div>
       </article>
     </div>
+  </div>
+</div>
+
+<!-- ==================== 랭킹 ==================== -->
+<div class="page rise" id="screenRanking" hidden>
+  <div class="adm-head">
+    <div>
+      <h2 class="adm-t">랭킹</h2>
+      <p class="adm-d">받은 이모지만 셉니다. 많이 쓴 사람이 아니라 남에게 가닿은 사람입니다.</p>
+    </div>
+    <div class="seg adm-seg" id="rankSeg"></div>
+  </div>
+  <div class="adm-grid">
+    <div class="adm-col" id="rankMain"></div>
+    <div class="adm-col" id="rankRail"></div>
   </div>
 </div>
 

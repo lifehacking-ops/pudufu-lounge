@@ -107,19 +107,17 @@
 
           <div class="composer-foot">
             <div class="attach-row">
-              <button type="button" class="attach-btn" title="파일 첨부" aria-label="파일 첨부">
+              <!-- 링크 · 유튜브는 버튼을 두지 않는다. 본문에 붙여넣으면 서버가
+                   알아서 카드로 만든다 — 사람은 링크를 '첨부'한다고 생각하지 않는다. -->
+              <input type="file" id="fileInput" hidden
+                     accept="image/png,image/jpeg,image/gif,image/webp,application/pdf">
+              <button type="button" class="attach-btn" id="fileBtn" title="파일 첨부" aria-label="파일 첨부">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>
               </button>
-              <button type="button" class="attach-btn" title="링크 첨부" aria-label="링크 첨부">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.5 3.5l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.5 20.5l1.7-1.7"/></svg>
-              </button>
-              <button type="button" class="attach-btn" title="유튜브 첨부" aria-label="유튜브 첨부">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10.5 9.5 4.5 2.5-4.5 2.5z"/></svg>
-              </button>
-              <button type="button" class="attach-btn" title="이모지 첨부" aria-label="이모지 첨부">
+              <button type="button" class="attach-btn" id="emojiBtn" title="이모지" aria-label="이모지">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01"/><path d="M15 9.5h.01"/></svg>
               </button>
-              <button type="button" class="attach-btn" title="GIF 첨부" aria-label="GIF 첨부" style="width:auto;padding:0 7px;font-size:11px;font-weight:700">GIF</button>
+              <span class="attach-now" id="attachNow" hidden></span>
             </div>
 
             <span class="grow"></span>

@@ -567,3 +567,70 @@ async function setMission(loungeId, userId, week, input) {
 }
 
 module.exports.setMission = setMission;
+
+/* ---------- 피드백권 지급 ----------
+   권의 소유는 프드프 소관이라는 원칙은 그대로다. 다만 라운지 관리자가
+   '이번 주만 한 장 더' 를 줄 수 있어야 운영이 된다. local 에서는 캐시를
+   직접 고치고, remote 에서는 프드프에 요청한다. */
+
+async function grantPass(loungeId, userId, targetUserId, n) {
+  await admin(loungeId, userId);
+  const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
+  const add = Math.max(1, Math.min(10, Number(n) || 1));
+
+  if (config.pudufu.mode === "remote") {
+    const res = await fetch(config.pudufu.base + "/api/lounge/passes/grant", {
+      method: "POST",
+      headers: { "content-type": "application/json", "X-Lounge-Key": config.pudufu.key },
+      body: JSON.stringify({ user_id: targetUserId, course_id: L.course_id, count: add })
+    });
+    if (!res.ok) throw new Denied("프드프가 지급을 받지 않았습니다");
+    return { ok: true, granted: add };
+  }
+
+  /* 쓴 횟수를 줄이는 방식으로 준다. 주기당 지급 수를 늘리면 다음 주에도
+     늘어난 채로 남는다 — '이번 주만' 이 되지 않는다. */
+  const r = await one(
+    `UPDATE ext_feedback_pass SET used = greatest(0, used - $3), synced_at = now()
+      WHERE user_id = $1 AND course_id = $2
+      RETURNING quota_per, used`, [targetUserId, L.course_id, add]);
+  if (!r) throw new Missing("이 사람의 피드백권 기록이 없습니다");
+
+  return { ok: true, granted: add, left: r.quota_per - r.used };
+}
+
+/* ---------- 라운지 소개 ---------- */
+
+async function setLounge(loungeId, userId, input) {
+  await admin(loungeId, userId);
+  await rows(
+    `UPDATE lounge SET name = coalesce($2, name), intro = $3, banner_url = $4 WHERE id = $1`,
+    [loungeId, (input.name || "").trim() || null,
+     (input.intro || "").trim() || null, (input.banner || "").trim() || null]);
+  return { ok: true };
+}
+
+/* ---------- 카테고리 이름 ----------
+   글의 카테고리는 id 로 이어져 있으므로 이름을 바꿔도 글이 흩어지지 않는다. */
+
+async function renameCategory(loungeId, userId, categoryId, name) {
+  await admin(loungeId, userId);
+  name = (name || "").trim();
+  if (!name) throw new Denied("이름이 없습니다");
+  if (name === "전체") throw new Denied("‘전체’ 는 필터 바가 쓰는 이름입니다");
+
+  const c = await one(`SELECT id, name, is_system FROM category WHERE id = $1 AND deleted_at IS NULL`, [categoryId]);
+  if (!c) throw new Missing();
+  if (c.is_system) throw new Denied(`‘${c.name}’ 은 뒤에 동작이 붙어 있어 이름을 바꾸지 않습니다`);
+
+  const dup = await one(
+    `SELECT id FROM category WHERE name = $1 AND deleted_at IS NULL AND id <> $2`, [name, categoryId]);
+  if (dup) throw new Denied(`‘${name}’ 은 이미 있습니다`);
+
+  await rows(`UPDATE category SET name = $1 WHERE id = $2`, [name, categoryId]);
+  return { ok: true, name: name };
+}
+
+module.exports.grantPass = grantPass;
+module.exports.setLounge = setLounge;
+module.exports.renameCategory = renameCategory;

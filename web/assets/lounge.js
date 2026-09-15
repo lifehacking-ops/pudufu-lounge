@@ -870,6 +870,8 @@
     ta.value = "";
     autoGrow(ta);
     if (missionForm) missionForm.clear();
+    draft.attach = null;
+    paintAttach();
     draft.cat = DEFAULT_CAT;
     draft.wk = CURRENT_WK;
     syncComposer();
@@ -879,6 +881,54 @@
 
   ta.addEventListener("input", function () { autoGrow(ta); updatePostBtn(); });
   wTitle.addEventListener("input", updatePostBtn);
+
+  /* ----- 파일 첨부 -----
+     파일은 서버를 통과하지 않는다. 서버에서 '올려도 되는 주소'를 받아
+     브라우저가 보관소로 바로 올린다 — 서버리스는 본문 크기 제한이 있다. */
+
+  var fileInput = $("fileInput"), fileBtn = $("fileBtn"), attachNow = $("attachNow");
+
+  function paintAttach() {
+    attachNow.textContent = "";
+    attachNow.hidden = !draft.attach;
+    if (!draft.attach) return;
+
+    attachNow.appendChild(el("b", null, draft.attach.name || "첨부"));
+    var x = el("button", null, "×");
+    x.type = "button";
+    x.setAttribute("aria-label", "첨부 떼기");
+    x.addEventListener("click", function () { draft.attach = null; paintAttach(); updatePostBtn(); });
+    attachNow.appendChild(x);
+  }
+
+  if (fileBtn) fileBtn.addEventListener("click", function () { fileInput.click(); });
+
+  if (fileInput) fileInput.addEventListener("change", function () {
+    var f = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+
+    if (!API) {
+      // 프로토타입에는 보관소가 없다. 자리만 잡아 둔다.
+      draft.attach = { type: "image", label: f.name, name: f.name };
+      paintAttach();
+      return;
+    }
+
+    draft.attach = { name: f.name, uploading: true };
+    paintAttach();
+
+    send("POST", "/uploads", { type: f.type, size: f.size })
+      .then(function (r) {
+        return fetch(r.uploadUrl, { method: "PUT", body: f, headers: { "content-type": f.type } })
+          .then(function (up) {
+            if (!up.ok) throw new Error("올리지 못했습니다 (" + up.status + ")");
+            draft.attach = { type: r.kind, url: r.url, title: f.name, label: f.name, name: f.name };
+            paintAttach();
+          });
+      })
+      .catch(function (err) { draft.attach = null; paintAttach(); failed(err); });
+  });
 
   /* 글쓰기 상태. 주차는 사용자가 고르는 값이 아니라 맥락이 정하는 값이다.
      기본 카테고리는 양식이 안 붙는 것으로 둔다. 창을 열면 빈 종이여야 하고,
@@ -1122,9 +1172,11 @@
     };
 
     // 서버가 받아 준 뒤에 화면에 올린다. 권한과 피드백권은 서버가 다시 본다.
+    if (draft.attach) post.attach = draft.attach;
+
     send("POST", "/posts", {
       cat: post.cat, wk: post.wk || null, title: post.title,
-      body: post.body, mission: answers
+      body: post.body, mission: answers, attach: draft.attach || null
     }).then(function (r) {
       if (r) post.id = r.id;
       POSTS.unshift(post);
@@ -1135,6 +1187,8 @@
       wTitle.value = "";
       ta.value = "";
       autoGrow(ta);
+      draft.attach = null;
+      paintAttach();
       if (missionForm) missionForm.clear();
       draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
       draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
@@ -1697,6 +1751,12 @@
     detailComments.appendChild(newCommentBox());
   }
 
+  function parentOf(reply) {
+    return (openRef.thread || []).filter(function (c) {
+      return (c.replies || []).indexOf(reply) > -1;
+    })[0] || { replies: [] };
+  }
+
   function commentNode(c, isReply) {
     var row = el("div", "cmt");
     c.node = row;   // 검색 결과에서 이 댓글로 바로 내려가기 위해
@@ -1740,6 +1800,44 @@
       re.type = "button";
       re.addEventListener("click", function () { toggleReply(c, main); });
       act.appendChild(re);
+    }
+
+    /* 내 댓글은 내가, 남의 댓글은 관리자가 지운다. 서버가 다시 본다. */
+    if (c.author === ME.name || can("delete")) {
+      var del = el("button", "del", "삭제");
+      del.type = "button";
+      del.addEventListener("click", function () {
+        var gate = el("div", "gate");
+        gate.style.marginTop = "8px";
+        gate.appendChild(el("b", null, "이 댓글을 지웁니다."));
+        if (!isReply && c.replies && c.replies.length) {
+          gate.appendChild(el("span", "muted", "답글 " + c.replies.length + "개도 같이 사라집니다."));
+        }
+        gate.appendChild(el("span", "grow"));
+
+        var no = el("button", "btn-sec", "취소");
+        no.type = "button";
+        no.addEventListener("click", function () { gate.remove(); });
+        gate.appendChild(no);
+
+        var yes = el("button", "btn-primary sm", "삭제");
+        yes.type = "button";
+        yes.addEventListener("click", function () {
+          function drop() {
+            var list = isReply ? parentOf(c).replies : openRef.thread;
+            var i = list.indexOf(c);
+            if (i > -1) list.splice(i, 1);
+            renderComments();
+            render();
+          }
+          if (API && c.id) send("DELETE", "/comments/" + c.id).then(drop).catch(failed);
+          else drop();
+        });
+        gate.appendChild(yes);
+
+        if (!main.querySelector(".gate")) main.appendChild(gate);
+      });
+      act.appendChild(del);
     }
     main.appendChild(act);
 
@@ -3016,7 +3114,7 @@
   function paintRolesTab(host) {
     /* 멤버 표 */
     var c1 = admCard("멤버", MEMBERS.length + "명");
-    var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "역할"]);
+    var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "피드백권", "역할"]);
 
     MEMBERS.forEach(function (m, i) {
       var tr = el("tr");
@@ -3026,6 +3124,26 @@
       tr.appendChild(el("td", "num", m.role === "student" ? m.wk + "주차" : "—"));
       tr.appendChild(el("td", "num", m.lastDays === 0 ? "오늘" : m.lastDays + "일 전"));
       tr.appendChild(el("td", "num", scopeLabel(m)));
+
+      /* 권은 프드프가 갖지만 '이번 주만 한 장 더' 는 라운지에서 줄 수 있어야
+         운영이 된다. 다음 주기가 되면 원래대로 돌아간다. */
+      var pt = el("td");
+      if (m.role === "student") {
+        var give = el("button", "fadd-btn", "+1");
+        give.type = "button";
+        give.setAttribute("aria-label", m.name + " 에게 피드백권 한 장");
+        give.addEventListener("click", function () {
+          give.disabled = true;
+          send("POST", "/admin/members/" + m.userId + "/passes", { count: 1 })
+            .then(function (r) {
+              give.textContent = r && r.left != null ? "남음 " + r.left : "지급됨";
+              setTimeout(function () { give.textContent = "+1"; give.disabled = false; }, 1600);
+            })
+            .catch(function (e) { give.disabled = false; failed(e); });
+        });
+        pt.appendChild(give);
+      }
+      tr.appendChild(pt);
 
       var td = el("td");
       var pick = el("div", "pick");
@@ -3192,6 +3310,38 @@
         if (col.key === "off") {
           var cat = categoryOf(name);
           var why = catBlocker(cat);
+
+          /* 이름은 미사용 칸에서 고친다. 글은 id 로 이어져 있어 흩어지지 않는다. */
+          if (!cat.system) {
+            var ren = el("button", "fmove", "✎");
+            ren.type = "button";
+            ren.setAttribute("aria-label", name + " 이름 바꾸기");
+            ren.addEventListener("click", function () {
+              var inp = document.createElement("input");
+              inp.className = "adm-find";
+              inp.value = name;
+              inp.style.margin = "0";
+              item.textContent = "";
+              item.appendChild(inp);
+              inp.focus();
+              inp.select();
+
+              function done(save) {
+                var v = inp.value.trim();
+                if (!save || !v || v === name) return renderAdmin();
+                function put() { cat.name = v; renderFilters(); paintCat(); renderAdmin(); }
+                if (!API) return put();
+                send("PATCH", "/admin/categories/" + cat.id, { name: v })
+                  .then(put).catch(function (e) { renderAdmin(); failed(e); });
+              }
+              inp.addEventListener("keydown", function (e) {
+                if (e.key === "Enter") done(true);
+                if (e.key === "Escape") done(false);
+              });
+              inp.addEventListener("blur", function () { done(true); });
+            });
+            bs.appendChild(ren);
+          }
 
           if (why) {
             bs.appendChild(el("span", "fwhy", why));

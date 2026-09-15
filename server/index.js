@@ -14,6 +14,7 @@ const render = require("./render");
 const account = require("./account");
 const writes = require("./writes");
 const { unfurl } = require("./unfurl");
+const storage = require("./storage");
 const { pool } = require("./db");
 
 const ROOT = path.join(__dirname, "..");
@@ -103,6 +104,10 @@ async function handler(req, res) {
 
         /* 글쓰기 창에서 주소를 붙여넣는 순간 미리 보여주기 위한 것.
            저장은 글을 올릴 때 서버가 다시 한다. */
+        /* 파일은 서버를 통과하지 않는다. 올려도 되는 주소만 내준다. */
+        if (req.method === "POST" && s[1] === "uploads")
+          return json(res, 200, await storage.signUpload(me, input.type, Number(input.size || 0)));
+
         if (req.method === "POST" && s[1] === "unfurl")
           return json(res, 200, await unfurl(String(input.url || "").slice(0, 2000)));
 
@@ -147,6 +152,15 @@ async function handler(req, res) {
 
           if (req.method === "PUT" && s[2] === "weeks" && s[4] === "mission")
             return json(res, 200, await writes.setMission(L, me, +s[3], input));
+
+          if (req.method === "POST" && s[2] === "members" && s[4] === "passes")
+            return json(res, 200, await writes.grantPass(L, me, +s[3], input.count));
+
+          if (req.method === "PUT" && s[2] === "lounge")
+            return json(res, 200, await writes.setLounge(L, me, input));
+
+          if (req.method === "PATCH" && s[2] === "categories")
+            return json(res, 200, await writes.renameCategory(L, me, +s[3], input.name));
         }
       } catch (e) {
         if (e.code === 403 || e.code === 404) return json(res, e.code, { error: e.message });

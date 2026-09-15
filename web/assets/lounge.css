@@ -2909,6 +2909,36 @@
     color: var(--brand);
     font-weight: 600;
   }
+  .attach-now {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
+    border-radius: var(--radius-chip);
+    background: var(--cloud);
+    padding: 4px 6px 4px 11px;
+    font-size: 12px;
+    color: var(--slate);
+    max-width: 260px;
+  }
+  .attach-now b {
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .attach-now button {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    color: var(--mist);
+    flex: none;
+  }
+  .attach-now button:hover {
+    background: var(--surface);
+    color: var(--ink);
+  }
   .del {
     color: var(--danger);
     font-size: 12px;

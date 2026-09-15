@@ -143,7 +143,7 @@ DELETE /l/{lounge}/posts/{id}         관리자
 POST   /l/{lounge}/posts/{id}/comments    { body, parent_id }
 DELETE /l/{lounge}/comments/{id}
 PUT    /l/{lounge}/posts/{id}/reactions   { emoji }      토글
-POST   /l/{lounge}/uploads                이미지. 저장소는 미정
+POST   /l/{lounge}/uploads                이미지 → Supabase Storage
 ```
 
 ### 관리
@@ -175,11 +175,18 @@ GET    /l/{lounge}/admin/digest?date=          어제 요약
 
 ---
 
+## 정해진 것
+
+| 항목 | 결정 |
+|---|---|
+| 서버 | **Node.js.** 대시보드 집계와 어제 요약 생성 로직이 `lounge.js` 에 있으므로, 서버도 JS 면 같은 함수를 써서 화면과 cron 이 같은 숫자를 낸다 |
+| DB | **PostgreSQL** (Supabase). 단 **관리형 Postgres + Storage 로만** 쓴다 |
+| 쓰지 않는 것 | Supabase Auth · RLS · 클라이언트 직결. 셋 다 나중에 옮길 때 통째로 재작성 대상이 되고, 특히 클라이언트 직결은 `LOUNGE_DATA` 이음새를 깬다 |
+| 이미지 | Supabase Storage |
+
 ## 아직 정하지 않은 것
 
 | 항목 | 상태 |
 |---|---|
-| 이미지 업로드 저장소 | 프드프가 AWS 사용 중. 어느 서비스인지 확인 필요 |
-| 라운지 서버 스택 | 독립이므로 자유. 프레임워크 최소 + 서버 렌더를 권함 |
 | 알림 | 프드프에 체계가 없다. 1차 범위 밖 |
 | 프드프 → 라운지 변경 통지 | 지금은 라운지가 주기적으로 당겨 온다(pull). 웹훅은 나중에 |

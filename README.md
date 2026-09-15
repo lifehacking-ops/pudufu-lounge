@@ -10,7 +10,7 @@
 | `web/assets/lounge.css` | 빌드 결과. **프로토타입과 앱이 같은 파일을 쓴다** |
 | `web/assets/lounge.js` | 화면과 동작. 〃 |
 | `web/assets/data-mock.js` | 예시 데이터. 앱에서는 서버가 같은 모양으로 채운다 |
-| `db/schema.sql` | 스키마. 라운지 12개 + 프드프 캐시 8개 |
+| `db/schema.sql` | 스키마(PostgreSQL). 라운지 12개 + 프드프 캐시 8개 |
 | `db/seed.sql` | 시드. `data-mock.js` 에서 생성된다 |
 | `docs/API.md` | API 계약. 프드프에 요청할 5개 + 라운지 자체 |
 | `DESIGN.md` | 디자인 토큰. `pudufu.net` 에서 추출 |
@@ -57,6 +57,28 @@ npm run css:watch    고칠 때마다
 사람만 돌린다. 3.0 도 번들러 없이 Tailwind 를 쓰므로 운용 방식이 같다.
 
 > 빌드한 뒤 화면이 그대로면 브라우저 캐시다. 강력 새로고침(`⌘⇧R`).
+
+## DB
+
+**PostgreSQL** 이다. 운영은 Supabase 를 쓰되 **관리형 Postgres + Storage 로만** 쓴다 —
+Auth · RLS · 클라이언트 직결은 쓰지 않는다. 그래야 나중에 어디로든 옮길 수 있고,
+`window.LOUNGE_DATA` 이음새도 지켜진다.
+
+```
+createdb lounge
+psql -d lounge -f db/schema.sql
+psql -d lounge -f db/seed.sql
+```
+
+시드는 불러오는 시점 기준 상대 시각으로 들어가므로 며칠 뒤에 넣어도
+&lsquo;어제 올라온 글&rsquo;과 &lsquo;이번 주 미제출&rsquo;이 그대로 말이 된다.
+
+**숫자가 화면과 일치하는지 확인했다.** 수강생 24 · 대기 피드백 3 · 답 없는 과제 8 ·
+이번 주 미제출 12 · 7일 이상 조용 4 · 어제 글 5 · 어제 입장 2 · 어제 강사 피드백 3,
+그리고 주차별 이탈 퍼널까지 프로토타입 화면과 같다.
+
+나중에 MySQL 로 되돌릴 일이 생기면 `make-seed.js` 의 방언 함수 세 줄만 바꾸면
+시드는 자동으로 따라온다. 스키마는 손으로 번역한다(테이블 20개).
 
 ## 어디에 만드나
 

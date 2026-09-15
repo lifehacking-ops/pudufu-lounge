@@ -259,19 +259,20 @@
   }
 
   /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
-  function publishMission(wk, answers, title, overwrite) {
+  function publishMission(wk, answers, title, overwrite, attach) {
     var exist = myMissionPost(wk);
     var name = title || wk + "주차 과제 올립니다";
 
     // 과제는 주차마다 한 편이다. 덮어쓰기는 앞의 것을 지우고 새로 쓴다.
     send("POST", "/posts", {
       cat: "과제", wk: wk, title: name, body: "", mission: answers,
-      overwrite: !!(overwrite && exist)
+      attach: attach || null, overwrite: !!(overwrite && exist)
     }).then(function (r) {
       if (overwrite && exist) {
         exist.mission = answers;
         exist.when = "방금 수정함";
         exist.title = name;
+        if (attach) exist.attach = attach;
         if (r) exist.id = r.id;
       } else {
         POSTS.unshift({
@@ -280,7 +281,8 @@
           author: ME.name, when: "방금", state: "live",
           views: 1, mine: true,
           reactions: {}, myReact: null, thread: [],
-          title: name, body: "", mission: answers
+          title: name, body: "", mission: answers,
+          attach: attach || undefined
         });
       }
       render();
@@ -903,30 +905,31 @@
 
   if (fileBtn) fileBtn.addEventListener("click", function () { fileInput.click(); });
 
+  /* 올리기 자체는 한 곳에만 둔다. 글쓰기 창과 강의실 과제 폼이 같이 쓴다. */
+  function uploadFile(f, onProgress) {
+    if (!API) {
+      // 프로토타입에는 보관소가 없다. 자리만 잡아 둔다.
+      return Promise.resolve({ type: "image", label: f.name, name: f.name });
+    }
+    if (onProgress) onProgress({ name: f.name, uploading: true });
+
+    return send("POST", "/uploads", { type: f.type, size: f.size })
+      .then(function (r) {
+        return fetch(r.uploadUrl, { method: "PUT", body: f, headers: { "content-type": f.type } })
+          .then(function (up) {
+            if (!up.ok) throw new Error("올리지 못했습니다 (" + up.status + ")");
+            return { type: r.kind, url: r.url, title: f.name, label: f.name, name: f.name };
+          });
+      });
+  }
+
   if (fileInput) fileInput.addEventListener("change", function () {
     var f = fileInput.files && fileInput.files[0];
     fileInput.value = "";
     if (!f) return;
 
-    if (!API) {
-      // 프로토타입에는 보관소가 없다. 자리만 잡아 둔다.
-      draft.attach = { type: "image", label: f.name, name: f.name };
-      paintAttach();
-      return;
-    }
-
-    draft.attach = { name: f.name, uploading: true };
-    paintAttach();
-
-    send("POST", "/uploads", { type: f.type, size: f.size })
-      .then(function (r) {
-        return fetch(r.uploadUrl, { method: "PUT", body: f, headers: { "content-type": f.type } })
-          .then(function (up) {
-            if (!up.ok) throw new Error("올리지 못했습니다 (" + up.status + ")");
-            draft.attach = { type: r.kind, url: r.url, title: f.name, label: f.name, name: f.name };
-            paintAttach();
-          });
-      })
+    uploadFile(f, function (p) { draft.attach = p; paintAttach(); })
+      .then(function (a) { draft.attach = a; paintAttach(); })
       .catch(function (err) { draft.attach = null; paintAttach(); failed(err); });
   });
 
@@ -2332,11 +2335,53 @@
     // 이미 제출했다면 그때 쓴 답변을 그대로 불러온다
     if (posted) form.fill(posted.mission.map(function (a) { return a.a; }));
 
+    /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많다. */
+    var cmAttach = null;
+    var cmFile = document.createElement("input");
+    cmFile.type = "file";
+    cmFile.hidden = true;
+    cmFile.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf";
+
+    var cmRow = el("div", "row cm-attach");
+    var cmBtn = el("button", "fadd-btn", "+ 파일 첨부");
+    cmBtn.type = "button";
+    cmBtn.addEventListener("click", function () { cmFile.click(); });
+    var cmNow = el("span", "attach-now");
+    cmNow.hidden = true;
+
+    function paintCm() {
+      cmNow.textContent = "";
+      cmNow.hidden = !cmAttach;
+      cmBtn.hidden = !!cmAttach;
+      if (!cmAttach) return;
+      cmNow.appendChild(el("b", null, cmAttach.name || "첨부"));
+      var x = el("button", null, "×");
+      x.type = "button";
+      x.setAttribute("aria-label", "첨부 떼기");
+      x.addEventListener("click", function () { cmAttach = null; paintCm(); });
+      cmNow.appendChild(x);
+    }
+
+    cmFile.addEventListener("change", function () {
+      var f = cmFile.files && cmFile.files[0];
+      cmFile.value = "";
+      if (!f) return;
+      uploadFile(f, function (p) { cmAttach = p; paintCm(); })
+        .then(function (a) { cmAttach = a; paintCm(); })
+        .catch(function (err) { cmAttach = null; paintCm(); failed(err); });
+    });
+
+    cmRow.appendChild(cmFile);
+    cmRow.appendChild(cmBtn);
+    cmRow.appendChild(cmNow);
+    // 이미 낸 과제에 붙어 있던 파일은 그대로 이어 받는다
+    if (posted && posted.attach) { cmAttach = posted.attach; paintCm(); }
+
     var confirmBox = el("div", "gate cm-confirm");
     confirmBox.hidden = true;
 
     function doSend(overwrite) {
-      publishMission(wk, form.answers(), null, overwrite);
+      publishMission(wk, form.answers(), null, overwrite, cmAttach);
       confirmBox.hidden = true;
     }
 
@@ -2375,6 +2420,7 @@
     row.appendChild(send);
 
     card.appendChild(form.el);
+    card.appendChild(cmRow);
     card.appendChild(row);
     card.appendChild(confirmBox);   // 확인은 누른 버튼 바로 아래에 뜬다
     classMission.appendChild(card);
@@ -2548,6 +2594,73 @@
     return f;
   }
 
+  /* 질문 칸. 주차마다 물을 것이 다르므로 개수를 고정하지 않는다.
+     세 개로 박아 두면 '주소 하나만 받는 주차' 도 빈 칸 두 개를 끌고 간다. */
+  var QS_MAX = 8;
+
+  function questionList(host, initial) {
+    var wrap = el("div");
+    var rows = [];
+
+    function add(q, hint, focus) {
+      if (rows.length >= QS_MAX) return;
+      var row = el("div", "qrow-edit");
+      var n = rows.length + 1;
+
+      var qi = cField("Q" + n + " 질문", "수강생에게 물을 것");
+      var hi = cField("Q" + n + " 힌트", "칸 안내 문구 · 비워도 됩니다");
+      qi.input.value = q || "";
+      hi.input.value = hint || "";
+
+      var pair = el("div", "cadd-2");
+      pair.appendChild(qi.el);
+      pair.appendChild(hi.el);
+      row.appendChild(pair);
+
+      var x = el("button", "fmove", "×");
+      x.type = "button";
+      x.setAttribute("aria-label", n + "번 질문 빼기");
+      x.addEventListener("click", function () {
+        if (rows.length <= 1) return;   // 질문이 없는 과제는 과제가 아니다
+        rows.splice(rows.indexOf(item), 1);
+        row.remove();
+        renumber();
+      });
+      row.appendChild(x);
+
+      var item = { q: qi, h: hi, el: row };
+      rows.push(item);
+      wrap.appendChild(row);
+      renumber();
+      if (focus) qi.input.focus();
+    }
+
+    function renumber() {
+      rows.forEach(function (r, i) {
+        r.q.el.querySelector(".cfield-l").textContent = "Q" + (i + 1) + " 질문";
+        r.h.el.querySelector(".cfield-l").textContent = "Q" + (i + 1) + " 힌트";
+        r.el.querySelector(".fmove").disabled = rows.length <= 1;
+      });
+      more.hidden = rows.length >= QS_MAX;
+      more.textContent = "+ 질문 추가 (" + rows.length + "/" + QS_MAX + ")";
+    }
+
+    var more = el("button", "fadd-btn", "+ 질문 추가");
+    more.type = "button";
+    more.addEventListener("click", function () { add("", "", true); });
+
+    (initial && initial.length ? initial : [{ q: "", hint: "" }])
+      .forEach(function (x) { add(x.q, x.hint, false); });
+
+    host.appendChild(wrap);
+    host.appendChild(more);
+
+    return function () {
+      return rows.map(function (r) { return { q: r.q.val(), hint: r.h.val() }; })
+        .filter(function (x) { return x.q; });
+    };
+  }
+
   /* 이미 연 주차의 과제 양식을 고친다.
      이미 낸 과제는 그때의 질문을 스냅샷으로 갖고 있어서 안 바뀐다. */
   function missionForm2(cr) {
@@ -2558,24 +2671,13 @@
     mis.input.value = (cur.title || "").replace(/^\d+주차 미션 · /, "");
     f.el.appendChild(mis.el);
 
-    var qs = [0, 1, 2].map(function (n) {
-      var q = cField("Q" + (n + 1) + " 질문", "수강생에게 물을 것");
-      var h = cField("Q" + (n + 1) + " 힌트", "칸 안내 문구 · 비워도 됩니다");
-      q.input.value = (cur.qs[n] && cur.qs[n].q) || "";
-      h.input.value = (cur.qs[n] && cur.qs[n].hint) || "";
-      var pair = el("div", "cadd-2");
-      pair.appendChild(q.el);
-      pair.appendChild(h.el);
-      f.el.appendChild(pair);
-      return { q: q, h: h };
-    });
+    var readQs = questionList(f.el, cur.qs || []);
 
     function close() { f.say(""); f.el.hidden = true; }
 
     f.foot("양식 저장", function () {
       if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
-      var list = qs.filter(function (x) { return x.q.val(); })
-                   .map(function (x) { return { q: x.q.val(), hint: x.h.val() }; });
+      var list = readQs();
       if (!list.length) { f.say("질문이 하나는 있어야 합니다."); return; }
 
       function put(title) {
@@ -2622,15 +2724,7 @@
     var mis = cField("과제 미션 한 줄", "예: 후기 세 개 받아오기");
     f.el.appendChild(mis.el);
 
-    var qs = [1, 2, 3].map(function (n) {
-      var q = cField("Q" + n + " 질문", "수강생에게 물을 것");
-      var h = cField("Q" + n + " 힌트", "칸 안내 문구 · 비워도 됩니다");
-      var pair = el("div", "cadd-2");
-      pair.appendChild(q.el);
-      pair.appendChild(h.el);
-      f.el.appendChild(pair);
-      return { q: q, h: h };
-    });
+    var readQs = questionList(f.el, []);
 
     function close() {
       f.say("");
@@ -2641,13 +2735,10 @@
     f.foot("만들고 비공개로 두기", function () {
       if (!title.val()) { f.say("강의 제목은 있어야 합니다."); return; }
       if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
-      if (qs.filter(function (x) { return !x.q.val(); }).length) { f.say("질문 세 개를 모두 채워주세요."); return; }
+      var picked = readQs();
+      if (!picked.length) { f.say("질문이 하나는 있어야 합니다."); return; }
 
-      var body = {
-        title: title.val(),
-        mission: mis.val(),
-        qs: qs.map(function (x) { return { q: x.q.val(), hint: x.h.val() }; })
-      };
+      var body = { title: title.val(), mission: mis.val(), qs: picked };
 
       function put(wk) {
         MISSIONS[wk] = {

@@ -1174,6 +1174,14 @@
 
   @media (max-width: 620px) { .cadd-2 { grid-template-columns: 1fr; } }
 
+  /* 질문 한 줄 = 질문·힌트 한 쌍 + 빼기 단추. 개수는 주차마다 다르다 */
+  .qrow-edit { display: flex; gap: 8px; align-items: end; }
+  .qrow-edit .cadd-2 { flex: 1; min-width: 0; }
+  .qrow-edit .fmove { margin-bottom: 7px; }
+
+  /* 강의실 과제 폼의 첨부 줄 */
+  .cm-attach { gap: 8px; align-items: center; min-height: 26px; }
+
   .fadd { margin-top: 14px; }
   .fadd-btn { font-size: 13px; font-weight: 600; color: var(--slate); }
   .fadd-btn:hover { color: var(--brand); }

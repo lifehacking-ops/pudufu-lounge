@@ -109,9 +109,14 @@ async function createPost(loungeId, userId, input) {
         `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
         [id, a.type, a.url || "", a.title || a.label || null]);
     } else {
-      /* 첨부를 따로 고르지 않았어도 본문에 주소가 있으면 카드로 만든다.
-         사람은 링크를 '첨부'한다고 생각하지 않고 그냥 붙여넣는다. */
-      const found = firstUrl(input.body);
+      /* 첨부를 따로 고르지 않았어도 주소가 있으면 카드로 만든다.
+         사람은 링크를 '첨부'한다고 생각하지 않고 그냥 붙여넣는다.
+         과제 글은 본문이 비어 있고 답변에 쓰므로 답변까지 훑는다 —
+         '블로그 주소를 적으세요' 같은 질문이 실제로 있다. */
+      const hay = [input.body || ""]
+        .concat((input.mission || []).map((a) => a.a || ""))
+        .join("\n");
+      const found = firstUrl(hay);
       if (found) {
         const card = await unfurl(found);
         await client.query(
@@ -419,8 +424,9 @@ async function addWeek(loungeId, userId, input) {
       WHERE l.id = $1`, [loungeId]);
   if (!input.title) throw new Denied("강의 제목은 있어야 합니다");
   if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
-  if (!input.qs || input.qs.length !== 3 || input.qs.some((q) => !q.q))
-    throw new Denied("질문 세 개를 모두 채워주세요");
+  const qs = (input.qs || []).filter((q) => q.q && q.q.trim());
+  if (!qs.length) throw new Denied("질문이 하나는 있어야 합니다");
+  if (qs.length > 8) throw new Denied("질문은 8개까지입니다");
 
   const next = await one(
     `SELECT coalesce(max(week), 0) + 1 AS w FROM ext_week WHERE course_id = $1`, [L.course_id]);
@@ -429,11 +435,11 @@ async function addWeek(loungeId, userId, input) {
   await rows(`INSERT INTO ext_week (course_id, week, title, synced_at) VALUES ($1, $2, $3, now())`,
     [L.course_id, wk, input.title]);
 
-  for (const [i, q] of input.qs.entries()) {
+  for (const [i, q] of qs.entries()) {
     await rows(
       `INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at)
        VALUES ($1, $2, $3, $4, $5, $6, now())`,
-      [L.course_id, wk, `${wk}주차 미션 · ${input.mission}`, i + 1, q.q, q.hint || null]);
+      [L.course_id, wk, `${wk}주차 미션 · ${input.mission}`, i + 1, q.q.trim(), (q.hint || "").trim() || null]);
   }
 
   await rows(`UPDATE ext_course SET weeks = greatest(weeks, $2) WHERE id = $1`, [L.course_id, wk]);
@@ -550,6 +556,7 @@ async function setMission(loungeId, userId, week, input) {
 
   if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
   if (!input.qs || !input.qs.length) throw new Denied("질문이 하나는 있어야 합니다");
+  if (input.qs.length > 8) throw new Denied("질문은 8개까지입니다");
   if (input.qs.some((q) => !q.q || !q.q.trim())) throw new Denied("빈 질문은 둘 수 없습니다");
 
   const title = `${week}주차 미션 · ${input.mission}`;

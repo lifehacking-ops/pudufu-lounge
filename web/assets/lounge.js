@@ -881,6 +881,12 @@
     if (!D.lounge) return;   // 프로토타입에는 없다. 마크업의 예시 문장을 그대로 둔다.
     introHead.querySelector(".card-t").textContent = D.lounge.name;
     introText.textContent = D.lounge.intro || "아직 소개글이 없습니다.";
+
+    /* 첨부는 글과 같은 것을 쓴다. 링크 카드도 사진도 같은 모양으로 선다. */
+    var old = document.querySelector("#intro .att, #intro .shotwrap");
+    if (old) old.remove();
+    var att = attachments(D.lounge.attach, false);
+    if (att) introText.parentNode.insertBefore(att, introText.nextSibling);
   }
   paintIntro();
 
@@ -900,6 +906,10 @@
       ta2.value = (D.lounge && D.lounge.intro) || "";
       ta2.setAttribute("aria-label", "라운지 소개글");
       box.appendChild(ta2);
+
+      /* 글쓰기 창과 같은 첨부 줄. 주소를 그냥 적어도 카드가 된다. */
+      var att = attachRow((D.lounge && D.lounge.attach) || []);
+      box.appendChild(att.el);
 
       /* 할 일은 한 줄에 하나로 적는다. 칸을 다섯 개 세워 두면 다섯 개를
          채워야 할 것 같아진다 — 비워 두는 쪽이 기본이어야 한다. */
@@ -927,9 +937,10 @@
       undo.addEventListener("click", done);
 
       save.addEventListener("click", function () {
-        var was = { intro: D.lounge.intro, todo: D.lounge.todo };
+        var was = { intro: D.lounge.intro, todo: D.lounge.todo, attach: D.lounge.attach };
 
         D.lounge.intro = ta2.value.trim();
+        D.lounge.attach = att.value();
         D.lounge.todo = ta3.value.split("\n")
           .map(function (x) { return x.trim(); })
           .filter(Boolean);
@@ -938,10 +949,16 @@
         paintTodo();
         done();
 
-        send("PUT", "/admin/lounge", { intro: D.lounge.intro, todo: D.lounge.todo })
+        send("PUT", "/admin/lounge",
+             { intro: D.lounge.intro, todo: D.lounge.todo, attach: D.lounge.attach })
+          .then(function (r) {
+            // 본문에 적은 주소를 서버가 카드로 폈을 수 있다. 돌려준 것을 그대로 쓴다.
+            if (r && r.attach) { D.lounge.attach = r.attach; paintIntro(); }
+          })
           .catch(function (e) {
             D.lounge.intro = was.intro;
             D.lounge.todo = was.todo;
+            D.lounge.attach = was.attach;
             paintIntro();
             paintTodo();
             failed(e);
@@ -1028,6 +1045,66 @@
             return { type: r.kind, url: r.url, title: f.name, label: f.name, name: f.name };
           });
       });
+  }
+
+  /* 첨부 줄 한 벌. 글쓰기 창 · 강의실 과제 · 라운지 소개가 같은 것을 쓴다.
+     붙이는 방법이 자리마다 다르면 자리마다 새로 익혀야 한다. */
+  function attachRow(initial) {
+    var list = (initial || []).slice();
+
+    var wrap = el("div", "row att-row");
+    var pick = document.createElement("input");
+    pick.type = "file";
+    pick.hidden = true;
+    pick.multiple = true;
+    pick.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime";
+
+    var add = el("button", "fadd-btn", "+ 파일 첨부");
+    add.type = "button";
+    add.addEventListener("click", function () { pick.click(); });
+
+    var chips = el("span", "attach-now");
+
+    function paint() {
+      chips.textContent = "";
+      chips.hidden = !list.length;
+      add.hidden = list.length >= ATTACH_MAX;
+
+      list.forEach(function (a, i) {
+        var chip = el("span", "att-chip");
+        chip.appendChild(el("b", null, a.name || a.label || "첨부"));
+        var x = el("button", null, "×");
+        x.type = "button";
+        x.setAttribute("aria-label", (a.name || a.label || "첨부") + " 떼기");
+        x.addEventListener("click", function () { list.splice(i, 1); paint(); });
+        chip.appendChild(x);
+        chips.appendChild(chip);
+      });
+    }
+
+    pick.addEventListener("change", function () {
+      var files = [].slice.call(pick.files || []).slice(0, ATTACH_MAX - list.length);
+      pick.value = "";
+
+      files.forEach(function (f) {
+        var slot = { name: f.name, uploading: true };
+        list.push(slot);
+        paint();
+        uploadFile(f)
+          .then(function (a) { var i = list.indexOf(slot); if (i > -1) list[i] = a; paint(); })
+          .catch(function (err) { var i = list.indexOf(slot); if (i > -1) list.splice(i, 1); paint(); failed(err); });
+      });
+    });
+
+    wrap.appendChild(pick);
+    wrap.appendChild(add);
+    wrap.appendChild(chips);
+    paint();
+
+    return {
+      el: wrap,
+      value: function () { return list.filter(function (a) { return !a.uploading; }); }
+    };
   }
 
   if (fileInput) fileInput.addEventListener("change", function () {
@@ -3824,21 +3901,47 @@
 
       /* 권은 프드프가 갖지만 '이번 주만 한 장 더' 는 라운지에서 줄 수 있어야
          운영이 된다. 다음 주기가 되면 원래대로 돌아간다. */
-      var pt = el("td");
-      if (m.role === "student") {
-        var give = el("button", "fadd-btn", "+1");
-        give.type = "button";
-        give.setAttribute("aria-label", m.name + " 에게 피드백권 한 장");
-        give.addEventListener("click", function () {
-          give.disabled = true;
-          send("POST", "/admin/members/" + m.userId + "/passes", { count: 1 })
+      /* 잔량을 먼저 보여주고 그 옆에서 더하고 뺀다. 눌러 봐야 결과를 아는
+         단추는 아무도 누르지 못한다. 회수가 없으면 잘못 누른 것도 못 되돌린다. */
+      var pt = el("td", "passcell");
+      if (m.role === "student" && m.passLeft != null) {
+        var now = el("b", "passn", m.passLeft + " / " + m.passQuota);
+
+        function step(delta, btn) {
+          btn.disabled = true;
+          send("POST", "/admin/members/" + m.userId + "/passes", { count: delta })
             .then(function (r) {
-              give.textContent = r && r.left != null ? "남음 " + r.left : "지급됨";
-              setTimeout(function () { give.textContent = "+1"; give.disabled = false; }, 1600);
+              if (r && r.left != null) {
+                m.passLeft = r.left;
+                now.textContent = m.passLeft + " / " + m.passQuota;
+              }
+              paintPassBtns();
             })
-            .catch(function (e) { give.disabled = false; failed(e); });
-        });
-        pt.appendChild(give);
+            .catch(function (e) { btn.disabled = false; failed(e); });
+        }
+
+        var minus = el("button", "fmove", "−");
+        minus.type = "button";
+        minus.setAttribute("aria-label", m.name + " 의 피드백권 한 장 회수");
+        minus.addEventListener("click", function () { step(-1, minus); });
+
+        var plus = el("button", "fmove", "+");
+        plus.type = "button";
+        plus.setAttribute("aria-label", m.name + " 에게 피드백권 한 장");
+        plus.addEventListener("click", function () { step(1, plus); });
+
+        // 없는 것을 더 뺄 수도, 쿼터보다 많이 줄 수도 없다
+        function paintPassBtns() {
+          minus.disabled = m.passLeft <= 0;
+          plus.disabled = m.passLeft >= m.passQuota;
+        }
+        paintPassBtns();
+
+        pt.appendChild(minus);
+        pt.appendChild(now);
+        pt.appendChild(plus);
+      } else if (m.role === "student") {
+        pt.appendChild(el("span", "passn-none", "기록 없음"));
       }
       tr.appendChild(pt);
 

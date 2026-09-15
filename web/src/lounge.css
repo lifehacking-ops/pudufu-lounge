@@ -377,6 +377,7 @@
   .intro-x { margin: 0; font-size: 13px; line-height: 1.7; color: var(--slate);
              white-space: pre-wrap; }
   .intro-edit { display: grid; gap: 8px; }
+  .att-row { align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
   .intro-edit .ta { min-height: 76px; }
 
   .todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -1168,6 +1169,13 @@
   .fmove:hover[disabled] { background: none; color: var(--mist); }
 
   .fwhy { font-size: 11px; color: var(--mist); padding-right: 6px; white-space: nowrap; }
+
+  /* 피드백권 칸 : 회수 · 잔량 · 지급 */
+  .passcell { white-space: nowrap; }
+  .passcell .fmove { width: 20px; height: 20px; font-size: 14px; }
+  .passn { display: inline-block; min-width: 40px; text-align: center;
+           font-variant-numeric: tabular-nums; font-weight: 700; }
+  .passn-none { font-size: 11px; color: var(--mist); }
   /* 강의 게시 : 주차 표에서 게시 여부를 정하고, 표 아래 폼에서 강을 붙인다 */
   .crow { display: flex; gap: 12px; align-items: baseline; white-space: nowrap; }
   .cadd {

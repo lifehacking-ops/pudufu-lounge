@@ -4,7 +4,7 @@
 const { rows, one } = require("./db");
 
 const lounge = (id) =>
-  one(`SELECT id, course_id, name, intro, todo FROM lounge WHERE id = $1`, [id]);
+  one(`SELECT id, course_id, name, intro, todo, intro_att FROM lounge WHERE id = $1`, [id]);
 
 const lounges = () =>
   rows(`SELECT l.id, l.name,
@@ -21,8 +21,9 @@ const memberOf = (loungeId, userId) =>
          JOIN ext_user u ON u.id = m.user_id
         WHERE m.lounge_id = $1 AND m.user_id = $2`, [loungeId, userId]);
 
-const members = (loungeId) =>
+const members = (loungeId, courseId) =>
   rows(`SELECT m.user_id, u.nickname, m.role, m.cohort, m.week,
+               fp.quota_per, fp.used,
                m.joined_at, m.expires_at, m.last_seen_at, m.muted_until, m.muted_reason,
                (SELECT min(p.created_at) FROM post p JOIN category c ON c.id = p.category_id
                  WHERE p.user_id = m.user_id AND p.lounge_id = m.lounge_id
@@ -30,9 +31,11 @@ const members = (loungeId) =>
                (SELECT json_agg(x.lounge_id ORDER BY x.lounge_id)
                   FROM lounge_member x WHERE x.user_id = m.user_id
                    AND x.role IN ('instructor','admin')) AS staff_of
-          FROM lounge_member m JOIN ext_user u ON u.id = m.user_id
+          FROM lounge_member m
+          JOIN ext_user u ON u.id = m.user_id
+     LEFT JOIN ext_feedback_pass fp ON fp.user_id = m.user_id AND fp.course_id = $2
          WHERE m.lounge_id = $1
-         ORDER BY m.role, m.id`, [loungeId]);
+         ORDER BY m.role, m.id`, [loungeId, courseId]);
 
 const categories = () =>
   rows(`SELECT id, name, is_system, pass_required

@@ -613,10 +613,12 @@ module.exports.setMission = setMission;
    '이번 주만 한 장 더' 를 줄 수 있어야 운영이 된다. local 에서는 캐시를
    직접 고치고, remote 에서는 프드프에 요청한다. */
 
+/* n 이 음수면 회수다. 잘못 누른 것을 되돌릴 방법이 없으면 아무도 못 누른다. */
 async function grantPass(loungeId, userId, targetUserId, n) {
   await admin(loungeId, userId);
   const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
-  const add = Math.max(1, Math.min(10, Number(n) || 1));
+  const add = Math.max(-10, Math.min(10, Number(n) || 1));
+  if (!add) throw new Denied("바꿀 수가 0 입니다");
 
   if (config.pudufu.mode === "remote") {
     const res = await fetch(config.pudufu.base + "/api/lounge/passes/grant", {
@@ -629,9 +631,12 @@ async function grantPass(loungeId, userId, targetUserId, n) {
   }
 
   /* 쓴 횟수를 줄이는 방식으로 준다. 주기당 지급 수를 늘리면 다음 주에도
-     늘어난 채로 남는다 — '이번 주만' 이 되지 않는다. */
+     늘어난 채로 남는다 — '이번 주만' 이 되지 않는다.
+     회수는 반대로 쓴 횟수를 늘린다. 이미 쓴 것까지 되돌리지는 않으므로
+     쿼터를 넘기지 않게 막는다. */
   const r = await one(
-    `UPDATE ext_feedback_pass SET used = greatest(0, used - $3), synced_at = now()
+    `UPDATE ext_feedback_pass
+        SET used = least(quota_per, greatest(0, used - $3)), synced_at = now()
       WHERE user_id = $1 AND course_id = $2
       RETURNING quota_per, used`, [targetUserId, L.course_id, add]);
   if (!r) throw new Missing("이 사람의 피드백권 기록이 없습니다");
@@ -668,10 +673,28 @@ async function setLounge(loungeId, userId, input) {
     vals.push(v || null);
     sets.push(`${cols[key]} = $${vals.length}`);
   }
+  /* 첨부는 글과 똑같이 다룬다. 따로 고른 게 없으면 소개글에 적힌 첫 주소를
+     카드로 편다 — 사람은 링크를 '첨부' 한다고 생각하지 않고 그냥 붙여넣는다. */
+  let stored = null;
+  if ("intro" in input || "attach" in input) {
+    let files = [].concat(input.attach || []).filter(Boolean).slice(0, ATTACH_MAX);
+
+    if (!files.length && "intro" in input) {
+      const found = firstUrl(String(input.intro || ""));
+      if (found) {
+        const card = await unfurl(found);
+        files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
+      }
+    }
+    stored = files;
+    vals.push(files.length ? JSON.stringify(files) : null);
+    sets.push(`intro_att = $${vals.length}`);
+  }
+
   if (!sets.length) return { ok: true };
 
   await rows(`UPDATE lounge SET ${sets.join(", ")} WHERE id = $1`, vals);
-  return { ok: true };
+  return { ok: true, attach: stored };
 }
 
 /* ---------- 카테고리 이름 ----------

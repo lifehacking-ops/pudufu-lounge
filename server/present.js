@@ -47,7 +47,7 @@ async function loungeData(loungeId, viewerId) {
 
   const [mem, cats, rights, ps, cms, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
     await Promise.all([
-      Q.members(loungeId), Q.categories(), Q.categoryRights(loungeId),
+      Q.members(loungeId, L.course_id), Q.categories(), Q.categoryRights(loungeId),
       Q.posts(loungeId, viewerId), Q.comments(loungeId, viewerId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
       Q.received(loungeId, 7), Q.received(loungeId, 30), Q.received(loungeId, null),
@@ -76,6 +76,9 @@ async function loungeData(loungeId, viewerId) {
           : daysBetween(m.joined_at, now) - daysBetween(m.first_submit_at, now))
       : null,
     paid: m.role === "student",
+
+    /* 피드백권 잔량. 표에서 바로 보여야 지급과 회수를 판단할 수 있다. */
+    ...(m.quota_per == null ? {} : { passLeft: m.quota_per - m.used, passQuota: m.quota_per }),
     muted: !!(m.muted_until && new Date(m.muted_until) > now),
     mutedUntil: m.muted_until || null,
     mutedReason: m.muted_reason || null,
@@ -214,7 +217,8 @@ async function loungeData(loungeId, viewerId) {
     ranking: { "7": ranked(lb7), "30": ranked(lb30), all: ranked(lbAll) },
     topPosts: { "7": tp7, "30": tp30, all: tpAll },
     lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro,
-              todo: (L.todo || "").split("\n").map((x) => x.trim()).filter(Boolean) },
+              todo: (L.todo || "").split("\n").map((x) => x.trim()).filter(Boolean),
+              attach: L.intro_att || [] },
     me: (function () {
       const m = mem.find((x) => Number(x.user_id) === Number(viewerId));
       return m

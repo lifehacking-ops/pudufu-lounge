@@ -58,6 +58,7 @@ CREATE TABLE lounge (
   name       varchar(120) NOT NULL,
   intro      text,
   todo       text,
+  intro_att  jsonb,
   banner_url varchar(500),
   is_active  boolean      NOT NULL DEFAULT true,
   created_at timestamptz  NOT NULL DEFAULT now(),
@@ -65,6 +66,7 @@ CREATE TABLE lounge (
 );
 COMMENT ON COLUMN lounge.course_id IS '프드프 강의 id. 우리 테이블이 아니므로 FK 를 걸지 않는다';
 COMMENT ON COLUMN lounge.todo      IS '소개 카드의 오늘 할 일. 한 줄에 하나. 배열 타입을 쓰지 않는다';
+COMMENT ON COLUMN lounge.intro_att IS '소개글 첨부. 글의 attachment 와 같은 모양을 읽기 전용으로 담는다';
 CREATE TRIGGER lounge_touch BEFORE UPDATE ON lounge
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 

@@ -17,12 +17,13 @@ class Missing extends Error {
 /* 이 라운지에서 이 사람이 무엇인가 */
 async function membership(loungeId, userId) {
   const m = await one(
-    `SELECT m.id, m.role, m.expires_at, u.nickname
+    `SELECT m.id, m.role, m.expires_at, m.muted_until, m.muted_reason, u.nickname
        FROM lounge_member m JOIN ext_user u ON u.id = m.user_id
       WHERE m.lounge_id = $1 AND m.user_id = $2`, [loungeId, userId]);
   if (!m) throw new Denied("이 라운지의 멤버가 아닙니다");
   m.expired = !!(m.expires_at && new Date(m.expires_at) < new Date());
   m.staff = m.role === "instructor" || m.role === "admin";
+  m.muted = !!(m.muted_until && new Date(m.muted_until) > new Date());
   return m;
 }
 
@@ -70,6 +71,7 @@ async function createPost(loungeId, userId, input) {
   const me = await membership(loungeId, userId);
   me.user_id = userId;
   const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
+  if (me.muted) throw new Denied("활동이 정지되어 글을 쓸 수 없습니다" + (me.muted_reason ? " — " + me.muted_reason : ""));
   const cat = await writable(loungeId, me, input.cat);
   checkExpiry(me, cat, input.wk);
 
@@ -158,6 +160,7 @@ async function deletePost(loungeId, userId, postId) {
 
 async function createComment(loungeId, userId, postId, input) {
   const me = await membership(loungeId, userId);   // 만료돼도 댓글은 쓴다
+  if (me.muted) throw new Denied("활동이 정지되어 댓글을 쓸 수 없습니다");
   const p = await one(
     `SELECT id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`,
     [postId, loungeId]);
@@ -202,7 +205,8 @@ async function deleteComment(loungeId, userId, commentId) {
 /* ---------- 반응 ---------- */
 
 async function toggleReaction(loungeId, userId, kind, targetId, emoji) {
-  await membership(loungeId, userId);
+  const me = await membership(loungeId, userId);
+  if (me.muted) throw new Denied("활동이 정지되어 반응할 수 없습니다");
   if (!emoji) throw new Denied("이모지가 없습니다");
 
   const exists = await one(
@@ -634,3 +638,53 @@ async function renameCategory(loungeId, userId, categoryId, name) {
 module.exports.grantPass = grantPass;
 module.exports.setLounge = setLounge;
 module.exports.renameCategory = renameCategory;
+
+/* ---------- 활동 정지 ----------
+   강퇴가 아니다. 돈을 낸 사람을 쫓아낼 수는 없으므로 읽기는 두고 쓰기만 멈춘다.
+   기한이 지나면 저절로 풀린다 — 영구 정지는 사실상 환불 문제가 된다. */
+
+async function setMuted(loungeId, userId, targetUserId, days, reason) {
+  const me = await admin(loungeId, userId);
+  if (Number(targetUserId) === Number(userId)) throw new Denied("자기 자신은 정지할 수 없습니다");
+
+  const t = await one(
+    `SELECT id, role FROM lounge_member WHERE lounge_id = $1 AND user_id = $2`,
+    [loungeId, targetUserId]);
+  if (!t) throw new Missing("이 라운지의 멤버가 아닙니다");
+  if (t.role === "admin") throw new Denied("관리자는 정지할 수 없습니다. 먼저 역할을 내리세요");
+
+  const n = Number(days) || 0;
+  if (n <= 0) {
+    await rows(`UPDATE lounge_member SET muted_until = NULL, muted_reason = NULL WHERE id = $1`, [t.id]);
+    return { muted: false };
+  }
+  if (n > 90) throw new Denied("90일까지만 정지할 수 있습니다");
+
+  const r = await one(
+    `UPDATE lounge_member SET muted_until = now() + ($2 || ' days')::interval,
+            muted_reason = $3 WHERE id = $1 RETURNING muted_until`,
+    [t.id, String(n), (reason || "").slice(0, 200) || null]);
+  return { muted: true, until: r.muted_until };
+}
+
+/* ---------- 신고 ----------
+   알림이 없으므로 신고는 관리자가 게시물 관리에서 본다.
+   같은 사람이 여러 번 눌러도 한 건이다. */
+
+async function reportPost(loungeId, userId, postId, reason) {
+  await membership(loungeId, userId);
+  const p = await one(
+    `SELECT id, user_id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`,
+    [postId, loungeId]);
+  if (!p) throw new Missing();
+  if (Number(p.user_id) === Number(userId)) throw new Denied("내 글은 신고하지 않습니다");
+
+  await rows(
+    `INSERT INTO post_report (post_id, user_id, reason) VALUES ($1, $2, $3)
+     ON CONFLICT (post_id, user_id) DO UPDATE SET reason = $3, created_at = now()`,
+    [postId, userId, (reason || "").slice(0, 200) || null]);
+  return { ok: true };
+}
+
+module.exports.setMuted = setMuted;
+module.exports.reportPost = reportPost;

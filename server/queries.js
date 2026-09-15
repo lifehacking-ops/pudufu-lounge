@@ -16,7 +16,7 @@ const lounges = () =>
 
 const members = (loungeId) =>
   rows(`SELECT m.user_id, u.nickname, m.role, m.cohort, m.week,
-               m.joined_at, m.expires_at, m.last_seen_at,
+               m.joined_at, m.expires_at, m.last_seen_at, m.muted_until, m.muted_reason,
                (SELECT min(p.created_at) FROM post p JOIN category c ON c.id = p.category_id
                  WHERE p.user_id = m.user_id AND p.lounge_id = m.lounge_id
                    AND c.name = '과제' AND p.deleted_at IS NULL) AS first_submit_at,
@@ -56,7 +56,9 @@ const posts = (loungeId, viewerId) =>
                (SELECT json_agg(json_build_object('seq', a.seq, 'q', a.question, 'a', a.answer) ORDER BY a.seq)
                   FROM post_answer a WHERE a.post_id = p.id) AS answers,
                (SELECT json_build_object('kind', t.kind, 'url', t.url, 'label', t.label)
-                  FROM attachment t WHERE t.post_id = p.id ORDER BY t.sort LIMIT 1) AS attach
+                  FROM attachment t WHERE t.post_id = p.id ORDER BY t.sort LIMIT 1) AS attach,
+               (SELECT count(*)::int FROM post_report pr WHERE pr.post_id = p.id) AS reports,
+               EXISTS (SELECT 1 FROM post_report pr WHERE pr.post_id = p.id AND pr.user_id = $2) AS reported
           FROM post p JOIN category c ON c.id = p.category_id
          WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
          ORDER BY p.created_at DESC`, [loungeId, viewerId]);

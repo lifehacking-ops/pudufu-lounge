@@ -114,6 +114,9 @@ async function handler(req, res) {
         if (req.method === "PUT" && s[1] === "posts" && s[3] === "pinned")
           return json(res, 200, await writes.setPinned(L, me, +s[2], input.pinned));
 
+        if (req.method === "POST" && s[1] === "posts" && s[3] === "report")
+          return json(res, 200, await writes.reportPost(L, me, +s[2], input.reason));
+
         if (req.method === "POST" && s[1] === "posts" && s[3] === "view")
           return json(res, 200, await writes.markView(L, me, +s[2]));
 
@@ -152,6 +155,9 @@ async function handler(req, res) {
 
           if (req.method === "PUT" && s[2] === "weeks" && s[4] === "mission")
             return json(res, 200, await writes.setMission(L, me, +s[3], input));
+
+          if (req.method === "PUT" && s[2] === "members" && s[4] === "muted")
+            return json(res, 200, await writes.setMuted(L, me, +s[3], input.days, input.reason));
 
           if (req.method === "POST" && s[2] === "members" && s[4] === "passes")
             return json(res, 200, await writes.grantPass(L, me, +s[3], input.count));

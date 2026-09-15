@@ -21,7 +21,7 @@
 -- 한글 부분 일치 검색용. Supabase 에는 이미 들어 있다.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TABLE IF EXISTS lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
+DROP TABLE IF EXISTS post_report, lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
   comment, attachment, post_answer, post, lounge_category, category,
   lounge_member, lounge CASCADE;
 DROP TABLE IF EXISTS ext_live, ext_feedback_pass, ext_watch, ext_purchase,
@@ -86,6 +86,11 @@ CREATE TABLE lounge_member (
   -- 하루 한 번 동기화면 충분하다(대시보드가 오늘 아침 기준으로만 맞으면 된다).
   week           smallint    NOT NULL DEFAULT 1,
   week_synced_at timestamptz,
+
+  /* 돈을 낸 사람을 쫓아낼 수는 없다. 읽기는 두고 쓰기만 멈춘다.
+     기한이 지나면 저절로 풀린다 — 영구 정지는 사실상 환불 문제가 된다. */
+  muted_until    timestamptz,
+  muted_reason   varchar(200),
 
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
@@ -313,6 +318,21 @@ CREATE TABLE feedback_pass_use (
 );
 COMMENT ON COLUMN feedback_pass_use.post_id IS '글 하나에 한 번';
 CREATE INDEX ix_pass_user ON feedback_pass_use (lounge_id, user_id, used_at);
+
+
+-- 신고 -----------------------------------------------------------------------
+-- 알림이 없으므로 신고는 관리자가 게시물 관리에서 본다. 한 사람이 같은 글을
+-- 여러 번 신고해도 한 건으로 센다.
+
+CREATE TABLE post_report (
+  post_id    bigint      NOT NULL REFERENCES post (id) ON DELETE CASCADE,
+  user_id    bigint      NOT NULL,
+  reason     varchar(200),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, user_id)
+);
+
+CREATE INDEX ix_report_recent ON post_report (created_at);
 
 
 -- 주차 게시 여부 ---------------------------------------------------------------

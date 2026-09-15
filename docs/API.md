@@ -148,6 +148,7 @@ POST   /l/posts/{id}/view          사람 단위로 한 번만 센다
 PUT    /l/lessons/{id}/done        { done }             시청 기록 → 프드프
 POST   /l/unfurl                   { url }              붙여넣은 주소를 카드로
 POST   /l/uploads                  { type, size }       올려도 되는 주소를 받는다
+POST   /l/posts/{id}/report        { reason }           남의 글만
 PUT    /l/comments/{id}/reactions  { emoji }            토글
 POST   /l/uploads                  이미지 → Supabase Storage (아직)
 ```
@@ -207,6 +208,7 @@ POST   /l/admin/lessons                       { week, chapter, title, duration, 
 POST   /l/admin/weeks                         { title, mission, qs[] }
 PATCH  /l/admin/categories/{id}                { name }        이름 변경
 POST   /l/admin/members/{userId}/passes        { count }       피드백권 지급
+PUT    /l/admin/members/{userId}/muted         { days, reason } 0 이면 해제
 PUT    /l/admin/lounge                         { name, intro, banner }
 GET    /l/admin/digest?date=                 어제 요약 (아직)
 ```
@@ -258,6 +260,6 @@ GET    /l/admin/digest?date=                 어제 요약 (아직)
 | 항목 | 상태 |
 |---|---|
 | 알림 | 프드프에 체계가 없다. 1차 범위 밖 |
-| 멤버 강퇴 · 글 신고 | 아직 없다 |
+| 강퇴 | **두지 않는다.** 돈을 낸 사람을 쫓아낼 수는 없다. 대신 **활동 정지** — 읽기는 두고 쓰기만 멈추고, 기한(최대 90일)이 지나면 저절로 풀린다 |
 | 랭킹 · 내 서재 · 라운지 전환 | 만들 예정. 지금은 자리만 있다 |
 | 프드프 → 라운지 변경 통지 | 지금은 라운지가 주기적으로 당겨 온다(pull). 웹훅은 나중에 |

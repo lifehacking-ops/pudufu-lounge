@@ -72,6 +72,9 @@ async function loungeData(loungeId, viewerId) {
           : daysBetween(m.joined_at, now) - daysBetween(m.first_submit_at, now))
       : null,
     paid: m.role === "student",
+    muted: !!(m.muted_until && new Date(m.muted_until) > now),
+    mutedUntil: m.muted_until || null,
+    mutedReason: m.muted_reason || null,
     ...(m.staff_of ? { lounges: m.staff_of.map(loungeKey) } : {})
   }));
 
@@ -125,6 +128,8 @@ async function loungeData(loungeId, viewerId) {
       mine: p.mine,
       liked: p.reacted,
       myReact: p.my_react || null,
+      reports: p.reports || 0,
+      reported: p.reported,
       title: p.title,
       thread: byPost.get(p.id) || []
     };

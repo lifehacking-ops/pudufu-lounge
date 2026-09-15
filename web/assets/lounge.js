@@ -3110,7 +3110,7 @@
   function paintRolesTab(host) {
     /* 멤버 표 */
     var c1 = admCard("멤버", MEMBERS.length + "명");
-    var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "피드백권", "역할"]);
+    var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
 
     MEMBERS.forEach(function (m, i) {
       var tr = el("tr");
@@ -3140,6 +3140,23 @@
         pt.appendChild(give);
       }
       tr.appendChild(pt);
+
+      /* 강퇴가 아니라 정지다. 읽기는 두고 쓰기만 멈춘다. */
+      var mt = el("td");
+      if (m.role !== "admin") {
+        var mb = el("button", m.muted ? "del" : "fadd-btn", m.muted ? "정지 중" : "정지");
+        mb.type = "button";
+        mb.addEventListener("click", function () {
+          var days = m.muted ? 0 : 7;
+          var was = m.muted;
+          m.muted = !was;
+          renderAdmin();
+          send("PUT", "/admin/members/" + m.userId + "/muted", { days: days })
+            .catch(function (e) { m.muted = was; renderAdmin(); failed(e); });
+        });
+        mt.appendChild(mb);
+      }
+      tr.appendChild(mt);
 
       var td = el("td");
       var pick = el("div", "pick");
@@ -3554,6 +3571,16 @@
     function close() { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); }
 
     if (p.mine) item("수정", false, function () { opts.onEdit(); });
+
+    /* 신고는 남의 글에만. 알림이 없으므로 관리자가 게시물 관리에서 본다. */
+    if (!p.mine && API) {
+      item(p.reported ? "신고함" : "신고", false, function () {
+        p.reported = true;
+        p.reports = (p.reports || 0) + 1;
+        render();
+        send("POST", "/posts/" + p.id + "/report", {}).catch(failed);
+      });
+    }
     if (can("delete")) item(p.pinned ? "고정 해제" : "상단 고정", false, function () { togglePin(p, opts.after); });
     if (can("delete")) item("삭제", true, function () { opts.onDelete(); });
 
@@ -3631,7 +3658,7 @@
     find.addEventListener("input", function () { postQ = find.value; delRow = -1; paintRows(); });
     c.appendChild(find);
 
-    var t = admTable(["제목", "카테고리", "글쓴이", "반응", "댓글", "올린 때", ""]);
+    var t = admTable(["제목", "카테고리", "글쓴이", "반응", "댓글", "신고", "올린 때", ""]);
 
     paintRows = function () {
     t.body.textContent = "";
@@ -3666,6 +3693,9 @@
       tr.appendChild(el("td", "nm", p.author));
       tr.appendChild(el("td", "num", String((p.likes || 0) + reactTotal(p))));
       tr.appendChild(el("td", "num", String(cmtCount(p))));
+      var rt = el("td", "num");
+      if (p.reports) rt.appendChild(el("span", "badge b-late", String(p.reports)));
+      tr.appendChild(rt);
       tr.appendChild(el("td", "num", p.when));
 
       var tdd = el("td");
@@ -3680,7 +3710,7 @@
       if (delRow === i) {
         var ctr = el("tr");
         var ctd = el("td");
-        ctd.colSpan = 7;
+        ctd.colSpan = 8;
         ctd.appendChild(deleteGate(p, function (done) { delRow = -1; if (!done) paintRows(); }));
         ctr.appendChild(ctd);
         t.body.appendChild(ctr);

@@ -15,6 +15,48 @@
      앱은 서버가 같은 모양으로 채운다. 이 아래 코드는 어느 쪽인지 모른다. */
   var D = window.LOUNGE_DATA;
 
+  /* 쓰기는 이 한 곳으로만 나간다.
+     프로토타입에는 D.api 가 없어서 메모리만 고치고 끝난다.
+     앱에서는 서버가 D.api 를 넣어 주므로 같은 자리에서 DB 로도 간다.
+     이 아래 코드는 자기가 어느 쪽인지 알지 못한다. */
+  var API = D.api || null;
+
+  function send(method, path, payload) {
+    if (!API) return Promise.resolve(null);
+    return fetch(API + path, {
+      method: method,
+      headers: { "content-type": "application/json" },
+      body: payload ? JSON.stringify(payload) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ("저장하지 못했습니다 (" + r.status + ")"));
+        return j;
+      });
+    });
+  }
+
+  /* 저장이 실패하면 조용히 지나가지 않는다. 화면과 DB 가 어긋난 채로 두면
+     무엇이 사실인지 알 수 없게 된다. 그 자리에 알리고 되읽게 한다. */
+  function failed(e) {
+    var box = $("saveError");
+    if (!box) {
+      box = el("div", "gate");
+      box.id = "saveError";
+      box.style.margin = "12px 0";
+      document.querySelector(".grid-community").prepend(box);
+    }
+    box.textContent = "";
+    box.appendChild(el("b", null, "저장하지 못했습니다."));
+    box.appendChild(el("span", "muted", e.message));
+    box.appendChild(el("span", "grow"));
+    var again = el("button", "btn-sec", "새로고침");
+    again.type = "button";
+    again.addEventListener("click", function () { location.reload(); });
+    box.appendChild(again);
+    box.hidden = false;
+  }
+
+
   var $ = function (id) { return document.getElementById(id); };
 
   function el(tag, cls, text) {
@@ -52,7 +94,9 @@
 
   /* 역할은 계정 단위가 아니라 라운지 단위다. 어느 라운지의 강사인지까지 있어야
      '옆 강의 관리자가 내 라운지를 만지는' 일이 안 생긴다. */
-  var ME = { name: "박현종", role: "student", lounges: [] };   // student | instructor | admin
+  /* 앱에서는 서버가 내려준다(lounge_member 가 정한다).
+     프로토타입에는 없으므로 아래 기본값으로 시작하고 전환기로 바꾼다. */
+  var ME = D.me || { name: "박현종", role: "student", lounges: [] };   // student | instructor | admin
 
   var ROLES = [
     { key: "student",    label: "수강생" },
@@ -217,25 +261,31 @@
   /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
   function publishMission(wk, answers, title, overwrite) {
     var exist = myMissionPost(wk);
+    var name = title || wk + "주차 과제 올립니다";
 
-    if (overwrite && exist) {
-      exist.mission = answers;
-      exist.when = "방금 수정함";
-      if (title) exist.title = title;
-    } else {
-      POSTS.unshift({
-        cat: "과제", wk: wk,
-        author: ME.name, when: "방금", state: "live",
-        views: 1, mine: true,
-        reactions: {}, myReact: null, thread: [],
-        title: title || wk + "주차 과제 올립니다",
-        body: "",
-        mission: answers
-      });
-    }
-
-    render();
-    markMissionQuest(wk);
+    // 과제는 주차마다 한 편이다. 덮어쓰기는 앞의 것을 지우고 새로 쓴다.
+    send("POST", "/posts", {
+      cat: "과제", wk: wk, title: name, body: "", mission: answers,
+      overwrite: !!(overwrite && exist)
+    }).then(function (r) {
+      if (overwrite && exist) {
+        exist.mission = answers;
+        exist.when = "방금 수정함";
+        exist.title = name;
+        if (r) exist.id = r.id;
+      } else {
+        POSTS.unshift({
+          id: r ? r.id : undefined,
+          cat: "과제", wk: wk,
+          author: ME.name, when: "방금", state: "live",
+          views: 1, mine: true,
+          reactions: {}, myReact: null, thread: [],
+          title: name, body: "", mission: answers
+        });
+      }
+      render();
+      markMissionQuest(wk);
+    }).catch(failed);
   }
 
   var POSTS = D.posts;
@@ -391,8 +441,10 @@
      '같은 사람이 어떤 권한을 가졌을 때'를 보는 장치다. */
 
   var roleBtn = $("roleBtn"), roleMenu = $("roleMenu"), roleNow = $("roleNow");
+  var hasSwitcher = !!roleBtn;   // 앱에는 없다. 역할은 서버가 정한다
 
   function paintRoleMenu() {
+    if (!hasSwitcher) return;
     roleMenu.textContent = "";
     ROLES.forEach(function (r) {
       var b = el("button", null, r.label);
@@ -404,14 +456,17 @@
   }
 
   function closeRoleMenu() {
+    if (!hasSwitcher) return;
     roleMenu.hidden = true;
     roleBtn.setAttribute("aria-expanded", "false");
   }
 
   function applyRole(key) {
     ME.role = key;
-    ME.lounges = key === "student" ? [] : [loungeId];   // 담당은 지금 보고 있는 라운지 하나
-    roleNow.textContent = roleLabel(key);
+    if (hasSwitcher) roleNow.textContent = roleLabel(key);
+    /* 담당 라운지는 서버가 정한다. 전환기로 바꾼 경우에만 흉내 낸다 —
+       앱에서 이 줄이 돌면 서버가 준 실제 담당 목록을 지운다. */
+    if (hasSwitcher) ME.lounges = key === "student" ? [] : [loungeId];
     $("tabAdmin").hidden = !can("dashboard");
 
     // 권한을 잃은 채로 관리 화면에 서 있으면 커뮤니티로 되돌린다
@@ -427,7 +482,7 @@
     if (screenNow === "lesson" && !course().published && !can("manage")) show("courses");
   }
 
-  roleBtn.addEventListener("click", function (e) {
+  if (hasSwitcher) roleBtn.addEventListener("click", function (e) {
     e.stopPropagation();
     var open = roleMenu.hidden;
     if (open) paintRoleMenu();
@@ -731,7 +786,7 @@
       loungeMenu.hidden = true;
       loungeBtn.setAttribute("aria-expanded", "false");
     }
-    if (!roleMenu.hidden && !roleMenu.contains(e.target) && !roleBtn.contains(e.target)) closeRoleMenu();
+    if (hasSwitcher && !roleMenu.hidden && !roleMenu.contains(e.target) && !roleBtn.contains(e.target)) closeRoleMenu();
     if (roleRow > -1 && !e.target.closest(".pick")) { roleRow = -1; renderAdmin(); }
   });
 
@@ -1038,7 +1093,7 @@
       return;
     }
 
-    POSTS.unshift({
+    var post = {
       cat: draft.cat,
       wk: cur ? cur.wk : 0,
       author: ME.name,
@@ -1046,25 +1101,34 @@
       state: "live",
       comments: 0, views: 1,
       mine: true,
-      reactions: {}, myReact: null,
+      reactions: {}, myReact: null, thread: [],
       title: title || (cur ? cur.wk + "주차 과제 올립니다" : body.split("\n")[0].slice(0, 70)),
       body: answers ? "" : (title ? body : body.split("\n").slice(1).join(" ")).slice(0, 160),
       mission: answers
-    });
+    };
 
-    // 피드백권이 필요한 카테고리면 여기서 1회 차감된다
-    if (pass) pass.left -= 1;
+    // 서버가 받아 준 뒤에 화면에 올린다. 권한과 피드백권은 서버가 다시 본다.
+    send("POST", "/posts", {
+      cat: post.cat, wk: post.wk || null, title: post.title,
+      body: post.body, mission: answers
+    }).then(function (r) {
+      if (r) post.id = r.id;
+      POSTS.unshift(post);
 
-    wTitle.value = "";
-    ta.value = "";
-    autoGrow(ta);
-    if (missionForm) missionForm.clear();
-    draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
-    draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
-    setComposer(false);
-    render();
-    syncComposer();
-    updatePostBtn();
+      // 피드백권이 필요한 카테고리면 여기서 1회 차감된다
+      if (pass) pass.left -= 1;
+
+      wTitle.value = "";
+      ta.value = "";
+      autoGrow(ta);
+      if (missionForm) missionForm.clear();
+      draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
+      draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
+      setComposer(false);
+      render();
+      syncComposer();
+      updatePostBtn();
+    }).catch(failed);
 
     // 미션을 올리면 그 주차 과제 퀘스트가 체크되고 진도율이 오른다
     if (cur) markMissionQuest(cur.wk);
@@ -1164,7 +1228,22 @@
       if (picker) { host.removeChild(picker); picker = null; }
     }
 
+    /* 반응만 낙관적으로 먼저 반영한다. 딸깍 반응이 서버를 기다리면
+       딸깍이 아니게 된다. 실패하면 되돌린다. */
     function toggle(key) {
+      var before = { my: p.myReact, counts: Object.assign({}, p.reactions) };
+      var chain = [];
+      if (p.myReact && p.myReact !== key) chain.push(p.myReact);
+      chain.push(key);
+      chain.forEach(function (e) {
+        send("PUT", "/posts/" + p.id + "/reactions", { emoji: e }).catch(function (err) {
+          p.myReact = before.my;
+          p.reactions = before.counts;
+          paint();
+          failed(err);
+        });
+      });
+
       if (p.myReact === key) {
         p.reactions[key] = Math.max(0, (p.reactions[key] || 1) - 1);
         p.myReact = null;
@@ -1563,6 +1642,8 @@
       else p.body = body.value.trim();
       p.when = "방금 수정함";
 
+      send("PATCH", "/posts/" + p.id, { title: p.title, body: p.body || "" }).catch(failed);
+
       render();
       openPost(p);
       if (form) mountClassMission();
@@ -1619,6 +1700,7 @@
     up.addEventListener("click", function () {
       c.mineUp = !c.mineUp;
       c.up += c.mineUp ? 1 : -1;
+      if (c.id) send("PUT", "/comments/" + c.id + "/reactions", { emoji: "👍" }).catch(failed);
       paintUp();
     });
     paintUp();
@@ -1701,7 +1783,10 @@
 
   function newCommentBox() {
     return writeBox("댓글 남기기", "댓글 등록", function (text) {
-      openRef.thread.push({ author: ME.name, when: "방금", text: text, up: 0, replies: [] });
+      var c = { author: ME.name, when: "방금", text: text, up: 0, replies: [] };
+      send("POST", "/posts/" + openRef.id + "/comments", { body: text })
+        .then(function (r) { if (r) c.id = r.id; }).catch(failed);
+      openRef.thread.push(c);
       renderComments();
       render();
     }).el;
@@ -1713,7 +1798,10 @@
 
     var w = writeBox(c.author + "님에게 답글", "답글 등록", function (text) {
       c.replies = c.replies || [];
-      c.replies.push({ author: ME.name, at: c.author, when: "방금", text: text, up: 0, replies: [] });
+      var re = { author: ME.name, at: c.author, when: "방금", text: text, up: 0, replies: [] };
+      send("POST", "/posts/" + openRef.id + "/comments", { body: text, parentId: c.id })
+        .then(function (r) { if (r) re.id = r.id; }).catch(failed);
+      c.replies.push(re);
       renderComments();
       render();
     });
@@ -3108,12 +3196,18 @@
   }
 
   function deletePost(p) {
-    var i = POSTS.indexOf(p);
-    if (i < 0) return;
-    POSTS.splice(i, 1);
-    delRow = -1;
-    render();
-    if (screenNow === "admin") renderAdmin();
+    if (POSTS.indexOf(p) < 0) return;
+
+    function drop() {
+      POSTS.splice(POSTS.indexOf(p), 1);
+      delRow = -1;
+      render();
+      if (screenNow === "admin") renderAdmin();
+    }
+
+    // 지우는 것은 되돌릴 수 없으므로 서버가 받아 준 뒤에 화면에서 뺀다
+    if (API) send("DELETE", "/posts/" + p.id).then(drop).catch(failed);
+    else drop();
   }
 
   var postQ = "";

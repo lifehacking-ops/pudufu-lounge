@@ -12,6 +12,7 @@ const config = require("./config");
 const present = require("./present");
 const render = require("./render");
 const account = require("./account");
+const writes = require("./writes");
 const { pool } = require("./db");
 
 const ROOT = path.join(__dirname, "..");
@@ -29,6 +30,24 @@ function send(res, code, body, type) {
   res.writeHead(code, { "content-type": type || "text/plain; charset=utf-8" });
   res.end(body);
 }
+
+const json = (res, code, obj) =>
+  send(res, code, JSON.stringify(obj), "application/json; charset=utf-8");
+
+function body(req) {
+  return new Promise((ok, no) => {
+    let s = "";
+    req.on("data", (d) => {
+      s += d;
+      if (s.length > 1e6) { no(new Error("본문이 너무 큽니다")); req.destroy(); }
+    });
+    req.on("end", () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } });
+    req.on("error", no);
+  });
+}
+
+/* /l/posts/12/comments 처럼 생긴 것에서 숫자를 꺼낸다 */
+const seg = (p) => p.split("/").filter(Boolean);
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
@@ -56,6 +75,39 @@ const server = http.createServer(async (req, res) => {
       const L = await require("./queries").lounge(config.loungeId);
       const n = await account.syncWeeks(config.loungeId, L.course_id);
       return send(res, 200, `${n}명 갱신`);
+    }
+
+    /* ---- 쓰기. 권한은 server/writes.js 가 다시 검사한다 ---- */
+    if (req.method !== "GET" && p.startsWith("/l/")) {
+      const me = viewer(req);
+      const L = config.loungeId;
+      const s = seg(p);            // ["l", ...]
+      const input = await body(req);
+
+      try {
+        if (req.method === "POST" && s[1] === "posts" && s.length === 2)
+          return json(res, 200, await writes.createPost(L, me, input));
+
+        if (req.method === "PATCH" && s[1] === "posts" && s.length === 3)
+          return json(res, 200, await writes.editPost(L, me, +s[2], input));
+
+        if (req.method === "DELETE" && s[1] === "posts" && s.length === 3)
+          return json(res, 200, await writes.deletePost(L, me, +s[2]));
+
+        if (req.method === "POST" && s[1] === "posts" && s[3] === "comments")
+          return json(res, 200, await writes.createComment(L, me, +s[2], input));
+
+        if (req.method === "DELETE" && s[1] === "comments" && s.length === 3)
+          return json(res, 200, await writes.deleteComment(L, me, +s[2]));
+
+        if (req.method === "PUT" && s[3] === "reactions")
+          return json(res, 200, await writes.toggleReaction(
+            L, me, s[1] === "posts" ? "post" : "comment", +s[2], input.emoji));
+      } catch (e) {
+        if (e.code === 403 || e.code === 404) return json(res, e.code, { error: e.message });
+        throw e;
+      }
+      return json(res, 404, { error: "그런 길이 없습니다" });
     }
 
     if (p === "/" || p === "/l" || p.startsWith("/l/")) {

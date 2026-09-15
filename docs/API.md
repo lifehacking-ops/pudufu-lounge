@@ -134,17 +134,43 @@ GET  /l/{lounge}/admin/dashboard      강사 · 관리자
 GET  /l/{lounge}/admin/members        관리자
 ```
 
-### 쓰기
+### 쓰기 — 만들어져 있다
 
 ```
-POST   /l/{lounge}/posts              { category_id, title, body, week, answers[], attachments[] }
-PATCH  /l/{lounge}/posts/{id}         본인 글
-DELETE /l/{lounge}/posts/{id}         관리자
-POST   /l/{lounge}/posts/{id}/comments    { body, parent_id }
-DELETE /l/{lounge}/comments/{id}
-PUT    /l/{lounge}/posts/{id}/reactions   { emoji }      토글
-POST   /l/{lounge}/uploads                이미지 → Supabase Storage
+POST   /l/posts                    { cat, title, body, wk, mission[], attach, overwrite }
+PATCH  /l/posts/{id}               본인 글만
+DELETE /l/posts/{id}               이 라운지 관리자만
+POST   /l/posts/{id}/comments      { body, parentId }   답글은 한 단계까지
+DELETE /l/comments/{id}            본인 또는 관리자
+PUT    /l/posts/{id}/reactions     { emoji }            토글
+PUT    /l/comments/{id}/reactions  { emoji }            토글
+POST   /l/uploads                  이미지 → Supabase Storage (아직)
 ```
+
+**권한은 `server/writes.js` 가 다시 판정한다.** 브라우저가 보내는 것은 무엇이든
+거짓일 수 있으므로 클라이언트의 `can()` 을 믿지 않는다. 실제로 수강생 계정으로
+`DELETE /l/posts/1` 을 부르면 `403 관리자만 지울 수 있습니다` 가 온다.
+
+검사하는 것:
+
+| | 규칙 |
+|---|---|
+| 멤버 | 이 라운지의 `lounge_member` 여야 한다 |
+| 카테고리 | 이 라운지에 **놓여 있어야** 한다. 미사용 카테고리는 아무도 못 쓴다 |
+| 역할 | `lounge_category` 의 쓰기 권한을 본다 |
+| 만료 | 과제 제출과 피드백권 사용만 막고, 글·댓글·반응은 그대로 연다 |
+| 피드백권 | 잔여를 프드프에서 읽고, 없으면 거절한다 |
+| 답글 | 답글의 답글은 원댓글에 붙인다. 한 단계에서 멈춘다 |
+
+### 클라이언트가 보내는 방식
+
+```
+글 · 과제 · 수정 · 삭제   서버가 받아 준 뒤에 화면에 반영한다
+반응                      먼저 반영하고 실패하면 되돌린다 — 딸깍이 기다리면 딸깍이 아니다
+```
+
+실패는 조용히 지나가지 않는다. 화면 맨 위에 무엇이 안 됐는지 적고 새로고침을
+권한다. 화면과 DB 가 어긋난 채로 두면 무엇이 사실인지 알 수 없게 된다.
 
 ### 관리
 

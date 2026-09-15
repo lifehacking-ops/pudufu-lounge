@@ -76,6 +76,7 @@ async function loungeData(loungeId, viewerId) {
   const byId = new Map();
   cms.forEach((c) => {
     const node = {
+      id: c.id,
       author: c.author_name, when: when(c.created_at, now), text: c.body,
       up: c.reaction_count, replies: []
     };
@@ -92,6 +93,7 @@ async function loungeData(loungeId, viewerId) {
 
   const posts = ps.map((p) => {
     const out = {
+      id: p.id,
       cat: p.category,
       wk: p.week || 0,
       author: p.author_name,
@@ -157,7 +159,14 @@ async function loungeData(loungeId, viewerId) {
           days: Math.max(0, Math.ceil((new Date(live.starts_at) - now) / 86400000)) }
       : { title: "예정된 라이브가 없습니다", when: "", days: 0 },
     leaderboard: { "7": lb7.map(fmt), "30": lb30.map(fmt), all: lbAll.map(fmt) },
-    lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro }
+    lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro },
+    me: (function () {
+      const m = mem.find((x) => Number(x.user_id) === Number(viewerId));
+      return m
+        ? { name: m.nickname, role: m.role, lounges: (m.staff_of || []).map(loungeKey) }
+        : { name: "손님", role: "student", lounges: [] };
+    })(),
+    api: "/l"        // 목업에는 없다. 있으면 쓰기가 서버로 간다
   };
 }
 

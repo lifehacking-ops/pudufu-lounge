@@ -2072,9 +2072,6 @@
       card.setAttribute("data-open", "true");
       card.addEventListener("click", function () { openWeek(c.wk); });
 
-      var cover = el("div", "course-cover", c.wk + "주차 커버 자리");
-      card.appendChild(cover);
-
       var box = el("div", "course-in");
       var head = el("div");
       head.appendChild(el("span", "kicker", c.wk + "주차"));

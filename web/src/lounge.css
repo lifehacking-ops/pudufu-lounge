@@ -902,13 +902,6 @@
   .course[data-open="true"]:hover { transform: translateY(-2px); }
   .course[data-open="false"] { border-style: dashed; box-shadow: none; cursor: default; }
 
-  .course-cover {
-    aspect-ratio: 16 / 9; background: var(--cloud); border-bottom: 1px solid var(--line);
-    display: grid; place-items: center; font-size: 11px; color: var(--mist); text-align: center; padding: 12px;
-  }
-
-  .course[data-open="false"] .course-cover { background: transparent; border-bottom-style: dashed; }
-
   .course-in { padding: 16px 18px; display: grid; gap: 11px; }
   .course-t { font-size: 15px; font-weight: 700; letter-spacing: normal; margin: 0; }
   .course-d { font-size: 12px; color: var(--slate); margin: 0; }

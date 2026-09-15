@@ -39,6 +39,7 @@ async function loungeData(loungeId, viewerId) {
 
   /* ---- 멤버 ---- */
   const members = mem.map((m) => ({
+    userId: Number(m.user_id),
     name: m.nickname,
     cohort: m.cohort || 0,
     role: m.role,
@@ -57,7 +58,7 @@ async function loungeData(loungeId, viewerId) {
   const rightOf = new Map(rights.map((r) => [r.name, r]));
   const categories = cats.map((c) => {
     const r = rightOf.get(c.name);
-    const out = { name: c.name };
+    const out = { id: c.id, name: c.name };
     if (c.is_system) out.system = true;
     if (c.pass_required) out.pass = true;
     if (!r) {

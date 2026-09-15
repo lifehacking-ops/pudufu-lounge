@@ -172,15 +172,33 @@ POST   /l/uploads                  이미지 → Supabase Storage (아직)
 실패는 조용히 지나가지 않는다. 화면 맨 위에 무엇이 안 됐는지 적고 새로고침을
 권한다. 화면과 DB 가 어긋난 채로 두면 무엇이 사실인지 알 수 없게 된다.
 
-### 관리
+### 관리 — 만들어져 있다
+
+이 라운지를 맡은 **관리자만**. 역할이 계정이 아니라 라운지에 붙으므로 옆 강의
+관리자는 여기를 만지지 못한다.
 
 ```
-PATCH  /l/{lounge}/admin/members/{user_id}     { role }
-PUT    /l/{lounge}/admin/categories            배치와 쓰기 권한 한 번에
-POST   /l/{lounge}/admin/categories            { name }
-DELETE /l/{lounge}/admin/categories/{id}       미사용 + 글 0건일 때만
-GET    /l/{lounge}/admin/digest?date=          어제 요약
+PATCH  /l/admin/members/{userId}             { role }
+POST   /l/admin/categories                   { name }
+DELETE /l/admin/categories/{id}
+PUT    /l/admin/categories/{id}/placement    { placement: show|more|off }
+PUT    /l/admin/categories/{id}/rights       { student, instructor }
+GET    /l/admin/digest?date=                 어제 요약 (아직)
 ```
+
+서버가 막는 것:
+
+| | 규칙 |
+|---|---|
+| 마지막 관리자 | 내릴 수 없다. 내리면 아무도 이 라운지를 못 만진다 |
+| 카테고리 이름 | 살아 있는 것끼리 중복 불가. `전체` 는 필터 바가 쓰는 이름이라 막는다 |
+| 카테고리 삭제 | 기본 기능이 아니고 · 글이 없고 · 어느 라운지도 안 쓸 때만 |
+| 기본 노출 | 7개까지. 칩 줄이 접히면 필터가 있다는 사실 자체가 안 보인다 |
+| 관리자 쓰기 권한 | 칸을 두지 않는다. 관리자는 항상 쓸 수 있다 |
+
+되돌리기가 필요한 자리가 하나 있다. **자기 자신을 내리려다 거절당하면** 화면
+권한까지 같이 되돌려야 한다 — 안 그러면 서버는 거절했는데 관리 탭이 사라진
+채로 남는다.
 
 ---
 

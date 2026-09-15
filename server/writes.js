@@ -219,3 +219,134 @@ async function toggleReaction(loungeId, userId, kind, targetId, emoji) {
 
 module.exports = { createPost, editPost, deletePost, createComment, deleteComment,
                    toggleReaction, Denied, Missing };
+
+/* ============================================================================
+   관리 — 이 라운지를 맡은 관리자만.
+   역할이 계정이 아니라 라운지에 붙으므로, 옆 강의 관리자는 여기를 만지지 못한다.
+   ============================================================================ */
+
+async function admin(loungeId, userId) {
+  const me = await membership(loungeId, userId);
+  if (me.role !== "admin") throw new Denied("이 라운지의 관리자가 아닙니다");
+  return me;
+}
+
+/* 역할은 이 라운지에 대해서만 올라가고 내려간다.
+   담당 라운지 목록은 이 행들에서 저절로 나온다 — 따로 적지 않는다. */
+async function setRole(loungeId, userId, targetUserId, role) {
+  await admin(loungeId, userId);
+  if (["student", "instructor", "admin"].indexOf(role) < 0) throw new Denied("없는 역할입니다");
+
+  const m = await one(
+    `SELECT id, role FROM lounge_member WHERE lounge_id = $1 AND user_id = $2`,
+    [loungeId, targetUserId]);
+  if (!m) throw new Missing("이 라운지의 멤버가 아닙니다");
+
+  // 마지막 관리자를 내리면 아무도 이 라운지를 못 만진다
+  if (m.role === "admin" && role !== "admin") {
+    const n = await one(
+      `SELECT count(*)::int AS n FROM lounge_member
+        WHERE lounge_id = $1 AND role = 'admin' AND user_id <> $2`, [loungeId, targetUserId]);
+    if (!n.n) throw new Denied("마지막 관리자는 내릴 수 없습니다");
+  }
+
+  await rows(`UPDATE lounge_member SET role = $1 WHERE id = $2`, [role, m.id]);
+  return { ok: true };
+}
+
+/* 카테고리는 전역 풀이다. 만들면 이 라운지에 바로 붙여 쓸 수 있게 놓는다. */
+async function addCategory(loungeId, userId, name) {
+  await admin(loungeId, userId);
+  name = (name || "").trim();
+  if (!name) throw new Denied("이름이 없습니다");
+  if (name === "전체") throw new Denied("‘전체’ 는 필터 바가 쓰는 이름입니다");
+  if (name.length > 40) throw new Denied("이름이 너무 깁니다");
+
+  const dup = await one(`SELECT id FROM category WHERE name = $1 AND deleted_at IS NULL`, [name]);
+  if (dup) throw new Denied(`‘${name}’ 은 이미 있습니다`);
+
+  const c = await one(`INSERT INTO category (name) VALUES ($1) RETURNING id`, [name]);
+
+  // 기본 노출 상한을 넘으면 '필터 더보기' 안으로 들어간다
+  const cnt = await one(
+    `SELECT count(*)::int AS n FROM lounge_category
+      WHERE lounge_id = $1 AND placement = 'show'`, [loungeId]);
+  const placement = cnt.n < FILTER_MAX ? "show" : "more";
+
+  await rows(
+    `INSERT INTO lounge_category (lounge_id, category_id, placement, sort)
+     VALUES ($1, $2, $3, $4)`, [loungeId, c.id, placement, cnt.n]);
+
+  return { id: c.id, placement };
+}
+
+const FILTER_MAX = 7;
+
+/* 지우는 조건은 화면이 보여주는 것과 같아야 한다.
+   기본 기능이 아니고 · 글이 없고 · 어느 라운지도 쓰지 않을 때만. */
+async function removeCategory(loungeId, userId, categoryId) {
+  await admin(loungeId, userId);
+  const c = await one(
+    `SELECT id, name, is_system FROM category WHERE id = $1 AND deleted_at IS NULL`, [categoryId]);
+  if (!c) throw new Missing();
+  if (c.is_system) throw new Denied(`‘${c.name}’ 은 뒤에 동작이 붙어 있어 지울 수 없습니다`);
+
+  const used = await one(
+    `SELECT (SELECT count(*)::int FROM post WHERE category_id = $1 AND deleted_at IS NULL) AS posts,
+            (SELECT count(*)::int FROM lounge_category WHERE category_id = $1) AS lounges`,
+    [categoryId]);
+  if (used.posts) throw new Denied(`글이 ${used.posts}개 남아 있습니다`);
+  if (used.lounges) throw new Denied("아직 쓰는 라운지가 있습니다");
+
+  await rows(`UPDATE category SET deleted_at = now() WHERE id = $1`, [categoryId]);
+  return { ok: true };
+}
+
+/* 기본 노출 / 필터 더보기 / 미사용. 행이 없으면 미사용이다. */
+async function setPlacement(loungeId, userId, categoryId, placement) {
+  await admin(loungeId, userId);
+  if (["show", "more", "off"].indexOf(placement) < 0) throw new Denied("없는 자리입니다");
+
+  if (placement === "off") {
+    await rows(`DELETE FROM lounge_category WHERE lounge_id = $1 AND category_id = $2`,
+      [loungeId, categoryId]);
+    return { ok: true };
+  }
+
+  if (placement === "show") {
+    const cnt = await one(
+      `SELECT count(*)::int AS n FROM lounge_category
+        WHERE lounge_id = $1 AND placement = 'show' AND category_id <> $2`,
+      [loungeId, categoryId]);
+    // 칩 줄이 접히면 필터가 있다는 사실 자체가 안 보인다
+    if (cnt.n >= FILTER_MAX) throw new Denied(`기본 노출은 ${FILTER_MAX}개까지입니다`);
+  }
+
+  const sort = await one(
+    `SELECT coalesce(max(sort), -1) + 1 AS s FROM lounge_category
+      WHERE lounge_id = $1 AND placement = $2`, [loungeId, placement]);
+
+  await rows(
+    `INSERT INTO lounge_category (lounge_id, category_id, placement, sort)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (lounge_id, category_id)
+     DO UPDATE SET placement = $3, sort = $4`,
+    [loungeId, categoryId, placement, sort.s]);
+  return { ok: true };
+}
+
+/* 카테고리 × 역할. 관리자는 항상 쓸 수 있으므로 칸을 두지 않는다. */
+async function setRights(loungeId, userId, categoryId, rights) {
+  await admin(loungeId, userId);
+  const n = await rows(
+    `UPDATE lounge_category SET student_can_write = $1, instructor_can_write = $2
+      WHERE lounge_id = $3 AND category_id = $4`,
+    [!!rights.student, !!rights.instructor, loungeId, categoryId]);
+  return { ok: true };
+}
+
+module.exports.setRole = setRole;
+module.exports.addCategory = addCategory;
+module.exports.removeCategory = removeCategory;
+module.exports.setPlacement = setPlacement;
+module.exports.setRights = setRights;

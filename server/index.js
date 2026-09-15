@@ -103,6 +103,24 @@ const server = http.createServer(async (req, res) => {
         if (req.method === "PUT" && s[3] === "reactions")
           return json(res, 200, await writes.toggleReaction(
             L, me, s[1] === "posts" ? "post" : "comment", +s[2], input.emoji));
+
+        /* 관리. 이 라운지를 맡은 관리자만 — server/writes.js 가 다시 본다. */
+        if (s[1] === "admin") {
+          if (req.method === "PATCH" && s[2] === "members")
+            return json(res, 200, await writes.setRole(L, me, +s[3], input.role));
+
+          if (req.method === "POST" && s[2] === "categories" && s.length === 3)
+            return json(res, 200, await writes.addCategory(L, me, input.name));
+
+          if (req.method === "DELETE" && s[2] === "categories")
+            return json(res, 200, await writes.removeCategory(L, me, +s[3]));
+
+          if (req.method === "PUT" && s[2] === "categories" && s[4] === "placement")
+            return json(res, 200, await writes.setPlacement(L, me, +s[3], input.placement));
+
+          if (req.method === "PUT" && s[2] === "categories" && s[4] === "rights")
+            return json(res, 200, await writes.setRights(L, me, +s[3], input));
+        }
       } catch (e) {
         if (e.code === 403 || e.code === 404) return json(res, e.code, { error: e.message });
         throw e;

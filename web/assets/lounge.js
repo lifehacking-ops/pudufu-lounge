@@ -2921,11 +2921,23 @@
           b.setAttribute("aria-current", String(m.role === r.key));
           b.addEventListener("click", function (e) {
             e.stopPropagation();
+            var was = m.role;
             m.role = r.key;
             setScope(m, r.key !== "student");   // 권한은 이 라운지에만 붙는다
             roleRow = -1;
             if (m.name === ME.name) applyRole(r.key);
             else renderAdmin();
+
+            send("PATCH", "/admin/members/" + m.userId, { role: r.key })
+              .catch(function (err) {
+                m.role = was;
+                setScope(m, was !== "student");
+                // 나를 내린 것이었으면 화면 권한까지 같이 되돌린다.
+                // 안 그러면 서버가 거절했는데 관리 탭이 사라진 채로 남는다.
+                if (m.name === ME.name) applyRole(was);
+                else renderAdmin();
+                failed(err);
+              });
           });
           menu.appendChild(b);
         });
@@ -2960,6 +2972,15 @@
           paintCat();
           renderFilters();
           renderAdmin();
+
+          send("PUT", "/admin/categories/" + cat.id + "/rights", {
+            student: roleAllows(cat, "student"),
+            instructor: roleAllows(cat, "instructor")
+          }).catch(function (err) {
+            setCatRole(cat, r.key, !roleAllows(cat, r.key));   // 되돌린다
+            paintCat(); renderFilters(); renderAdmin();
+            failed(err);
+          });
         });
         td.appendChild(b);
         tr.appendChild(td);
@@ -2983,6 +3004,7 @@
       .filter(function (n) { return used.indexOf(n) < 0; });
 
     function moveTo(name, to) {
+      var before = { show: L.show.slice(), more: L.more.slice() };
       [L.show, L.more].forEach(function (arr) {
         var i = arr.indexOf(name);
         if (i > -1) arr.splice(i, 1);
@@ -2991,6 +3013,14 @@
       if (to === "more") L.more.push(name);
       renderFilters();
       renderAdmin();
+
+      var cat = categoryOf(name);
+      send("PUT", "/admin/categories/" + (cat && cat.id) + "/placement", { placement: to })
+        .catch(function (err) {
+          L.show = before.show; L.more = before.more;
+          renderFilters(); renderAdmin();
+          failed(err);
+        });
     }
 
     var cols = el("div", "fcols");
@@ -3147,22 +3177,48 @@
     if (categoryOf(name)) { catErr = "\u201c" + name + "\u201d 은 이미 있습니다."; renderAdmin(); return; }
     if (name === "전체") { catErr = "\u201c전체\u201d 는 필터 바가 쓰는 이름입니다."; renderAdmin(); return; }
 
-    CATEGORIES.push({ name: name });
-
-    // 만들자마자 쓸 수 있게 이 라운지에 붙인다. 상한을 넘으면 더보기로.
+    var cat = { name: name };
     var L = lounge();
-    (L.show.length < FILTER_MAX ? L.show : L.more).push(name);
 
-    catErr = "";
-    catDel = "";
-    renderFilters();
-    paintCat();
-    renderAdmin();
+    function place(where) {
+      CATEGORIES.push(cat);
+      // 만들자마자 쓸 수 있게 이 라운지에 붙인다. 상한을 넘으면 더보기로.
+      (where === "show" ? L.show : L.more).push(name);
+      catErr = "";
+      catDel = "";
+      renderFilters();
+      paintCat();
+      renderAdmin();
+    }
+
+    if (!API) return place(L.show.length < FILTER_MAX ? "show" : "more");
+
+    // 이름 중복과 상한은 서버가 다시 본다
+    send("POST", "/admin/categories", { name: name }).then(function (r) {
+      cat.id = r.id;
+      place(r.placement);
+    }).catch(function (err) {
+      catErr = err.message;
+      renderAdmin();
+    });
   }
 
   function removeCat(name) {
-    var i = CATEGORIES.indexOf(categoryOf(name));
+    var cat = categoryOf(name);
+    var i = CATEGORIES.indexOf(cat);
     if (i < 0) return;
+
+    // 지우는 것은 되돌릴 수 없다. 서버가 조건을 다시 보고 받아 준 뒤에 뺀다.
+    if (API) {
+      send("DELETE", "/admin/categories/" + cat.id).then(function () {
+        CATEGORIES.splice(CATEGORIES.indexOf(cat), 1);
+        if (state.cat === name) { state.cat = "전체"; }
+        catErr = ""; catDel = "";
+        render(); renderFilters(); paintCat(); renderAdmin();
+      }).catch(function (err) { catDel = ""; renderAdmin(); failed(err); });
+      return;
+    }
+
     CATEGORIES.splice(i, 1);
 
     if (state.cat === name) { state.cat = "전체"; render(); }

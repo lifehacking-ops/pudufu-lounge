@@ -6,6 +6,19 @@ const config = require("./config");
 // 시각은 전부 UTC 로 넣고 UTC 로 읽는다. 세션 타임존에 기대지 않는다.
 const base = { options: "-c timezone=UTC" };
 
+/* 비밀번호를 주소에 끼워 넣으면 인코딩에서 어긋나기 쉽다. DB_PASSWORD 가
+   따로 있으면 주소에서 나머지만 떼어 쓰고 비밀번호는 그대로 넘긴다. */
+function parts(url) {
+  const u = new URL(url);
+  return {
+    host: u.hostname,
+    port: Number(u.port || 5432),
+    user: decodeURIComponent(u.username),
+    database: u.pathname.slice(1) || "postgres",
+    password: process.env.DB_PASSWORD || decodeURIComponent(u.password)
+  };
+}
+
 const url = config.db.connectionString;
 const hosted = url && /supabase|neon|railway|render/.test(url);
 
@@ -19,7 +32,7 @@ const pool = new Pool(
   url
     ? {
         ...base,
-        connectionString: url,
+        ...parts(url),
         /* Supabase 직접 연결은 자체 서명 인증서라 검증을 끄지 않으면 붙지 않는다.
            엄격하게 하려면 Supabase 의 CA 를 내려받아 ssl.ca 로 넣으면 된다. */
         ssl: hosted ? { rejectUnauthorized: false } : undefined,

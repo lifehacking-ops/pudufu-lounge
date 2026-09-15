@@ -47,7 +47,15 @@ const categoryRights = (loungeId) =>
           FROM lounge_category lc JOIN category c ON c.id = lc.category_id
          WHERE lc.lounge_id = $1 AND c.deleted_at IS NULL`, [loungeId]);
 
-const posts = (loungeId, viewerId) =>
+/* 첫 화면에 글을 전부 실어 보내지 않는다. 150편이면 250KB 가 되고,
+   그걸 다 그리면 화면이 90 뭉치만큼 길어진다. 최신 것부터 한 묶음씩 준다.
+
+   커서는 (쓴 시각, id) 쌍이다. 시각만으로는 같은 초에 올라온 두 글에서
+   한 편이 건너뛰어진다. id 만으로는 시각 순서와 어긋날 수 있다.
+   고정 글은 여기서 따로 다루지 않는다 — 어느 묶음에 있든 화면이 위로 올린다. */
+const PAGE = 30;
+
+const posts = (loungeId, viewerId, before, limit, ids) =>
   rows(`SELECT p.id, p.title, p.body, p.week, p.is_pinned, p.view_count,
                p.created_at, p.user_id, p.author_name, c.name AS category,
                (p.user_id = $2) AS mine,
@@ -69,12 +77,61 @@ const posts = (loungeId, viewerId) =>
                                  ORDER BY t.sort)
                   FROM attachment t WHERE t.post_id = p.id) AS attach,
                (SELECT count(*)::int FROM post_report pr WHERE pr.post_id = p.id) AS reports,
-               EXISTS (SELECT 1 FROM post_report pr WHERE pr.post_id = p.id AND pr.user_id = $2) AS reported
+               EXISTS (SELECT 1 FROM post_report pr WHERE pr.post_id = p.id AND pr.user_id = $2) AS reported,
+               (SELECT count(*)::int FROM comment cm
+                 WHERE cm.post_id = p.id AND cm.deleted_at IS NULL) AS comment_n
           FROM post p JOIN category c ON c.id = p.category_id
          WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
-         ORDER BY p.created_at DESC`, [loungeId, viewerId]);
+           AND ($3::timestamptz IS NULL
+                OR (p.created_at, p.id) < ($3::timestamptz, $4::bigint))
+           AND ($6::bigint[] IS NULL OR p.id = ANY($6))
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT $5`,
+    [loungeId, viewerId,
+     before ? before.at : null, before ? before.id : null,
+     limit || PAGE, ids && ids.length ? ids : null]);
 
-const comments = (loungeId, viewerId) =>
+/* 고정 글은 오래됐어도 맨 위에 서야 한다. 몇 편 없으므로 첫 묶음에 얹어 보낸다. */
+const pinnedPosts = (loungeId, viewerId) =>
+  rows(`SELECT id FROM post
+         WHERE lounge_id = $1 AND is_pinned = true AND deleted_at IS NULL
+         ORDER BY created_at DESC`, [loungeId]);
+
+/* 대시보드와 게시물 관리는 '전부' 를 세야 한다 — 이번 주 미제출, 어제 올라온 글,
+   답 없는 과제. 한 묶음만 보고 세면 숫자가 틀린다. 그래서 가벼운 목록을 따로 준다:
+   본문 · 첨부 · 댓글 내용 없이 세는 데 필요한 것만. 스태프에게만 보낸다. */
+const postIndex = (loungeId) =>
+  rows(`SELECT p.id, p.title, p.user_id, p.author_name, p.week, p.created_at,
+               c.name AS category, p.is_pinned, p.view_count,
+               (SELECT count(*)::int FROM comment cm
+                 WHERE cm.post_id = p.id AND cm.deleted_at IS NULL) AS comment_n,
+               (SELECT count(*)::int FROM reaction r
+                 WHERE r.target_kind = 'post' AND r.target_id = p.id) AS react_n,
+               (SELECT count(*)::int FROM post_report pr WHERE pr.post_id = p.id) AS reports
+          FROM post p JOIN category c ON c.id = p.category_id
+         WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
+         ORDER BY p.created_at DESC`, [loungeId]);
+
+/* id 몇 개를 콕 집어 온다. 고정 글과 ?p=<id> 딥링크가 쓴다. */
+const postsByIds = (loungeId, viewerId, ids) =>
+  ids && ids.length ? posts(loungeId, viewerId, null, ids.length, ids) : Promise.resolve([]);
+
+/* 레일의 '몇 명 중 몇 명 제출'. 화면이 들고 있는 글만 세면 페이지를 넘길 때마다
+   숫자가 달라진다. 세는 일은 DB 가 한다. */
+const weekSubmit = (loungeId) =>
+  one(`SELECT (SELECT count(*)::int FROM lounge_member
+                WHERE lounge_id = $1 AND role = 'student') AS students,
+              (SELECT count(DISTINCT p.user_id)::int
+                 FROM post p JOIN category c ON c.id = p.category_id
+                WHERE p.lounge_id = $1 AND c.name = '과제'
+                  AND p.deleted_at IS NULL
+                  AND p.created_at >= now() - interval '7 days') AS submitted`, [loungeId]);
+
+/* 남은 글이 더 있는지. 없는데 '더 보기' 가 떠 있으면 눌러 보게 된다. */
+const postCount = (loungeId) =>
+  one(`SELECT count(*)::int AS n FROM post WHERE lounge_id = $1 AND deleted_at IS NULL`, [loungeId]);
+
+const comments = (loungeId, viewerId, postIds) =>
   rows(`SELECT cm.id, cm.post_id, cm.parent_id, cm.author_name, cm.body,
                cm.reaction_count, cm.created_at,
                (m.role IN ('instructor','admin')) AS staff,
@@ -85,7 +142,8 @@ const comments = (loungeId, viewerId) =>
           JOIN post p ON p.id = cm.post_id
      LEFT JOIN lounge_member m ON m.user_id = cm.user_id AND m.lounge_id = p.lounge_id
          WHERE p.lounge_id = $1 AND cm.deleted_at IS NULL
-         ORDER BY cm.created_at`, [loungeId, viewerId]);
+           AND ($3::bigint[] IS NULL OR cm.post_id = ANY($3))
+         ORDER BY cm.created_at`, [loungeId, viewerId, postIds || null]);
 
 /* ---------- 랭킹 ----------
    받은 이모지만 센다. 글을 몇 개 썼는지 · 댓글을 몇 개 달았는지는 안 본다.
@@ -142,4 +200,4 @@ const weekFlags = (loungeId) =>
   rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
 
 module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
-                   posts, comments, received, topPosts, weekFlags };
+                   posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit, comments, received, topPosts, weekFlags, PAGE };

@@ -129,7 +129,7 @@
   /* 카테고리를 지워도 되는지. 글이 남아 있거나 다른 라운지가 쓰고 있으면 안 된다. */
   function catUsage(name) {
     return {
-      posts: POSTS.filter(function (p) { return p.cat === name; }).length,
+      posts: allPosts().filter(function (p) { return p.cat === name; }).length,
       lounges: LOUNGES.filter(function (L) {
         return L.show.indexOf(name) > -1 || L.more.indexOf(name) > -1;
       }).map(function (L) { return L.name; })
@@ -179,7 +179,7 @@
 
   /* 지금 내가 진행 중인 주차. 실제로는 마지막으로 본 강의에서 나오는 값이고,
      이미 시스템이 아는 값이라 글쓰기에서 다시 물어보지 않는다. */
-  var CURRENT_WK = 3;
+  var CURRENT_WK = D.currentWk || 3;
 
   /* 주차별 미션 양식. 강사는 질문과 예시만 갈아끼우면 된다.
      hint 는 칸의 placeholder 로만 쓰이고 저장되지 않는다 — 비계는 남기되 결과물에는 안 남는다. */
@@ -293,8 +293,10 @@
   var POSTS = D.posts;
 
   /* 좋아요는 반응의 한 종류다. 별도 버튼을 두지 않고 👍 로 흡수한다.
-     기존 likes 는 👍 개수로, liked 는 내 반응으로 옮긴다. */
-  POSTS.forEach(function (p) {
+     기존 likes 는 👍 개수로, liked 는 내 반응으로 옮긴다.
+     '더 보기' 로 이어 오는 글도 같은 손질을 거친다 — 한쪽만 손질하면
+     스크롤 아래부터 반응이 안 눌린다. */
+  function normalizePost(p) {
     if (!p.reactions) p.reactions = {};
     if (p.likes) p.reactions["👍"] = (p.reactions["👍"] || 0) + p.likes;
     if (p.liked && !p.myReact) p.myReact = "👍";
@@ -310,7 +312,15 @@
 
     // "2시간 전" 같은 문자열만으로는 '어제 몇 건'을 셀 수 없다. 숫자로 바꿔 둔다.
     p.daysAgo = parseDays(p.when);
-  });
+  }
+
+  POSTS.forEach(normalizePost);
+
+  /* 대시보드와 게시물 관리는 전체를 세야 한다. 서버가 가벼운 목록을 따로 준다.
+     없으면(프로토타입 · 수강생) 화면에 실린 글로 대신한다. */
+  var INDEX = D.postIndex || null;
+  if (INDEX) INDEX.forEach(function (p) { p.daysAgo = parseDays(p.when); });
+  function allPosts() { return INDEX || POSTS; }
 
   function parseDays(when) {
     if (/방금|분 전|시간 전/.test(when)) return 0;
@@ -327,6 +337,9 @@
     (p.thread || []).forEach(function (c) { n += 1 + (c.replies || []).length; });
     return n;
   }
+
+  /* 가벼운 목록에는 댓글 내용이 없고 개수만 있다. 세는 쪽을 하나로 둔다. */
+  function cmtN(p) { return p.comments != null ? p.comments : cmtCount(p); }
 
   function reactTotal(p) {
     var n = 0;
@@ -1156,8 +1169,14 @@
   /* 우측 레일의 이번 주 제출 현황. 관리 화면 대시보드와 같은 함수로 세어
      두 화면의 숫자가 어긋나지 않게 한다. */
   function paintWkSubmit() {
-    var all = students().length;
-    var done = all - notSubmitted().length;
+    var all, done;
+    if (D.stats) {
+      all = D.stats.students;
+      done = D.stats.submitted;
+    } else {
+      all = students().length;
+      done = all - notSubmitted().length;
+    }
     $("wkFill").style.width = (all ? (done / all) * 100 : 0) + "%";
     $("wkSubmit").textContent = "";
     $("wkSubmit").appendChild(el("span", "tnum", String(all)));
@@ -1901,6 +1920,43 @@
     return box;
   }
 
+  /* ----- 더 보기 -----
+     첫 화면에는 한 묶음만 실려 온다. 150편을 한꺼번에 그리면 화면이 90 뭉치만큼
+     길어지고, 그 아래를 보는 사람은 없다. 누를 때마다 다음 묶음을 잇는다. */
+  var more = { left: !!D.more, cursor: D.cursor || null, pending: false };
+
+  function moreButton() {
+    var b = el("button", "feed-more", more.pending ? "불러오는 중…" : "글 더 보기");
+    b.type = "button";
+    b.disabled = more.pending;
+    b.addEventListener("click", loadMore);
+    return b;
+  }
+
+  function loadMore() {
+    if (more.pending || !more.left || !API || !more.cursor) return;
+    more.pending = true;
+    render();
+
+    send("GET", "/posts?at=" + encodeURIComponent(more.cursor.at) + "&id=" + more.cursor.id)
+      .then(function (r) {
+        more.pending = false;
+        if (!r) return;
+        // 같은 글이 두 번 실리지 않게 — 그 사이에 새 글이 올라올 수 있다
+        var have = {};
+        POSTS.forEach(function (p) { have[p.id] = true; });
+        r.posts.forEach(function (p) {
+          if (have[p.id]) return;
+          normalizePost(p);
+          POSTS.push(p);
+        });
+        more.left = !!r.more;
+        more.cursor = r.cursor || null;
+        render();
+      })
+      .catch(function (e) { more.pending = false; render(); failed(e); });
+  }
+
   function render() {
     var rows = POSTS.filter(function (p) {
       if (state.cat !== "전체" && p.cat !== state.cat) return false;
@@ -1916,14 +1972,20 @@
     // 고정 글은 위계가 아니라 순서만 앞선다. 걸린 조건에 맞을 때만 올라온다.
     rows = rows.slice().sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); });
 
-    resultCount.textContent = String(rows.length);
+    /* 전체 수는 서버가 센다. 화면에 30편만 실려 있어도 '150개' 라고 말해야
+       사람이 스스로를 의심하지 않는다. */
+    var whole = state.cat === "전체" && !state.mine && !state.liked;
+    var total = whole && D.stats ? D.stats.posts
+      : whole && INDEX ? INDEX.length : rows.length;
+    resultCount.textContent = String(total);
     paintWkSubmit();
 
     feed.textContent = "";
 
     if (!rows.length) {
-      feed.appendChild(el("p", "empty", "이 조건에 맞는 글이 아직 없습니다."));
-      return;
+      feed.appendChild(el("p", "empty",
+        more.pending ? "불러오는 중입니다." : "이 조건에 맞는 글이 아직 없습니다."));
+      if (!more.pending) return;
     }
 
     rows.forEach(function (p) {
@@ -1997,6 +2059,8 @@
 
       feed.appendChild(card);
     });
+
+    if (more.left) feed.appendChild(moreButton());
 
     /* 접힌 줄이 실제로 있는지는 그려 봐야 안다. 다 그린 뒤 한 번에 잰다.
        화면이 숨어 있으면 높이가 0 이라 잴 수 없으니 그때는 건드리지 않는다. */
@@ -2603,6 +2667,13 @@
     if (!courseList) return;
     courseList.textContent = "";
 
+    if (!shownCourses().length) {
+      courseList.appendChild(el("p", "empty",
+        can("manage") ? "아직 등록된 강의가 없습니다. 관리 › 강의 게시에서 주차를 만드세요."
+                      : "아직 열린 강의가 없습니다."));
+      return;
+    }
+
     shownCourses().forEach(function (c) {
       var p = pctOf(c);
       var state = !c.published ? "draft"
@@ -2657,13 +2728,17 @@
 
   function paintWeekHead() {
     var c = course();
+    if (!c) return;   // 아직 강의가 없는 라운지. 강의실은 빈 화면으로 둔다.
+
     crumbCur.textContent = c.wk + "주차 · " + c.title;
     weekKicker.textContent = "";
-    weekKicker.appendChild(document.createTextNode("학원마케팅 올인원 강의 · "));
+    weekKicker.appendChild(document.createTextNode(loungeName() + " · "));
     weekKicker.appendChild(el("span", "disp", String(c.wk)));
     weekKicker.appendChild(document.createTextNode("주차"));
     weekTitle.textContent = c.title;
   }
+
+  function loungeName() { return (D.lounge && D.lounge.name) || "학원마케팅 올인원 강의"; }
 
   function updateProgress() {
     var p = pctOf(course());
@@ -2994,6 +3069,8 @@
   var admTab = "dash";
   var admSeg = $("admSeg"), admBody = $("admBody");
   var roleRow = -1;           // 역할 메뉴가 열린 멤버 인덱스
+  var memQ = "";              // 멤버 찾기
+  var memShown = 50;          // 한 번에 세우는 줄 수
   var delRow = -1;            // 삭제 확인이 열린 게시물 인덱스
 
   function admCard(title, sub) {
@@ -3525,13 +3602,13 @@
      과제에 답을 안 다는 것과는 무게가 다르다 — 수강생이 가진 것을 쓰고 기다리는 중이다. */
   function feedbackQueue() {
     var names = passCats();
-    return POSTS.filter(function (p) { return names.indexOf(p.cat) > -1 && cmtCount(p) === 0; })
+    return allPosts().filter(function (p) { return names.indexOf(p.cat) > -1 && cmtN(p) === 0; })
       .sort(function (a, b) { return b.daysAgo - a.daysAgo; });
   }
 
   function feedbackWeek() {
     var names = passCats();
-    return POSTS.filter(function (p) { return names.indexOf(p.cat) > -1 && p.daysAgo <= 7; }).length;
+    return allPosts().filter(function (p) { return names.indexOf(p.cat) > -1 && p.daysAgo <= 7; }).length;
   }
 
   /* 답이 안 달린 과제. 냈는데 아무 반응이 없으면 다음 것을 안 낸다. */
@@ -3545,7 +3622,7 @@
   /* 이번 주에 과제를 안 낸 사람 */
   function notSubmitted() {
     var did = {};
-    POSTS.forEach(function (p) { if (p.cat === "과제" && p.daysAgo <= 7) did[p.author] = true; });
+    allPosts().forEach(function (p) { if (p.cat === "과제" && p.daysAgo <= 7) did[p.author] = true; });
     return students().filter(function (m) { return !did[m.name]; });
   }
 
@@ -3747,7 +3824,7 @@
      그래서 여기서 문장을 만들어 두고, 관리자가 복사해 오픈채팅방에 붙인다. */
   function digestLines() {
     var joined = students().filter(function (m) { return m.joined === 1; }).length;
-    var posts = POSTS.filter(function (p) { return p.daysAgo === 1; }).length;
+    var posts = allPosts().filter(function (p) { return p.daysAgo === 1; }).length;
 
     var starters = {};
     POSTS.forEach(function (p) {
@@ -3822,7 +3899,7 @@
   function yesterdayCats() {
     var c = admCard("어제 올라온 글", "카테고리별");
     var rows = CATEGORIES.map(function (cat) {
-      return { name: cat.name, n: POSTS.filter(function (p) { return p.daysAgo === 1 && p.cat === cat.name; }).length };
+      return { name: cat.name, n: allPosts().filter(function (p) { return p.daysAgo === 1 && p.cat === cat.name; }).length };
     }).filter(function (r) { return r.n > 0; });
 
     if (!rows.length) { c.appendChild(el("p", "adm-empty", "어제 올라온 글이 없습니다")); return c; }
@@ -3886,11 +3963,32 @@
   }
 
   function paintRolesTab(host) {
-    /* 멤버 표 */
+    /* 멤버 표. 200명이면 그냥 다 세울 수 없다 — 찾아서, 끊어서 본다. */
     var c1 = admCard("멤버", MEMBERS.length + "명");
+    var mcount = c1.querySelector(".meta-m");
+
+    var mfind = el("input", "adm-find");
+    mfind.type = "text";
+    mfind.value = memQ;
+    mfind.placeholder = "닉네임 · 기수 · 역할로 찾기";
+    mfind.setAttribute("aria-label", "멤버 찾기");
+    mfind.addEventListener("input", function () {
+      memQ = mfind.value; memShown = 50; roleRow = -1; renderAdmin();
+      var again = document.querySelector("#screenAdmin .adm-find");
+      if (again) { again.focus(); again.setSelectionRange(memQ.length, memQ.length); }
+    });
+    c1.appendChild(mfind);
+
     var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
 
-    MEMBERS.forEach(function (m, i) {
+    var mtk = tokensOf(memQ.trim());
+    var mrows = MEMBERS.filter(function (m) {
+      return !mtk.length || hitAll([m.name, roleLabel(m.role), m.cohort ? m.cohort + "기" : ""].join(" "), mtk);
+    });
+    mcount.textContent = (mtk.length ? mrows.length + " / " : "") + MEMBERS.length + "명";
+
+    var mall = mrows.length;
+    mrows.slice(0, memShown).forEach(function (m, i) {
       var tr = el("tr");
       tr.appendChild(el("td", "nm", m.name));
       tr.appendChild(el("td", "num", m.cohort ? m.cohort + "기" : "—"));
@@ -4011,6 +4109,25 @@
       tr.appendChild(td);
       t.body.appendChild(tr);
     });
+
+    if (mall > memShown) {
+      var mr = el("tr"), mtd = el("td");
+      mtd.colSpan = 9;
+      var mb = el("button", "fadd-btn", "더 보기 (" + memShown + " / " + mall + ")");
+      mb.type = "button";
+      mb.addEventListener("click", function () { memShown += 50; renderAdmin(); });
+      mtd.appendChild(mb);
+      mr.appendChild(mtd);
+      t.body.appendChild(mr);
+    }
+
+    if (!mall) {
+      var er = el("tr"), etd = el("td");
+      etd.colSpan = 9;
+      etd.appendChild(el("p", "adm-empty", "찾는 멤버가 없습니다"));
+      er.appendChild(etd);
+      t.body.appendChild(er);
+    }
 
     c1.appendChild(t.el);
     host.appendChild(c1);
@@ -4474,10 +4591,11 @@
   }
 
   var postQ = "";
+  var postShown = 50;   // 한 번에 세우는 줄 수
   var paintRows = function () {};   // 검색 입력 때 표 몸통만 다시 그린다
 
   function paintPostsTab(host) {
-    var c = admCard("게시물", POSTS.length + "건");
+    var c = admCard("게시물", allPosts().length + "건");
     var count = c.querySelector(".meta-m");
 
     var find = el("input", "adm-find");
@@ -4485,7 +4603,7 @@
     find.value = postQ;
     find.placeholder = "제목 · 글쓴이 · 카테고리로 찾기";
     find.setAttribute("aria-label", "게시물 찾기");
-    find.addEventListener("input", function () { postQ = find.value; delRow = -1; paintRows(); });
+    find.addEventListener("input", function () { postQ = find.value; delRow = -1; postShown = 50; paintRows(); });
     c.appendChild(find);
 
     var t = admTable(["제목", "카테고리", "글쓴이", "반응", "댓글", "신고", "올린 때", ""]);
@@ -4493,11 +4611,15 @@
     paintRows = function () {
     t.body.textContent = "";
     var tk = tokensOf(postQ.trim());
-    var rows = POSTS.filter(function (p) {
+    var rows = allPosts().filter(function (p) {
       return !tk.length || hitAll([p.title, p.cat, p.author, p.body || ""].join(" "), tk);
     }).sort(function (a, b) { return a.daysAgo - b.daysAgo; });
 
-    count.textContent = tk.length ? rows.length + " / " + POSTS.length + "건" : POSTS.length + "건";
+    // 150건을 한 번에 세우면 표가 화면 열 뭉치만큼 길어진다. 끊어 보여준다.
+    var all = rows.length;
+    rows = rows.slice(0, postShown);
+
+    count.textContent = (tk.length ? all + " / " : "") + allPosts().length + "건";
 
     if (!rows.length) {
       var er = el("tr"), etd = el("td");
@@ -4546,6 +4668,18 @@
         t.body.appendChild(ctr);
       }
     });
+
+    // 더 있으면 한 줄로 알리고 그 자리에서 이어 붙인다
+    if (all > rows.length) {
+      var mr = el("tr"), mtd = el("td");
+      mtd.colSpan = 8;
+      var mb = el("button", "fadd-btn", "더 보기 (" + rows.length + " / " + all + ")");
+      mb.type = "button";
+      mb.addEventListener("click", function () { postShown += 50; paintRows(); });
+      mtd.appendChild(mb);
+      mr.appendChild(mtd);
+      t.body.appendChild(mr);
+    }
     };
 
     paintRows();
@@ -4554,10 +4688,15 @@
   }
 
   renderCourseList();
-  paintWeekHead();
-  renderCurric();
-  updateProgress();
-  selectLesson(curItem());
-  mountClassMission();
+
+  /* 강의가 하나도 없는 라운지도 있다 — 막 만들었거나 아직 동기화 전이다.
+     그때 강의실을 그리려다 부팅이 통째로 멈추면 커뮤니티까지 같이 죽는다. */
+  if (course()) {
+    paintWeekHead();
+    renderCurric();
+    updateProgress();
+    selectLesson(curItem());
+    mountClassMission();
+  }
   applyRole(ME.role);
 })();

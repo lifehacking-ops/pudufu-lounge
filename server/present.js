@@ -45,14 +45,16 @@ async function loungeData(loungeId, viewerId) {
   const now = new Date();
   const L = await Q.lounge(loungeId);
 
-  const [mem, cats, rights, ps, cms, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
+  const [mem, cats, rights, ps, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
     await Promise.all([
       Q.members(loungeId, L.course_id), Q.categories(), Q.categoryRights(loungeId),
-      Q.posts(loungeId, viewerId), Q.comments(loungeId, viewerId), Q.lounges(),
+      Q.posts(loungeId, viewerId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
       Q.received(loungeId, 7), Q.received(loungeId, 30), Q.received(loungeId, null),
       account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
+
+  const [submit, totalPosts] = await Promise.all([Q.weekSubmit(loungeId), Q.postCount(loungeId)]);
 
   const [tp7, tp30, tpAll] = await Promise.all([
     Q.topPosts(loungeId, 7), Q.topPosts(loungeId, 30), Q.topPosts(loungeId, null)
@@ -62,8 +64,13 @@ async function loungeData(loungeId, viewerId) {
   const seen = new Set((await account.watched(viewerId, L.course_id))
     .filter((w) => w.is_complete).map((w) => Number(w.lesson_id)));
 
-  /* ---- 멤버 ---- */
-  const members = mem.map((m) => ({
+  const meRow = mem.find((x) => Number(x.user_id) === Number(viewerId));
+  const staff = !!(meRow && (meRow.role === "instructor" || meRow.role === "admin"));
+
+  /* ---- 멤버 ----
+     수강생 화면이 멤버로 하는 일은 검색뿐이다. 접속 기록 · 정지 사유 · 피드백권은
+     운영 정보라 보낼 이유도 없다. 200명이면 그것만으로 38KB 다. */
+  const fullMembers = mem.map((m) => ({
     userId: Number(m.user_id),
     name: m.nickname,
     cohort: m.cohort || 0,
@@ -85,6 +92,10 @@ async function loungeData(loungeId, viewerId) {
     ...(m.staff_of ? { lounges: m.staff_of.map(loungeKey) } : {})
   }));
 
+  const members = staff ? fullMembers : fullMembers.map((m) => ({
+    userId: m.userId, name: m.name, role: m.role, cohort: m.cohort, wk: m.wk
+  }));
+
   /* ---- 카테고리 : 라운지별 쓰기 권한을 roles 로 되돌린다 ---- */
   const rightOf = new Map(rights.map((r) => [r.name, r]));
   const categories = cats.map((c) => {
@@ -103,53 +114,25 @@ async function loungeData(loungeId, viewerId) {
     return out;
   });
 
-  /* ---- 글 + 댓글 ---- */
-  const byPost = new Map();
-  const byId = new Map();
-  cms.forEach((c) => {
-    const node = {
-      id: c.id,
-      author: c.author_name, when: when(c.created_at, now), text: c.body,
-      up: c.reaction_count, mineUp: c.mine_up, replies: []
-    };
-    if (c.staff) node.staff = true;
-    byId.set(c.id, node);
-    if (c.parent_id) {
-      const parent = byId.get(c.parent_id);
-      if (parent) { node.at = parent.author; parent.replies.push(node); }
-    } else {
-      if (!byPost.has(c.post_id)) byPost.set(c.post_id, []);
-      byPost.get(c.post_id).push(node);
-    }
-  });
+  /* ---- 글 + 댓글 ----
+     첫 화면은 한 묶음만 싣는다. 나머지는 '더 보기' 가 같은 길로 이어 온다. */
+  /* 고정 글은 오래됐어도 맨 위여야 한다. 첫 묶음에 없으면 따로 집어 얹는다. */
+  const pinIds = (await Q.pinnedPosts(loungeId, viewerId)).map((x) => x.id)
+    .filter((id) => !ps.some((p) => String(p.id) === String(id)));
+  const extra = await Q.postsByIds(loungeId, viewerId, pinIds);
 
-  const posts = ps.map((p) => {
-    const out = {
-      id: p.id,
-      cat: p.category,
-      wk: p.week || 0,
-      author: p.author_name,
-      when: when(p.created_at, now),
-      likes: p.likes,
-      views: p.view_count,
-      mine: p.mine,
-      liked: p.reacted,
-      myReact: p.my_react || null,
-      reports: p.reports || 0,
-      reported: p.reported,
-      title: p.title,
-      thread: byPost.get(p.id) || []
-    };
-    if (p.is_pinned) out.pinned = true;
-    if (p.body) out.body = p.body;
-    if (p.reactions) out.reactions = p.reactions;
-    if (p.answers) out.mission = p.answers.map((a) => ({ q: a.q, a: a.a }));
-    if (p.attach) {
-      out.attach = p.attach.map((a) => ({ type: a.kind, url: a.url || null,
-                                          title: a.label, label: a.label }));
-    }
-    return out;
-  });
+  const all = extra.concat(ps);
+  const cms = all.length ? await Q.comments(loungeId, viewerId, all.map((p) => p.id)) : [];
+  const posts = shapePosts(all, cms, now);
+
+  /* 대시보드와 게시물 관리는 전체를 세야 한다. 스태프에게만 가벼운 목록을 보낸다. */
+  const index = staff ? (await Q.postIndex(loungeId)).map((p) => ({
+    id: p.id, cat: p.category, wk: p.week || 0,
+    author: p.author_name, mine: Number(p.user_id) === Number(viewerId),
+    when: when(p.created_at, now), title: p.title,
+    views: p.view_count, comments: p.comment_n, reacts: p.react_n,
+    reports: p.reports || 0, pinned: !!p.is_pinned
+  })) : null;
 
   /* ---- 강의 ---- */
   const lessons = course.lessons.map((l) => ({
@@ -191,9 +174,14 @@ async function loungeData(loungeId, viewerId) {
     : {};
 
   /* 순위는 동점을 같은 등수로 본다. 받은 수가 같은데 등수가 다르면 설명할 수 없다. */
+  /* 200명이면 세 기간을 합쳐 40KB 가 넘는다. 아래쪽은 아무도 열어 보지 않는다.
+     위 50명과 '나' 만 싣는다 — 내 순위는 몇 등이든 보여야 한다. */
+  const RANK_TOP = 50;
+
   function ranked(list) {
     let rank = 0, prev = null;
-    return list.map((r, i) => {
+    const meName = (mem.find((x) => Number(x.user_id) === Number(viewerId)) || {}).nickname;
+    const full = list.map((r, i) => {
       if (r.total !== prev) { rank = i + 1; prev = r.total; }
       return {
         rank: rank, name: r.name, wk: r.week, cohort: r.cohort || 0,
@@ -201,6 +189,10 @@ async function loungeData(loungeId, viewerId) {
         emojis: (r.emojis || []).map((x) => [x.e, x.n])
       };
     });
+    const top = full.slice(0, RANK_TOP);
+    const mine = full.find((x) => x.name === meName);
+    if (mine && !top.some((x) => x.name === meName)) top.push(mine);
+    return top;
   }
 
   const top5 = (list) => list.filter((r) => r.total > 0).slice(0, 5)
@@ -225,6 +217,10 @@ async function loungeData(loungeId, viewerId) {
         ? { name: m.nickname, role: m.role, lounges: (m.staff_of || []).map(loungeKey) }
         : { name: "손님", role: "student", lounges: [] };
     })(),
+    stats: { students: submit.students, submitted: submit.submitted, posts: totalPosts.n },
+    more: ps.length >= Q.PAGE,   // 더 실을 글이 남았는가
+    cursor: ps.length ? { at: ps[ps.length - 1].created_at, id: String(ps[ps.length - 1].id) } : null,
+    postIndex: index,            // 스태프에게만. 대시보드와 게시물 관리가 센다
     api: "/l"        // 목업에는 없다. 있으면 쓰기가 서버로 간다
   };
 }
@@ -242,4 +238,68 @@ function liveWhen(at) {
   return `${part.weekday} ${part.hour}:${part.minute}`;
 }
 
-module.exports = { loungeData, when };
+/* 글 한 묶음을 화면이 쓰는 모양으로 만든다. 첫 화면과 '더 보기' 가 같은 것을 쓴다 —
+   두 벌로 두면 한쪽만 고쳐져서 스크롤 아래부터 다르게 보이기 시작한다. */
+function shapePosts(ps, cms, now) {
+  const byPost = new Map();
+  const byId = new Map();
+
+  cms.forEach((c) => {
+    const node = {
+      id: c.id,
+      author: c.author_name, when: when(c.created_at, now), text: c.body,
+      up: c.reaction_count, mineUp: c.mine_up, replies: []
+    };
+    if (c.staff) node.staff = true;
+    byId.set(c.id, node);
+    if (c.parent_id) {
+      const parent = byId.get(c.parent_id);
+      if (parent) { node.at = parent.author; parent.replies.push(node); }
+    } else {
+      if (!byPost.has(c.post_id)) byPost.set(c.post_id, []);
+      byPost.get(c.post_id).push(node);
+    }
+  });
+
+  return ps.map((p) => {
+    const out = {
+      id: p.id,
+      cat: p.category,
+      wk: p.week || 0,
+      author: p.author_name,
+      when: when(p.created_at, now),
+      likes: p.likes,
+      views: p.view_count,
+      mine: p.mine,
+      liked: p.reacted,
+      myReact: p.my_react || null,
+      reports: p.reports || 0,
+      reported: p.reported,
+      title: p.title,
+      thread: byPost.get(p.id) || []
+    };
+    if (p.is_pinned) out.pinned = true;
+    if (p.body) out.body = p.body;
+    if (p.reactions) out.reactions = p.reactions;
+    if (p.answers) out.mission = p.answers.map((a) => ({ q: a.q, a: a.a }));
+    if (p.attach) {
+      out.attach = p.attach.map((a) => ({ type: a.kind, url: a.url || null,
+                                          title: a.label, label: a.label }));
+    }
+    return out;
+  });
+}
+
+/* '더 보기' 한 묶음. 첫 화면과 같은 조립을 거친다. */
+async function postPage(loungeId, viewerId, before) {
+  const ps = await Q.posts(loungeId, viewerId, before);
+  const ids = ps.map((p) => p.id);
+  const cms = ids.length ? await Q.comments(loungeId, viewerId, ids) : [];
+  return {
+    posts: shapePosts(ps, cms, new Date()),
+    more: ps.length >= Q.PAGE,
+    cursor: ps.length ? { at: ps[ps.length - 1].created_at, id: String(ps[ps.length - 1].id) } : null
+  };
+}
+
+module.exports = { loungeData, postPage, when };

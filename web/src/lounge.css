@@ -701,6 +701,15 @@
   .post-x { font-size: 13px; color: var(--slate); margin: 5px 0 0;
             white-space: pre-wrap; overflow-wrap: anywhere; }
   .post-xw { display: grid; justify-items: start; gap: 2px; }
+  /* 피드 아래 '더 보기'. 다음 묶음을 이어 붙인다. */
+  .feed-more {
+    width: 100%; padding: 13px; border-radius: var(--radius-card);
+    border: 1px solid var(--line); background: var(--surface);
+    font-size: 13px; font-weight: 700; color: var(--slate);
+  }
+  .feed-more:hover { border-color: var(--mist); color: var(--ink); }
+  .feed-more:disabled { opacity: .55; cursor: default; }
+
   .morelink { font-size: 12px; font-weight: 600; color: var(--slate); }
   .morelink:hover { color: var(--brand); text-decoration: underline; }
 

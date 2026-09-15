@@ -81,6 +81,14 @@ async function handler(req, res) {
       return res.end();
     }
 
+    /* 피드 '더 보기'. 첫 화면과 같은 조립을 거쳐 한 묶음씩 잇는다. */
+    if (p === "/l/posts" && req.method === "GET") {
+      if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });
+      const at = url.searchParams.get("at"), id = url.searchParams.get("id");
+      const before = at && id ? { at: at, id: id } : null;
+      return json(res, 200, await present.postPage(config.loungeId, viewer(req), before));
+    }
+
     /* 화면이 쓰는 데이터를 그대로 본다. 디버깅과 검증용. */
     if (p === "/l/data.json") {
       if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });

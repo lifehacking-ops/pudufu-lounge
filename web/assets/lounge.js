@@ -2032,6 +2032,63 @@
 
   /* 내 글 수정. 상세 본문 자리를 그대로 편집 화면으로 바꾼다.
      과제 글이면 미션 칸을, 보통 글이면 제목과 본문을 연다. */
+  /* 글쓰기 창의 카테고리 고르개를 그대로 쓴다. 자리가 달라도 같은 일을 하는
+     컨트롤은 같은 모양이어야 한다 — 하나를 익히면 나머지도 안다. */
+  function catPick(current, names, locked) {
+    var wrap = el("div", "pick");
+
+    var btn = el("button", "pick-btn");
+    btn.type = "button";
+    btn.setAttribute("aria-expanded", "false");
+    btn.disabled = !!locked;
+
+    var now = el("span", null, current);
+    btn.appendChild(now);
+    btn.appendChild(el("span", "caret", "▼"));
+
+    var menu = el("div", "pick-menu cat-pop");
+    menu.hidden = true;
+
+    var picked = current;
+
+    names.forEach(function (name) {
+      var b = el("button", null, name);
+      b.type = "button";
+      b.setAttribute("aria-current", String(name === picked));
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        picked = name;
+        now.textContent = name;
+        [].forEach.call(menu.children, function (x) {
+          x.setAttribute("aria-current", String(x.textContent === picked));
+        });
+        menu.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+      });
+      menu.appendChild(b);
+    });
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = menu.hidden;
+      closePicks();
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    return { el: wrap, value: function () { return picked; } };
+  }
+
+  function closePicks() {
+    [].forEach.call(document.querySelectorAll(".cat-pop"), function (m) {
+      m.hidden = true;
+      if (m.previousSibling) m.previousSibling.setAttribute("aria-expanded", "false");
+    });
+  }
+  document.addEventListener("click", closePicks);
+
   /* 이 카테고리가 피드백권을 쓰는가. PASSES 는 '내가 가진 권' 이라 스태프에게는
      비어 있다. 카테고리의 성질은 CATEGORIES 에서 봐야 한다. */
   function passOf(name) {
@@ -2064,32 +2121,7 @@
        다만 옮기는 것으로 관문을 피할 수는 없다 — 과제와 피드백권 카테고리는
        양식과 권에 묶여 있어서 그대로 둔다. 서버도 같은 것을 다시 본다. */
     var movable = p.cat !== "과제" && !passOf(p.cat);
-    var newCat = p.cat;
-
-    if (movable) {
-      var pickRow = el("div", "edit-cats");
-      pickRow.appendChild(el("span", "kicker", "카테고리"));
-
-      var chips = el("div", "edit-chips");
-      moveTargets(p.cat).forEach(function (name) {
-        var b = el("button", "chip", name);
-        b.type = "button";
-        b.setAttribute("aria-pressed", String(name === newCat));
-        b.addEventListener("click", function () {
-          newCat = name;
-          [].forEach.call(chips.children, function (x) {
-            x.setAttribute("aria-pressed", String(x.textContent === newCat));
-          });
-        });
-        chips.appendChild(b);
-      });
-      pickRow.appendChild(chips);
-      detailBody.appendChild(pickRow);
-    } else {
-      detailBody.appendChild(el("p", "sec-note",
-        p.cat === "과제" ? "과제는 주차 양식에 묶여 있어 카테고리를 옮길 수 없습니다"
-                         : "피드백권을 쓴 글은 카테고리를 옮길 수 없습니다"));
-    }
+    var cat = catPick(p.cat, movable ? moveTargets(p.cat) : [], !movable);
 
     var save = el("button", "btn-primary sm", "저장");
     save.type = "button";
@@ -2110,8 +2142,10 @@
       autoGrow(body);
     }
 
+    // 글쓰기 창과 같은 순서다 — 카테고리 · 취소 · 확정
     var row = el("div", "row");
     row.appendChild(el("span", "grow"));
+    row.appendChild(cat.el);
 
     var cancel = el("button", "btn-ghost", "취소");
     cancel.type = "button";
@@ -2120,13 +2154,19 @@
     row.appendChild(save);
     detailBody.appendChild(row);
 
+    if (!movable) {
+      detailBody.appendChild(el("p", "sec-note",
+        p.cat === "과제" ? "과제는 주차 양식에 묶여 있어 카테고리를 옮길 수 없습니다"
+                         : "피드백권을 쓴 글은 카테고리를 옮길 수 없습니다"));
+    }
+
     save.addEventListener("click", function () {
       var was = p.cat;
       var t = title.value.trim();
       if (t) p.title = t;
       if (form) p.mission = form.answers();
       else p.body = body.value.trim();
-      if (movable) p.cat = newCat;
+      if (movable) p.cat = cat.value();
       p.when = "방금 수정함";
 
       send("PATCH", "/posts/" + p.id, { title: p.title, body: p.body || "", cat: p.cat })

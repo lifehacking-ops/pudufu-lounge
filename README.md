@@ -12,6 +12,7 @@
 | `web/assets/data-mock.js` | 예시 데이터. 앱에서는 서버가 같은 모양으로 채운다 |
 | `db/schema.sql` | 스키마(PostgreSQL). 라운지 12개 + 프드프 캐시 8개 |
 | `db/seed.sql` | 시드. `data-mock.js` 에서 생성된다 |
+| `server/` | 라운지 서버(Node.js). `account.js` 가 프드프와의 경계다 |
 | `docs/API.md` | API 계약. 프드프에 요청할 5개 + 라운지 자체 |
 | `DESIGN.md` | 디자인 토큰. `pudufu.net` 에서 추출 |
 | `lounge-prototype.html` | 460px 모바일 컬럼 선행 버전. 웹 버전으로 대체됨 |
@@ -79,6 +80,29 @@ psql -d lounge -f db/seed.sql
 
 나중에 MySQL 로 되돌릴 일이 생기면 `make-seed.js` 의 방언 함수 세 줄만 바꾸면
 시드는 자동으로 따라온다. 스키마는 손으로 번역한다(테이블 20개).
+
+## 서버
+
+```
+npm install
+npm run dev          http://localhost:4000
+```
+
+프레임워크를 쓰지 않는다. 서버가 하는 일이 셋뿐이라서다 — 로그인 확인,
+DB 에서 화면 데이터 만들기, 쓰기 받기. 렌더는 `lounge.js` 가 브라우저에서 한다.
+
+| 파일 | 하는 일 |
+|---|---|
+| `server/account.js` | **프드프와의 경계.** 계정 · 구매 · 시청 기록 · 피드백권 · 강의를 받아 온다. `PUDUFU_MODE=local` 이면 `ext_*` 캐시만 읽고, `remote` 면 같은 함수가 HTTP 로 받아 온다 — 부르는 쪽은 그대로다 |
+| `server/queries.js` | SQL 을 전부 모아 둔다. 흩어지면 DB 를 바꿀 때 찾아다녀야 한다 |
+| `server/present.js` | DB 행을 `window.LOUNGE_DATA` 모양으로 옮긴다 |
+| `server/render.js` | 프로토타입 마크업을 그대로 쓰고 목업 자리에 서버 데이터를 끼운다 |
+
+`GET /l/data.json` 으로 화면이 쓰는 데이터를 그대로 볼 수 있다.
+`GET /l/sync-weeks` 는 시청 기록에서 주차를 다시 계산한다(하루 한 번이면 충분).
+
+**로그인은 아직 개발용 고정 사용자다.** SSO 가 붙으면 `server/index.js` 의
+`viewer()` 한 곳만 바뀐다.
 
 ## 어디에 만드나
 

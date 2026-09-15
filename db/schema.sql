@@ -25,7 +25,7 @@ DROP TABLE IF EXISTS lounge_digest, feedback_pass_use, post_view, reaction,
   comment, attachment, post_answer, post, lounge_category, category,
   lounge_member, lounge CASCADE;
 DROP TABLE IF EXISTS ext_live, ext_feedback_pass, ext_watch, ext_purchase,
-  ext_mission, ext_lesson, ext_course, ext_user CASCADE;
+  ext_mission, ext_lesson, ext_week, ext_course, ext_user CASCADE;
 DROP TYPE IF EXISTS lounge_role, chip_placement, attachment_kind,
   reaction_target, pass_period CASCADE;
 DROP FUNCTION IF EXISTS touch_updated_at CASCADE;
@@ -368,6 +368,16 @@ CREATE TABLE ext_course (
   title     varchar(200) NOT NULL,
   weeks     smallint     NOT NULL DEFAULT 8,
   synced_at timestamptz
+);
+
+
+-- 주차 제목. 강의 목록의 카드 제목이 된다.
+CREATE TABLE ext_week (
+  course_id bigint       NOT NULL,
+  week      smallint     NOT NULL,
+  title     varchar(200) NOT NULL,
+  synced_at timestamptz,
+  PRIMARY KEY (course_id, week)
 );
 
 

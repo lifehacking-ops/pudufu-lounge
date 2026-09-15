@@ -93,7 +93,7 @@ TRUNCATE lounge_digest, feedback_pass_use, post_view, reaction, comment,
   attachment, post_answer, post, lounge_category, category, lounge_member,
   lounge RESTART IDENTITY CASCADE;
 TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase, ext_mission,
-  ext_lesson, ext_course, ext_user RESTART IDENTITY CASCADE;
+  ext_lesson, ext_week, ext_course, ext_user RESTART IDENTITY CASCADE;
 `);
 
 /* ---- 2부 · 프드프에서 받아 온 것 ---- */
@@ -112,6 +112,11 @@ say(`
 -- 강의`);
 say("INSERT INTO ext_course (id, title, weeks, synced_at) VALUES");
 say(`  (${COURSE}, ${q("학원마케팅 올인원 강의")}, ${WEEKS.length}, now());`);
+
+say(`
+-- 주차 제목. 강의 목록의 카드 제목이 된다.`);
+say("INSERT INTO ext_week (course_id, week, title, synced_at) VALUES");
+say(WEEKS.map((t, i) => `  (${COURSE}, ${i + 1}, ${q(t)}, now())`).join(",\n") + ";");
 
 say(`
 -- 주차별 강. 교안 본문이 통합 검색의 대상이 된다.`);
@@ -232,6 +237,7 @@ const reactTotal = (p) => Object.values(p.reactions || {}).reduce((a, b) => a + 
 
 const postRows = [], answerRows = [], attachRows = [], commentRows = [], reactRows = [], passRows = [];
 let pid = 0, cmid = 0;
+const capped = [];
 
 POSTS.forEach((p) => {
   pid++;
@@ -257,9 +263,13 @@ POSTS.forEach((p) => {
   const pool = MEMBERS.filter((m) => m.name !== p.author).map((m) => uid[m.name]);
   let cursor = 0;
   const give = (emoji, count) => {
-    for (let k = 0; k < count && cursor < pool.length; k++, cursor++) {
+    let gave = 0;
+    for (; gave < count && cursor < pool.length; gave++, cursor++) {
       reactRows.push(`  ('post', ${pid}, ${pool[cursor]}, ${q(emoji)}, ${at})`);
     }
+    // 반응은 사람당 한 번이다. 목업의 수가 사람 수보다 많으면 여기서 잘린다 —
+    // 26명이 48개의 좋아요를 누를 수는 없다. 화면과 숫자가 달라 보이면 이것이다.
+    if (gave < count) capped.push(`${p.title.slice(0, 16)}… ${emoji} ${count}→${gave}`);
   };
   give("👍", p.likes || 0);
   Object.keys(p.reactions || {}).forEach((e) => give(e, p.reactions[e]));
@@ -320,4 +330,5 @@ COMMIT;
 
 console.log(out.join("\n"));
 
+if (capped.length) console.error(`사람 수보다 많아 잘린 반응 ${capped.length}건: ${capped.slice(0,3).join(" · ")}${capped.length>3?" …":""}`);
 console.error(`사람 ${MEMBERS.length} · 글 ${pid} · 댓글 ${cmid} · 반응 ${reactRows.length} · 강 ${LESSONS.length} · 미션 ${mrows.length} · 시청 ${wrows.length}`);

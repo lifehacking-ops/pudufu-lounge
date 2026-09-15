@@ -18,7 +18,7 @@ TRUNCATE lounge_digest, feedback_pass_use, post_view, reaction, comment,
   attachment, post_answer, post, lounge_category, category, lounge_member,
   lounge RESTART IDENTITY CASCADE;
 TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase, ext_mission,
-  ext_lesson, ext_course, ext_user RESTART IDENTITY CASCADE;
+  ext_lesson, ext_week, ext_course, ext_user RESTART IDENTITY CASCADE;
 
 
 -- =============================================================================
@@ -57,6 +57,17 @@ INSERT INTO ext_user (id, nickname, email, synced_at) VALUES
 -- 강의
 INSERT INTO ext_course (id, title, weeks, synced_at) VALUES
   (1, '학원마케팅 올인원 강의', 8, now());
+
+-- 주차 제목. 강의 목록의 카드 제목이 된다.
+INSERT INTO ext_week (course_id, week, title, synced_at) VALUES
+  (1, 1, '옆 학원 말고, 왜 우리 학원인데?', now()),
+  (1, 2, '원장님 학원, 검색하면 나와요?', now()),
+  (1, 3, '블로그 100개 썼는데, 왜 문의는 0건일까요?', now()),
+  (1, 4, '선택이 아닌 필수, 학원 인스타', now()),
+  (1, 5, '99% 등록으로 이루어지는 상담의 기술', now()),
+  (1, 6, '신규 100명보다 더 중요한 재원생 관리', now()),
+  (1, 7, '유튜브 · 맘카페 · 당근 채널 확장 전략', now()),
+  (1, 8, '원장 수업 없는 학원 시스템 만들기', now());
 
 -- 주차별 강. 교안 본문이 통합 검색의 대상이 된다.
 INSERT INTO ext_lesson (course_id, week, seq, chapter, title, duration, video_url, doc, synced_at) VALUES

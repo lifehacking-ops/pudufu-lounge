@@ -92,5 +92,8 @@ const leaderboard = (loungeId, days) =>
        WHERE m.role = 'student'
        GROUP BY u.nickname ORDER BY score DESC LIMIT 5`, [loungeId, days]);
 
+const weekFlags = (loungeId) =>
+  rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
+
 module.exports = { lounge, lounges, members, categories, categoryRights,
-                   posts, comments, leaderboard };
+                   posts, comments, leaderboard, weekFlags };

@@ -11,7 +11,7 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const SRC = path.join(ROOT, "lounge-web-prototype.html");
 
-function shell() {
+function shell(keepSwitcher) {
   let html = fs.readFileSync(SRC, "utf8");
 
   // 자산 경로를 서버 기준으로
@@ -19,10 +19,13 @@ function shell() {
 
   /* 역할 전환기는 프로토타입에만 있는 데모 장치다. 앱에서 역할은
      lounge_member 가 정하고 서버가 판정한다 — 브라우저에서 바꿀 수 있으면
-     안 되고, 바꿔 봐야 서버가 거절한다. */
-  const rs = html.indexOf("<!-- 세 시점을 바로 비교하기");
-  const re = html.indexOf("</div>", html.indexOf('id="roleMenu"')) + 6;
-  if (rs > -1) html = html.slice(0, rs) + html.slice(re);
+     안 되고, 바꿔 봐야 서버가 거절한다.
+     DB 없이 도는 데모에서는 세 시점을 봐야 하므로 남겨 둔다. */
+  if (!keepSwitcher) {
+    const rs = html.indexOf("<!-- 세 시점을 바로 비교하기");
+    const re = html.indexOf("</div>", html.indexOf('id="roleMenu"')) + 6;
+    if (rs > -1) html = html.slice(0, rs) + html.slice(re);
+  }
 
   // 스펙 시트는 기획 설명용이라 앱에서는 뺀다
   const i = html.indexOf('<section class="sheet">');
@@ -33,7 +36,7 @@ function shell() {
 }
 
 function page(data) {
-  return shell().replace(
+  return shell(!!data.demo).replace(
     '<script src="/assets/data-mock.js"></script>',
     "<script>window.LOUNGE_DATA=" +
       JSON.stringify(data).replace(/</g, "\\u003c") +

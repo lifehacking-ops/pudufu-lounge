@@ -89,7 +89,7 @@ SET TIME ZONE 'UTC';
 
 BEGIN;
 
-TRUNCATE lounge_digest, feedback_pass_use, post_view, reaction, comment,
+TRUNCATE lounge_week, lounge_digest, feedback_pass_use, post_view, reaction, comment,
   attachment, post_answer, post, lounge_category, category, lounge_member,
   lounge RESTART IDENTITY CASCADE;
 TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase, ext_mission,
@@ -189,6 +189,11 @@ say("INSERT INTO lounge (id, course_id, name, intro) OVERRIDING SYSTEM VALUE VAL
 say(LOUNGES.map((l, i) =>
   `  (${i + 1}, ${i + 1}, ${q(l.name)}, ${i === 0 ? q("강의를 듣기 전에 여기 먼저 들르는 곳입니다. 과제도, 피드백도, 등록 인증도 이 안에서 끝납니다. 잘 쓴 글보다 자주 들르는 게 중요합니다.") : "NULL"})`
 ).join(",\n") + ";");
+
+say(`
+-- 주차 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.`);
+say("INSERT INTO lounge_week (lounge_id, week, published) VALUES");
+say(WEEKS.map((t, i) => `  (1, ${i + 1}, true)`).join(",\n") + ";");
 
 say(`
 -- 멤버. 역할이 라운지 단위로 붙는다.`);

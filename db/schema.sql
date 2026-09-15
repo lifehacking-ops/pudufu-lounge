@@ -21,7 +21,7 @@
 -- 한글 부분 일치 검색용. Supabase 에는 이미 들어 있다.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TABLE IF EXISTS lounge_digest, feedback_pass_use, post_view, reaction,
+DROP TABLE IF EXISTS lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
   comment, attachment, post_answer, post, lounge_category, category,
   lounge_member, lounge CASCADE;
 DROP TABLE IF EXISTS ext_live, ext_feedback_pass, ext_watch, ext_purchase,
@@ -313,6 +313,19 @@ CREATE TABLE feedback_pass_use (
 );
 COMMENT ON COLUMN feedback_pass_use.post_id IS '글 하나에 한 번';
 CREATE INDEX ix_pass_user ON feedback_pass_use (lounge_id, user_id, used_at);
+
+
+-- 주차 게시 여부 ---------------------------------------------------------------
+-- 강의 내용은 프드프가 갖지만, 어느 주차를 라운지에서 열지는 라운지가 정한다.
+-- 그래서 ext_ 가 아니라 여기 있다. 행이 없으면 공개로 본다.
+
+CREATE TABLE lounge_week (
+  lounge_id  bigint      NOT NULL REFERENCES lounge (id),
+  week       smallint    NOT NULL,
+  published  boolean     NOT NULL DEFAULT true,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (lounge_id, week)
+);
 
 
 -- 어제 커뮤니티 요약 -----------------------------------------------------------

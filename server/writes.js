@@ -350,3 +350,85 @@ module.exports.addCategory = addCategory;
 module.exports.removeCategory = removeCategory;
 module.exports.setPlacement = setPlacement;
 module.exports.setRights = setRights;
+
+/* ---------- 강의 게시 ----------
+   구분이 하나 있다.
+
+   · 어느 주차를 라운지에서 열지는 **라운지가 정한다.** 커뮤니티 운영이지
+     강의 콘텐츠가 아니다. 그래서 lounge_week 에 쓴다.
+   · 주차와 강 자체는 **프드프가 원본이다.** 로컬(PUDUFU_MODE=local)에서는
+     비계인 ext_* 에 직접 써서 혼자 개발할 수 있게 하지만, 운영에서는 막는다 —
+     여기서 고쳐 봐야 다음 동기화 때 덮인다. */
+
+const config = require("./config");
+
+async function setWeekPublished(loungeId, userId, week, published) {
+  await admin(loungeId, userId);
+  await rows(
+    `INSERT INTO lounge_week (lounge_id, week, published) VALUES ($1, $2, $3)
+     ON CONFLICT (lounge_id, week) DO UPDATE SET published = $3, updated_at = now()`,
+    [loungeId, week, !!published]);
+  return { ok: true };
+}
+
+function onlyLocal() {
+  if (config.pudufu.mode !== "local") {
+    throw new Denied("강의 내용은 프드프에서 만듭니다. 여기서 고치면 다음 동기화 때 덮입니다");
+  }
+}
+
+async function addLesson(loungeId, userId, input) {
+  await admin(loungeId, userId);
+  onlyLocal();
+  const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
+  if (!input.chapter || !input.title) throw new Denied("챕터와 강 제목은 있어야 합니다");
+
+  const seq = await one(
+    `SELECT coalesce(max(seq), 0) + 1 AS s FROM ext_lesson WHERE course_id = $1 AND week = $2`,
+    [L.course_id, input.week]);
+
+  const r = await one(
+    `INSERT INTO ext_lesson (course_id, week, seq, chapter, title, duration, video_url, doc, synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now()) RETURNING id`,
+    [L.course_id, input.week, seq.s, input.chapter, input.title,
+     input.duration || null, input.duration ? "" : null, input.doc || null]);
+  return { id: r.id, seq: seq.s };
+}
+
+async function addWeek(loungeId, userId, input) {
+  await admin(loungeId, userId);
+  onlyLocal();
+  const L = await one(
+    `SELECT c.id AS course_id, c.weeks
+       FROM ext_course c JOIN lounge l ON l.course_id = c.id
+      WHERE l.id = $1`, [loungeId]);
+  if (!input.title) throw new Denied("강의 제목은 있어야 합니다");
+  if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
+  if (!input.qs || input.qs.length !== 3 || input.qs.some((q) => !q.q))
+    throw new Denied("질문 세 개를 모두 채워주세요");
+
+  const next = await one(
+    `SELECT coalesce(max(week), 0) + 1 AS w FROM ext_week WHERE course_id = $1`, [L.course_id]);
+  const wk = next.w;
+
+  await rows(`INSERT INTO ext_week (course_id, week, title, synced_at) VALUES ($1, $2, $3, now())`,
+    [L.course_id, wk, input.title]);
+
+  for (const [i, q] of input.qs.entries()) {
+    await rows(
+      `INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      [L.course_id, wk, `${wk}주차 미션 · ${input.mission}`, i + 1, q.q, q.hint || null]);
+  }
+
+  await rows(`UPDATE ext_course SET weeks = greatest(weeks, $2) WHERE id = $1`, [L.course_id, wk]);
+  // 새 주차는 비공개로 연다. 열 준비가 되면 관리자가 게시한다.
+  await rows(`INSERT INTO lounge_week (lounge_id, week, published) VALUES ($1, $2, false)
+              ON CONFLICT (lounge_id, week) DO UPDATE SET published = false`, [loungeId, wk]);
+
+  return { week: wk };
+}
+
+module.exports.setWeekPublished = setWeekPublished;
+module.exports.addLesson = addLesson;
+module.exports.addWeek = addWeek;

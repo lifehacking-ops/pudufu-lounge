@@ -2,7 +2,13 @@
 
 const env = process.env;
 
+/* DB 주소가 없으면 데모로 돈다.
+   프로토타입과 같은 목업 데이터를 서버가 내려주고 쓰기는 받지 않는다.
+   DATABASE_URL 을 넣는 순간 같은 코드가 진짜 DB 를 본다. */
+const demo = !env.DATABASE_URL && !env.PGHOST;
+
 module.exports = {
+  demo: demo,
   port: Number(env.PORT || 4000),
 
   db: {

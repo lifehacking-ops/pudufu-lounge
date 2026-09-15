@@ -49,7 +49,7 @@ function body(req) {
 /* /l/posts/12/comments 처럼 생긴 것에서 숫자를 꺼낸다 */
 const seg = (p) => p.split("/").filter(Boolean);
 
-const server = http.createServer(async (req, res) => {
+async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   const p = url.pathname;
 
@@ -120,6 +120,15 @@ const server = http.createServer(async (req, res) => {
 
           if (req.method === "PUT" && s[2] === "categories" && s[4] === "rights")
             return json(res, 200, await writes.setRights(L, me, +s[3], input));
+
+          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "published")
+            return json(res, 200, await writes.setWeekPublished(L, me, +s[3], input.published));
+
+          if (req.method === "POST" && s[2] === "lessons")
+            return json(res, 200, await writes.addLesson(L, me, input));
+
+          if (req.method === "POST" && s[2] === "weeks")
+            return json(res, 200, await writes.addWeek(L, me, input));
         }
       } catch (e) {
         if (e.code === 403 || e.code === 404) return json(res, e.code, { error: e.message });
@@ -138,10 +147,15 @@ const server = http.createServer(async (req, res) => {
     console.error(e);
     send(res, 500, "서버 오류: " + e.message);
   }
-});
+}
 
-server.listen(config.port, () => {
-  console.log(`라운지 → http://localhost:${config.port}  (프드프 ${config.pudufu.mode})`);
-});
+module.exports = handler;
 
-process.on("SIGTERM", () => { server.close(); pool.end(); });
+/* 직접 실행하면 서버를 띄운다. Vercel 에서는 api/index.js 가 핸들러만 가져간다. */
+if (require.main === module) {
+  const server = http.createServer(handler);
+  server.listen(config.port, () => {
+    console.log(`라운지 → http://localhost:${config.port}  (${config.demo ? "데모" : "DB"} · 프드프 ${config.pudufu.mode})`);
+  });
+  process.on("SIGTERM", () => { server.close(); pool.end(); });
+}

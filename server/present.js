@@ -5,8 +5,10 @@
  * 그래서 기능을 프로토타입에서 먼저 확인하고 그대로 앱에 쓸 수 있다.
  */
 
+const path = require("path");
 const Q = require("./queries");
 const account = require("./account");
+const config = require("./config");
 
 /* 시각은 서버가 문자열까지 만들어 내려준다.
    클라이언트가 "3일 전" 을 계산하면 브라우저 시계에 따라 달라진다. */
@@ -24,17 +26,32 @@ function when(at, now) {
 const daysBetween = (at, now) =>
   at ? Math.floor((now - new Date(at)) / 86400000) : null;
 
+/* DB 가 없으면 프로토타입이 쓰는 목업을 그대로 내려준다.
+   화면 코드는 어차피 출처를 모르므로 그대로 뜬다. 쓰기만 받지 않는다. */
+function demoData() {
+  global.window = global.window || {};
+  delete require.cache[require.resolve("../web/assets/data-mock.js")];
+  require("../web/assets/data-mock.js");
+  const D = global.window.LOUNGE_DATA;
+  return Object.assign({}, D, {
+    me: { name: "박현종", role: "student", lounges: [] },
+    demo: true
+    // api 를 넣지 않는다 — 쓰기가 서버로 가지 않고 화면 안에서만 돈다
+  });
+}
+
 async function loungeData(loungeId, viewerId) {
+  if (config.demo) return demoData();
   const now = new Date();
   const L = await Q.lounge(loungeId);
 
-  const [mem, cats, rights, ps, cms, allLounges, course, live, lb7, lb30, lbAll, pass] =
+  const [mem, cats, rights, ps, cms, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
     await Promise.all([
       Q.members(loungeId), Q.categories(), Q.categoryRights(loungeId),
       Q.posts(loungeId, viewerId), Q.comments(loungeId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
       Q.leaderboard(loungeId, 7), Q.leaderboard(loungeId, 30), Q.leaderboard(loungeId, null),
-      account.passes(viewerId, L.course_id)
+      account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
 
   /* ---- 멤버 ---- */
@@ -131,8 +148,13 @@ async function loungeData(loungeId, viewerId) {
   });
 
   const byWeek = new Map((course.weekTitles || []).map((w) => [w.week, w.title]));
+  const pub = new Map(flags.map((f) => [f.week, f.published]));
   const weeks = [];
-  for (let w = 1; w <= course.weeks; w++) weeks.push(byWeek.get(w) || `${w}주차`);
+  const weekPublished = [];
+  for (let w = 1; w <= course.weeks; w++) {
+    weeks.push(byWeek.get(w) || `${w}주차`);
+    weekPublished.push(pub.has(w) ? pub.get(w) : true);   // 행이 없으면 공개
+  }
 
   /* ---- 나머지 ---- */
   const lounges = allLounges.map((l) => ({
@@ -153,7 +175,7 @@ async function loungeData(loungeId, viewerId) {
   const fmt = (r) => [r.name, Number(r.score).toLocaleString("ko-KR")];
 
   return {
-    members, posts, lessons, weeks, missions, categories, lounges, passes,
+    members, posts, lessons, weeks, weekPublished, missions, categories, lounges, passes,
     live: live
       ? { title: live.title,
           when: liveWhen(live.starts_at),

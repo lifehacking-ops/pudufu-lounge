@@ -391,7 +391,11 @@
     };
   }
 
-  var COURSES = WEEKS.map(function (title, i) { return makeCourse(i + 1, title, true); });
+  /* 게시 여부는 라운지가 정한다. 서버가 주면 그것을 쓰고, 프로토타입에서는
+     전부 공개로 시작한다. */
+  var COURSES = WEEKS.map(function (title, i) {
+    return makeCourse(i + 1, title, D.weekPublished ? D.weekPublished[i] !== false : true);
+  });
 
   /* 게시 전 주차는 수강생 화면 어디에도 나오지 않는다 — 목록·검색·주차 선택기 전부.
      관리자에게만 보여서 게시하기 전에 열어보고 확인할 수 있다. */
@@ -2396,15 +2400,24 @@
     f.foot("이 주차에 게시", function () {
       if (!chap.val() || !title.val()) { f.say("챕터와 강 제목은 있어야 합니다."); return; }
 
-      cr.sections[0].items.push(lessonItemOf({
-        wk: cr.wk, chap: chap.val(), t: title.val(),
-        d: len.val(), video: !!len.val(), doc: doc.val()
-      }, false));
+      var made = { wk: cr.wk, chap: chap.val(), t: title.val(),
+                   d: len.val(), video: !!len.val(), doc: doc.val() };
 
-      reset();
-      renderCourseList();
-      if (viewWk === cr.wk) { renderCurric(); updateProgress(); }
-      renderAdmin();
+      function put() {
+        LESSONS.push(made);
+        cr.sections[0].items.push(lessonItemOf(made, false));
+        reset();
+        renderCourseList();
+        if (viewWk === cr.wk) { renderCurric(); updateProgress(); }
+        renderAdmin();
+      }
+
+      if (!API) return put();
+
+      send("POST", "/admin/lessons", {
+        week: cr.wk, chapter: made.chap, title: made.t,
+        duration: made.d, doc: made.doc
+      }).then(put).catch(function (err) { f.say(err.message); });
     }, reset);
 
     f.reset = reset;
@@ -2451,14 +2464,29 @@
       if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
       if (qs.filter(function (x) { return !x.q.val(); }).length) { f.say("질문 세 개를 모두 채워주세요."); return; }
 
-      MISSIONS[nextWk] = {
-        title: nextWk + "주차 미션 · " + mis.val(),
+      var body = {
+        title: title.val(),
+        mission: mis.val(),
         qs: qs.map(function (x) { return { q: x.q.val(), hint: x.h.val() }; })
       };
-      COURSES.push(makeCourse(nextWk, title.val(), false));
 
-      renderCourseList();
-      renderAdmin();
+      function put(wk) {
+        MISSIONS[wk] = {
+          title: wk + "주차 미션 · " + body.mission,
+          qs: body.qs
+        };
+        WEEKS[wk - 1] = body.title;
+        COURSES.push(makeCourse(wk, body.title, false));
+        close();
+        renderCourseList();
+        renderAdmin();
+      }
+
+      if (!API) return put(nextWk);
+
+      send("POST", "/admin/weeks", body)
+        .then(function (r) { put(r.week); })
+        .catch(function (err) { f.say(err.message); });
     }, close);
 
     open.addEventListener("click", function () {
@@ -2501,6 +2529,13 @@
         cr.published = !cr.published;
         renderCourseList();
         renderAdmin();
+
+        send("PUT", "/admin/weeks/" + cr.wk + "/published", { published: cr.published })
+          .catch(function (err) {
+            cr.published = !cr.published;
+            renderCourseList(); renderAdmin();
+            failed(err);
+          });
       });
       row.appendChild(pub);
 

@@ -824,34 +824,45 @@
      기획안 2장의 목표 행동을 설명이 아니라 '할 일'로 준다.
      닫으면 사라지므로 매일 오는 사람에게는 글쓰기 창이 최상단이 된다. */
 
-  var TODO = [
+  var TODO_FALLBACK = [
     "다른 사람 글 3개 읽기",
     "마음에 드는 글에 반응 하나",
     "이번 주차 과제 올리기"
   ];
 
-  TODO.forEach(function (text) {
-    var li = el("li");
-    li.setAttribute("data-on", "false");
+  function todoList() {
+    var t = D.lounge && D.lounge.todo;
+    return t && t.length ? t : TODO_FALLBACK;
+  }
 
-    var chk = el("button", "check");
-    chk.type = "button";
-    chk.setAttribute("aria-pressed", "false");
-    chk.setAttribute("aria-label", text);
-    chk.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M20 6 9 17l-5-5"/></svg>';
+  function paintTodo() {
+    var host = $("introTodo");
+    host.textContent = "";
 
-    chk.addEventListener("click", function () {
-      var on = chk.getAttribute("aria-pressed") !== "true";
-      chk.setAttribute("aria-pressed", String(on));
-      li.setAttribute("data-on", String(on));
+    todoList().forEach(function (text) {
+      var li = el("li");
+      li.setAttribute("data-on", "false");
+
+      var chk = el("button", "check");
+      chk.type = "button";
+      chk.setAttribute("aria-pressed", "false");
+      chk.setAttribute("aria-label", text);
+      chk.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M20 6 9 17l-5-5"/></svg>';
+
+      chk.addEventListener("click", function () {
+        var on = chk.getAttribute("aria-pressed") !== "true";
+        chk.setAttribute("aria-pressed", String(on));
+        li.setAttribute("data-on", String(on));
+      });
+
+      li.appendChild(chk);
+      li.appendChild(el("span", "t", text));
+      host.appendChild(li);
     });
-
-    li.appendChild(chk);
-    li.appendChild(el("span", "t", text));
-    $("introTodo").appendChild(li);
-  });
+  }
+  paintTodo();
 
   var introDismissed = false;
 
@@ -882,11 +893,22 @@
 
     edit.addEventListener("click", function () {
       var box = el("div", "intro-edit");
+
+      box.appendChild(el("span", "kicker", "소개글"));
       var ta2 = document.createElement("textarea");
       ta2.className = "ta";
       ta2.value = (D.lounge && D.lounge.intro) || "";
       ta2.setAttribute("aria-label", "라운지 소개글");
       box.appendChild(ta2);
+
+      /* 할 일은 한 줄에 하나로 적는다. 칸을 다섯 개 세워 두면 다섯 개를
+         채워야 할 것 같아진다 — 비워 두는 쪽이 기본이어야 한다. */
+      box.appendChild(el("span", "kicker", "오늘 여기서 할 일 · 한 줄에 하나 · 5개까지"));
+      var ta3 = document.createElement("textarea");
+      ta3.className = "ta";
+      ta3.value = todoList().join("\n");
+      ta3.setAttribute("aria-label", "오늘 여기서 할 일");
+      box.appendChild(ta3);
 
       var row = el("div", "row");
       var save = el("button", "btn-primary sm", "저장");
@@ -905,12 +927,25 @@
       undo.addEventListener("click", done);
 
       save.addEventListener("click", function () {
-        var was = D.lounge.intro;
+        var was = { intro: D.lounge.intro, todo: D.lounge.todo };
+
         D.lounge.intro = ta2.value.trim();
+        D.lounge.todo = ta3.value.split("\n")
+          .map(function (x) { return x.trim(); })
+          .filter(Boolean);
+
         paintIntro();
+        paintTodo();
         done();
-        send("PUT", "/admin/lounge", { intro: D.lounge.intro })
-          .catch(function (e) { D.lounge.intro = was; paintIntro(); failed(e); });
+
+        send("PUT", "/admin/lounge", { intro: D.lounge.intro, todo: D.lounge.todo })
+          .catch(function (e) {
+            D.lounge.intro = was.intro;
+            D.lounge.todo = was.todo;
+            paintIntro();
+            paintTodo();
+            failed(e);
+          });
       });
     });
   }
@@ -1263,7 +1298,12 @@
       mine: true,
       reactions: {}, myReact: null, thread: [],
       title: title || (cur ? cur.wk + "주차 과제 올립니다" : body.split("\n")[0].slice(0, 70)),
-      body: answers ? "" : (title ? body : body.split("\n").slice(1).join(" ")).slice(0, 160),
+
+      /* 제목을 안 적었으면 첫 줄이 제목이 되고 나머지가 본문이다.
+         예전에는 여기서 줄바꿈을 공백으로 바꾸고 160자에서 잘랐다 — 미리보기
+         문자열이던 시절의 코드다. 지금은 이 값이 그대로 DB 로 가므로
+         쓴 사람이 넣은 줄을 건드리지 않는다. 피드에서 접는 일은 CSS 가 한다. */
+      body: answers ? "" : (title ? body : body.split("\n").slice(1).join("\n").trim()),
       mission: answers
     };
 
@@ -3189,8 +3229,9 @@
   }
 
   /* ================= 랭킹 =================
-     받은 이모지만 센다. 글을 몇 개 썼는지는 보지 않는다 — 많이 쓴 사람이 아니라
-     남에게 가닿은 사람이 위로 온다.
+     글과 댓글에 받은 이모지만 센다. 글을 몇 개 썼는지는 보지 않는다 — 많이 쓴
+     사람이 아니라 남에게 가닿은 사람이 위로 온다. 남의 글에 단 좋은 댓글 하나가
+     내 글 한 편만큼 값하는 것은 커뮤니티에서 자연스럽다.
 
      순위를 '내가 몇 등인지' 만 보여주면 따라갈 수가 없다. 위와 나의 간격,
      그리고 어떤 글이 가닿았는지를 같이 둔다. */

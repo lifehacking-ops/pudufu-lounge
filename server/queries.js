@@ -4,7 +4,7 @@
 const { rows, one } = require("./db");
 
 const lounge = (id) =>
-  one(`SELECT id, course_id, name, intro FROM lounge WHERE id = $1`, [id]);
+  one(`SELECT id, course_id, name, intro, todo FROM lounge WHERE id = $1`, [id]);
 
 const lounges = () =>
   rows(`SELECT l.id, l.name,

@@ -284,6 +284,18 @@ POSTS.forEach((p) => {
     cmid++;
     const me = cmid;
     commentRows.push(`  (${me}, ${pid}, ${n(parent)}, ${uid[c.author]}, ${q(c.author)}, ${q(c.text)}, ${c.up || 0}, ${ago(c.when)})`);
+
+    /* 댓글 좋아요도 반응 행으로 남긴다. 숫자만 적어 두면 랭킹에서 안 보인다 —
+       랭킹은 '받은 이모지' 를 실제 행에서 세기 때문이다. */
+    const cpool = MEMBERS.filter((m) => m.name !== c.author).map((m) => uid[m.name]);
+    let ccur = 0;
+    for (let g = 0; g < (c.up || 0) && ccur < cpool.length; g++, ccur++) {
+      reactRows.push(`  ('comment', ${me}, ${cpool[ccur]}, ${q("👍")}, ${ago(c.when)})`);
+    }
+    if ((c.up || 0) > cpool.length) {
+      capped.push(`댓글 ${q(c.text).slice(1, 14)}… 👍 ${c.up}→${cpool.length}`);
+    }
+
     (c.replies || []).forEach((r) => pushCmt(r, me));
   };
   (p.thread || []).forEach((c) => pushCmt(c, null));
@@ -330,6 +342,9 @@ SELECT setval(pg_get_serial_sequence('comment','id'),  (SELECT max(id) FROM comm
 UPDATE post SET
   comment_count  = (SELECT count(*) FROM comment c WHERE c.post_id = post.id AND c.deleted_at IS NULL),
   reaction_count = (SELECT count(*) FROM reaction r WHERE r.target_kind = 'post' AND r.target_id = post.id);
+
+UPDATE comment SET
+  reaction_count = (SELECT count(*) FROM reaction r WHERE r.target_kind = 'comment' AND r.target_id = comment.id);
 
 COMMIT;
 `);

@@ -213,7 +213,8 @@ async function loungeData(loungeId, viewerId) {
     leaderboard: { "7": top5(lb7), "30": top5(lb30), all: top5(lbAll) },
     ranking: { "7": ranked(lb7), "30": ranked(lb30), all: ranked(lbAll) },
     topPosts: { "7": tp7, "30": tp30, all: tpAll },
-    lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro },
+    lounge: { id: loungeKey(L.id), name: L.name, intro: L.intro,
+              todo: (L.todo || "").split("\n").map((x) => x.trim()).filter(Boolean) },
     me: (function () {
       const m = mem.find((x) => Number(x.user_id) === Number(viewerId));
       return m

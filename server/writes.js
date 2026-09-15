@@ -622,12 +622,24 @@ async function grantPass(loungeId, userId, targetUserId, n) {
 async function setLounge(loungeId, userId, input) {
   await admin(loungeId, userId);
 
-  const cols = { name: "name", intro: "intro", banner: "banner_url" };
+  const cols = { name: "name", intro: "intro", todo: "todo", banner: "banner_url" };
   const sets = [], vals = [loungeId];
 
   for (const key of Object.keys(cols)) {
     if (!(key in input)) continue;
-    const v = String(input[key] || "").trim();
+
+    /* 할 일은 줄 단위다. 다섯 줄까지 — 그 이상은 할 일이 아니라 목록이 된다. */
+    let v;
+    if (key === "todo") {
+      const lines = [].concat(input.todo || []).join("\n")
+        .split("\n").map((x) => x.trim()).filter(Boolean);
+      if (lines.length > 5) throw new Denied("할 일은 5개까지입니다");
+      if (lines.some((x) => x.length > 60)) throw new Denied("할 일 한 줄이 너무 깁니다");
+      v = lines.join("\n");
+    } else {
+      v = String(input[key] || "").trim();
+    }
+
     if (key === "name" && !v) throw new Denied("라운지 이름은 비울 수 없습니다");
     if (v.length > 2000) throw new Denied("소개글이 너무 깁니다");
     vals.push(v || null);

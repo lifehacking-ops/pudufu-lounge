@@ -374,7 +374,8 @@
   .intro { display: grid; gap: 11px; }
   .intro-head { display: flex; align-items: baseline; gap: 12px; }
   .intro-head .card-t { flex: 1; min-width: 0; font-size: 17px; }
-  .intro-x { margin: 0; font-size: 13px; line-height: 1.7; color: var(--slate); }
+  .intro-x { margin: 0; font-size: 13px; line-height: 1.7; color: var(--slate);
+             white-space: pre-wrap; }
   .intro-edit { display: grid; gap: 8px; }
   .intro-edit .ta { min-height: 76px; }
 
@@ -572,7 +573,8 @@
   .ans { display: grid; gap: 9px; margin-top: 9px; }
   .ans-row { display: grid; gap: 1px; }
   .ans-q { font-size: 11px; font-weight: 600; color: var(--slate); }
-  .ans-a { font-size: 13px; color: var(--ink); margin: 0; }
+  .ans-a { font-size: 13px; color: var(--ink); margin: 0;
+           white-space: pre-wrap; overflow-wrap: anywhere; }
   /* 피드에서는 본문을 두 줄로 접는다. 접힌 줄이 있으면 '더보기' 가 붙는다. */
   .clamp2 {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -693,7 +695,8 @@
 
   .footlink { font-size: 12px; font-weight: 400; color: var(--mist); }
   .footlink:hover { color: var(--slate); }
-  .post-x { font-size: 13px; color: var(--slate); margin: 5px 0 0; }
+  .post-x { font-size: 13px; color: var(--slate); margin: 5px 0 0;
+            white-space: pre-wrap; overflow-wrap: anywhere; }
   .post-xw { display: grid; justify-items: start; gap: 2px; }
   .morelink { font-size: 12px; font-weight: 600; color: var(--slate); }
   .morelink:hover { color: var(--brand); text-decoration: underline; }
@@ -791,7 +794,10 @@
 
   .detail-body { padding: 18px; display: grid; gap: 13px; }
   .detail-title { font-size: 20px; font-weight: 700; margin: 0; line-height: 1.4; }
-  .detail-text { font-size: 14px; line-height: 1.75; color: var(--ink); margin: 0; }
+  /* 사람이 넣은 줄바꿈과 빈 줄을 그대로 살린다. 쓸 때 나눈 문단이
+     읽을 때 한 덩어리가 되면 쓴 사람의 뜻이 사라진다. */
+  .detail-text { font-size: 14px; line-height: 1.75; color: var(--ink); margin: 0;
+                 white-space: pre-wrap; overflow-wrap: anywhere; }
 
   /* ----- 댓글 : 아바타는 버블 밖, 액션은 버블 아래 ----- */
 
@@ -806,7 +812,8 @@
   .bubble { border-radius: 14px; background: var(--cloud); padding: 9px 12px; }
   .bubble .who { font-size: 12px; font-weight: 700; }
   .bubble .when { font-size: 11px; font-weight: 400; color: var(--mist); margin-left: 6px; }
-  .bubble p { margin: 3px 0 0; font-size: 13px; line-height: 1.65; }
+  .bubble p { margin: 3px 0 0; font-size: 13px; line-height: 1.65;
+              white-space: pre-wrap; overflow-wrap: anywhere; }
   .bubble .at { color: var(--brand); font-weight: 600; }
 
   .cmt-act { display: flex; align-items: center; gap: 12px; margin-top: 5px; padding-left: 4px; }
@@ -985,7 +992,7 @@
 
   .prose { font-size: 14px; line-height: 1.75; color: var(--slate); }
   .prose h4 { font-size: 14px; font-weight: 700; color: var(--ink); margin: 22px 0 8px; }
-  .prose p { margin: 0 0 12px; }
+  .prose p { margin: 0 0 12px; white-space: pre-wrap; }
   .prose ol, .prose ul { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 5px; }
   .prose strong { color: var(--ink); font-weight: 600; }
   .prose code { font-family: var(--font-display); font-size: 13px; background: var(--cloud); border-radius: 5px; padding: 1px 5px; color: var(--ink); }
@@ -1214,7 +1221,9 @@
     border-radius: var(--radius-card); background: var(--cloud);
   }
 
-  .att-compact .att-real { max-height: 180px; }
+  /* 피드의 썸네일은 사진이 무엇이든 같은 칸에 들어간다. 세로 사진 하나가
+     카드를 두 배로 늘리면 목록이 들쭉날쭉해진다. */
+  .att-compact .att-real { aspect-ratio: 16 / 10; max-height: none; }
 
   /* ================= 랭킹 =================
      한 줄에 순위 · 사람 · 받은 이모지 · 막대 · 합계. 막대는 1등 대비 길이다. */

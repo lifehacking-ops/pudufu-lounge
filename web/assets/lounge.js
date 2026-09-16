@@ -163,8 +163,14 @@
 
   var LOUNGES = D.lounges;
 
-  var loungeId = "academy";
-  function lounge() { return LOUNGES.filter(function (l) { return l.id === loungeId; })[0]; }
+  /* 지금 보고 있는 라운지. 서버가 알려준다 — 여기에 "academy" 가 박혀 있으면
+     다른 라운지에서는 담당 판정도 필터 배치도 남의 라운지 것을 본다. */
+  var loungeId = (D.lounge && D.lounge.id) || "academy";
+
+  function lounge() {
+    return LOUNGES.filter(function (l) { return l.id === loungeId; })[0]
+      || { id: loungeId, name: (D.lounge && D.lounge.name) || "", show: [], more: [] };
+  }
 
   /* 글쓰기 창에 띄울 카테고리 — 권한을 통과한 것만 */
   function writableCats() {
@@ -904,6 +910,38 @@
      두면 고칠 때마다 배포해야 한다. 데이터에서 읽고 자리에서 고친다. */
   var introHead = document.querySelector(".intro-head");
   var introText = document.querySelector(".intro-x");
+
+  /* 라운지 이름이 화면 곳곳에 박혀 있었다. 라운지가 둘이 되는 순간 전부 거짓말이
+     된다 — 다른 라운지에 들어와 있는데 머리에는 앞 라운지 이름이 걸린다. */
+  function paintLoungeName() {
+    if (!D.lounge) return;
+    var full = D.lounge.name + " 라운지";
+
+    document.title = full;
+    var set = function (id, text) { var e = $(id); if (e) e.textContent = text; };
+    set("loungeNow", full);
+    set("railName", full);
+    set("railBanner", "라운지 배너 자리 · " + D.lounge.name);
+    set("whoLounge", full);
+    set("whoName", ME.name);
+    set("classMeta", full + " · " + WEEKS.length + "주 과정");
+
+    // 라운지 전환 목록에서 '지금' 은 진짜 지금 보는 것에 붙어야 한다
+    var menu = $("loungeMenu");
+    if (menu) {
+      menu.textContent = "";
+      LOUNGES.forEach(function (l) {
+        var b = el("button", null, l.name + " 라운지");
+        b.type = "button";
+        if (l.id === loungeId) {
+          b.setAttribute("aria-current", "true");
+          b.appendChild(el("span", "now", "지금"));
+        }
+        menu.appendChild(b);
+      });
+    }
+  }
+  paintLoungeName();
 
   function paintIntro() {
     if (!D.lounge) return;   // 프로토타입에는 없다. 마크업의 예시 문장을 그대로 둔다.

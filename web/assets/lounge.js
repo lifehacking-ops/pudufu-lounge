@@ -649,7 +649,7 @@
   function postItem(p, tk) {
     var row = el("button", "sr-item");
     row.type = "button";
-    row.addEventListener("click", function () { closeSearchResults(); openPost(p); });
+    row.addEventListener("click", function () { closeSearchResults(); openById(p.id, null); });
 
     var main = el("div", "sr-main");
     main.appendChild(el("span", "sr-where", p.cat + (p.wk ? " · " + p.wk + "주차" : "") + " · " + p.author));
@@ -686,8 +686,7 @@
     row.type = "button";
     row.addEventListener("click", function () {
       closeSearchResults();
-      openPost(h.p);
-      focusComment(h.c);
+      openById(h.p.id, function () { focusComment(h.c); });
     });
 
     var main = el("div", "sr-main");
@@ -758,7 +757,7 @@
 
   function paintResults() {
     var tk = tokensOf(srQuery);
-    var groups = { "글": postHits(tk), "댓글": commentHits(tk), "강의": lessonHits(tk), "멤버": memberHits(tk) };
+    var groups = searchGroups();
 
     searchResults.textContent = "";
 
@@ -803,22 +802,54 @@
     searchResults.appendChild(list);
   }
 
+  /* 검색 결과. 서버가 준 것이 있으면 그것을 쓴다 — 화면에 실린 묶음만 뒤지면
+     30편 밖의 글은 없는 것이 된다. 서버가 없는 프로토타입에서는 실린 것에서 찾는다. */
+  var srServer = null;
+
   function runSearch() {
     srQuery = searchField.value.trim();
     if (!srQuery) { closeSearchResults(); return; }
 
+    srServer = null;
+    openResults();
+
+    if (!API) return;
+    send("GET", "/search?q=" + encodeURIComponent(srQuery))
+      .then(function (r) {
+        if (!r || srQuery !== searchField.value.trim()) return;
+        r.posts.forEach(function (p) { p.thread = p.thread || []; p.reactions = p.reactions || {}; });
+        srServer = r;
+        openResults();
+      })
+      .catch(failed);
+  }
+
+  function openResults() {
     // 결과가 가장 많은 탭을 먼저 연다
-    var tk = tokensOf(srQuery);
-    var counts = {
-      "글": postHits(tk).length, "댓글": commentHits(tk).length,
-      "강의": lessonHits(tk).length, "멤버": memberHits(tk).length
-    };
-    srTab = SR_TABS.reduce(function (a, b) { return counts[b] > counts[a] ? b : a; }, "글");
+    var g = searchGroups();
+    srTab = SR_TABS.reduce(function (a, b) { return g[b].length > g[a].length ? b : a; }, "글");
 
     paintResults();
     searchResults.hidden = false;
     setBrowsing(false);
     window.scrollTo(0, 0);
+  }
+
+  function searchGroups() {
+    var tk = tokensOf(srQuery);
+    if (srServer) {
+      return {
+        "글": srServer.posts,
+        "댓글": srServer.comments.map(function (c) {
+          return { c: { id: c.id, author: c.author, text: c.text, when: c.when },
+                   p: { id: c.postId, title: c.postTitle, cat: c.cat },
+                   reply: c.reply };
+        }),
+        "강의": lessonHits(tk),
+        "멤버": memberHits(tk)
+      };
+    }
+    return { "글": postHits(tk), "댓글": commentHits(tk), "강의": lessonHits(tk), "멤버": memberHits(tk) };
   }
 
   function clearSearch() {
@@ -2204,7 +2235,15 @@
   /* 검색에서 들어온 댓글은 글만 열어주면 어디 있는지 다시 못 찾는다.
      접힌 답글이면 펴고, 그 자리로 내려가 잠깐 표시해 둔다. */
   function focusComment(c) {
+    /* 서버 검색에서 온 댓글은 화면에 그려진 것과 다른 객체다. id 로 다시 찾는다 —
+       못 찾으면 글만 열리고 아무 데도 강조되지 않는다. */
     var node = c.node;
+    if (!node && c.id) {
+      var hit = [].filter.call(detailComments.querySelectorAll("[data-cid]"), function (n) {
+        return n.getAttribute("data-cid") === String(c.id);
+      })[0];
+      node = hit || null;
+    }
     if (!node) return;
 
     if (node.hidden) {
@@ -2402,6 +2441,7 @@
   function commentNode(c, isReply) {
     var row = el("div", "cmt");
     c.node = row;   // 검색 결과에서 이 댓글로 바로 내려가기 위해
+    if (c.id) row.setAttribute("data-cid", String(c.id));
     row.appendChild(el("span", "ava " + (isReply ? "ava-24" : "ava-34"), initial(c.author)));
 
     var main = el("div", "cmt-main");
@@ -2601,9 +2641,7 @@
      필터에 걸려 피드에 없더라도 연다 — 받은 사람은 그 글을 보러 온 것이다. */
   (function openFromUrl() {
     var want = (location.search.match(/[?&]p=(\d+)/) || [])[1];
-    if (!want) return;
-    var hit = POSTS.filter(function (p) { return String(p.id) === want; })[0];
-    if (hit) openPost(hit);
+    if (want) openById(want);
   })();
 
   /* ================= 리더보드 ================= */
@@ -3722,6 +3760,24 @@
 
   /* 대시보드에서 글로 건너뛴다. 모달을 닫았을 때 뒤에 전체 목록이 깔려 있으면
      방금 본 글이 어디에 서 있었는지 알 수 없다. 그 글이 선 자리로 데려다 놓는다. */
+  /* 글 한 편을 연다. 피드 묶음 안에 없으면 서버에서 그 한 편만 받아 온다 —
+     대시보드에서 건너뛴 글도, 링크를 받아 온 글도 묶음 밖일 수 있다. */
+  function openById(id, after) {
+    var have = POSTS.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (have) { openPost(have); if (after) after(have); return; }
+    if (!API) return;
+
+    send("GET", "/posts/" + id)
+      .then(function (p) {
+        if (!p) return;
+        normalizePost(p);
+        POSTS.push(p);
+        openPost(p);
+        if (after) after(p);
+      })
+      .catch(failed);
+  }
+
   function jumpTo(p) {
     var L = lounge();
     var inShow = L.show.indexOf(p.cat) > -1, inMore = L.more.indexOf(p.cat) > -1;
@@ -3735,7 +3791,7 @@
     renderFilters();
     show("community");   // 그리기 전에 띄운다 — 숨은 화면은 높이를 잴 수 없다
     render();
-    openPost(p);
+    openById(p.id);
   }
 
   /* 피드백권으로 온 요청은 따로 세운다. 과제 답글은 선의지만 이건 약속이다.
@@ -4718,14 +4774,26 @@
     return gate;
   }
 
+  /* 지울 글은 피드에서 올 수도, 게시물 관리의 가벼운 목록에서 올 수도 있다.
+     두 곳의 같은 글은 서로 다른 객체이므로 id 로 맞춰 양쪽에서 뺀다 —
+     예전에는 피드에 실린 글만 지워졌고, 목록에서 지우면 아무 일도 없었다. */
   function deletePost(p) {
-    if (POSTS.indexOf(p) < 0) return;
+    function dropFrom(list) {
+      if (!list) return;
+      for (var i = list.length - 1; i >= 0; i--) {
+        if (String(list[i].id) === String(p.id)) list.splice(i, 1);
+      }
+    }
 
     function drop() {
-      POSTS.splice(POSTS.indexOf(p), 1);
+      dropFrom(POSTS);
+      dropFrom(INDEX);
+      dropFrom(MY_MISSIONS);
+      if (D.stats && D.stats.posts > 0) D.stats.posts -= 1;
       delRow = -1;
       render();
       if (screenNow === "admin") renderAdmin();
+      if (screenNow === "lesson") mountClassMission();
     }
 
     // 지우는 것은 되돌릴 수 없으므로 서버가 받아 준 뒤에 화면에서 뺀다

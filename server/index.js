@@ -89,6 +89,38 @@ async function handler(req, res) {
       return json(res, 200, await present.postPage(config.loungeId, viewer(req), before));
     }
 
+    /* 검색. 화면에 실린 묶음만 뒤지면 30편 밖은 없는 것이 된다. */
+    if (p === "/l/search" && req.method === "GET") {
+      if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });
+      const tokens = (url.searchParams.get("q") || "").trim().split(/\s+/).filter(Boolean).slice(0, 5);
+      if (!tokens.length) return json(res, 200, { posts: [], comments: [] });
+
+      const me = viewer(req);
+      const [ps, cms] = await Promise.all([
+        Q.search(config.loungeId, me, tokens, 40),
+        Q.searchComments(config.loungeId, tokens, 40)
+      ]);
+      return json(res, 200, {
+        posts: ps.map((x) => ({
+          id: x.id, title: x.title, body: x.body || "", cat: x.category,
+          wk: x.week || 0, author: x.author_name, mine: x.mine,
+          when: present.when(x.created_at, new Date())
+        })),
+        comments: cms.map((x) => ({
+          id: x.id, postId: x.post_id, reply: !!x.parent_id,
+          author: x.author_name, text: x.body, postTitle: x.post_title, cat: x.category,
+          when: present.when(x.created_at, new Date())
+        }))
+      });
+    }
+
+    /* 글 한 편. 묶음 밖에 있는 글을 열 때. */
+    if (/^\/l\/posts\/\d+$/.test(p) && req.method === "GET") {
+      if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });
+      const one = await present.postOne(config.loungeId, viewer(req), Number(seg(p)[2]));
+      return one ? json(res, 200, one) : json(res, 404, { error: "없는 글입니다" });
+    }
+
     /* 화면이 쓰는 데이터를 그대로 본다. 디버깅과 검증용. */
     if (p === "/l/data.json") {
       if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });

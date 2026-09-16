@@ -141,6 +141,40 @@ const myMissions = (loungeId, userId) =>
            AND p.deleted_at IS NULL
          ORDER BY p.week`, [loungeId, userId]);
 
+/* 검색은 DB 가 한다. 화면에 실린 묶음만 뒤지면 30편 밖의 글은 없는 것이 된다.
+   pg_trgm 인덱스가 있어서 한글 부분 일치도 걸린다. 토큰은 모두 포함(AND). */
+const search = (loungeId, viewerId, tokens, limit) => {
+  const conds = tokens.map((_, i) => `(p.title ILIKE $${i + 3} OR p.body ILIKE $${i + 3}
+      OR p.author_name ILIKE $${i + 3} OR c.name ILIKE $${i + 3}
+      OR EXISTS (SELECT 1 FROM post_answer a
+                  WHERE a.post_id = p.id
+                    AND (a.question ILIKE $${i + 3} OR a.answer ILIKE $${i + 3})))`);
+  return rows(
+    `SELECT p.id, p.title, p.body, p.week, p.author_name, c.name AS category, p.created_at,
+            (p.user_id = $2) AS mine
+       FROM post p JOIN category c ON c.id = p.category_id
+      WHERE p.lounge_id = $1 AND p.deleted_at IS NULL AND ${conds.join(" AND ")}
+      ORDER BY p.created_at DESC
+      LIMIT ${Number(limit) || 40}`,
+    [loungeId, viewerId].concat(tokens.map((t) => "%" + t + "%")));
+};
+
+/* 댓글도 같은 방식으로. 결과에는 어느 글에 달린 것인지 같이 준다. */
+const searchComments = (loungeId, tokens, limit) => {
+  const conds = tokens.map((_, i) => `(cm.body ILIKE $${i + 2} OR cm.author_name ILIKE $${i + 2})`);
+  return rows(
+    `SELECT cm.id, cm.post_id, cm.parent_id, cm.author_name, cm.body, cm.created_at,
+            p.title AS post_title, c.name AS category
+       FROM comment cm
+       JOIN post p ON p.id = cm.post_id
+       JOIN category c ON c.id = p.category_id
+      WHERE p.lounge_id = $1 AND cm.deleted_at IS NULL AND p.deleted_at IS NULL
+        AND ${conds.join(" AND ")}
+      ORDER BY cm.created_at DESC
+      LIMIT ${Number(limit) || 40}`,
+    [loungeId].concat(tokens.map((t) => "%" + t + "%")));
+};
+
 /* 남은 글이 더 있는지. 없는데 '더 보기' 가 떠 있으면 눌러 보게 된다. */
 const postCount = (loungeId) =>
   one(`SELECT count(*)::int AS n FROM post WHERE lounge_id = $1 AND deleted_at IS NULL`, [loungeId]);
@@ -215,4 +249,4 @@ const weekFlags = (loungeId) =>
 
 module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
                    posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit,
-                   myMissions, comments, received, topPosts, weekFlags, PAGE };
+                   myMissions, comments, search, searchComments, received, topPosts, weekFlags, PAGE };

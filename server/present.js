@@ -320,4 +320,13 @@ async function postPage(loungeId, viewerId, before) {
   };
 }
 
-module.exports = { loungeData, postPage, when };
+/* 글 한 편. 묶음 밖에 있는 글로 바로 들어올 때 쓴다 —
+   링크를 받아 온 사람과, 대시보드에서 건너뛴 사람. */
+async function postOne(loungeId, viewerId, id) {
+  const ps = await Q.postsByIds(loungeId, viewerId, [id]);
+  if (!ps.length) return null;
+  const cms = await Q.comments(loungeId, viewerId, [ps[0].id]);
+  return shapePosts(ps, cms, new Date())[0];
+}
+
+module.exports = { loungeData, postPage, postOne, when };

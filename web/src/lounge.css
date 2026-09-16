@@ -594,6 +594,8 @@
   .chip[data-empty="true"] { opacity: .5; cursor: not-allowed; }
   .chip[data-empty="true"] .left { color: var(--slate); }
 
+  .gate .adm-find { margin-top: 0; max-width: 260px; }
+
   .gate {
     display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
     border-radius: var(--radius-ctl); background: var(--late-bg); color: var(--late);
@@ -662,6 +664,10 @@
 
   /* 정렬은 카테고리와 다른 축이다. 여러 개를 겹쳐 거는 칩과 달리 둘 중 하나만
      고르는 값이라, 칩이 아니라 스위치로 둔다. */
+  /* 확인 줄 안에 들어가는 작은 세그먼트 */
+  .seg-s { flex: none; }
+  .seg-s button { flex: none; padding: 5px 12px; font-size: 12px; white-space: nowrap; }
+
   .seg-sort { flex: none; align-self: flex-start; }
   .seg-sort button { flex: none; padding: 6px 14px; font-size: 12px; white-space: nowrap; }
 

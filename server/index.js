@@ -223,5 +223,15 @@ if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`라운지 → http://localhost:${config.port}  (${config.demo ? "데모" : "DB"} · 프드프 ${config.pudufu.mode})`);
   });
-  process.on("SIGTERM", () => { server.close(); pool.end(); });
+  /* 끌 때는 확실히 끈다. 예전에는 연결 풀만 닫고 프로세스는 살아 있어서,
+     포트는 쥔 채 모든 요청에 500 을 돌려주는 상태가 남았다. */
+  let closing = false;
+  const bye = () => {
+    if (closing) return process.exit(0);
+    closing = true;
+    server.close(() => { pool.end().then(() => process.exit(0), () => process.exit(0)); });
+    setTimeout(() => process.exit(0), 3000).unref();   // 붙잡힌 연결이 있어도 3초 뒤엔 나간다
+  };
+  process.on("SIGTERM", bye);
+  process.on("SIGINT", bye);
 }

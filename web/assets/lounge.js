@@ -3124,6 +3124,7 @@
   var admTab = "dash";
   var admSeg = $("admSeg"), admBody = $("admBody");
   var roleRow = -1;           // 역할 메뉴가 열린 멤버 인덱스
+  var muteRow = -1;           // 정지 확인이 열린 멤버 인덱스
   var memQ = "";              // 멤버 찾기
   var memShown = 50;          // 한 번에 세우는 줄 수
   var delRow = -1;            // 삭제 확인이 열린 게시물 인덱스
@@ -4098,20 +4099,20 @@
       }
       tr.appendChild(pt);
 
-      /* 강퇴가 아니라 정지다. 읽기는 두고 쓰기만 멈춘다. */
+      /* 강퇴가 아니라 정지다. 읽기는 두고 쓰기만 멈춘다.
+         한 번 눌러 바로 멈추게 두지 않는다 — 돈을 낸 사람의 입을 막는 일이고,
+         며칠인지 · 왜인지를 정하지 않으면 푸는 사람도 판단할 수 없다. */
       var mt = el("td");
       if (m.role !== "admin") {
         var mb = el("button", m.muted ? "del" : "fadd-btn", m.muted ? "정지 중" : "정지");
         mb.type = "button";
         mb.addEventListener("click", function () {
-          var days = m.muted ? 0 : 7;
-          var was = m.muted;
-          m.muted = !was;
+          if (m.muted) { muteRow = muteRow === i ? -1 : i; renderAdmin(); return; }
+          muteRow = muteRow === i ? -1 : i;
           renderAdmin();
-          send("PUT", "/admin/members/" + m.userId + "/muted", { days: days })
-            .catch(function (e) { m.muted = was; renderAdmin(); failed(e); });
         });
         mt.appendChild(mb);
+        if (m.muted && m.mutedReason) mt.appendChild(el("span", "fwhy", m.mutedReason));
       }
       tr.appendChild(mt);
 
@@ -4163,6 +4164,16 @@
       td.appendChild(pick);
       tr.appendChild(td);
       t.body.appendChild(tr);
+
+      /* 정지 확인은 누른 줄 바로 아래에서 받는다. 브라우저 팝업은 쓰지 않는다. */
+      if (muteRow === i) {
+        var ctr = el("tr");
+        var ctd = el("td");
+        ctd.colSpan = 9;
+        ctd.appendChild(muteGate(m));
+        ctr.appendChild(ctd);
+        t.body.appendChild(ctr);
+      }
     });
 
     if (mall > memShown) {
@@ -4612,6 +4623,83 @@
 
   /* 삭제 확인은 어디서 눌렀든 같은 모양으로, 누른 자리 바로 아래에 뜬다.
      브라우저 confirm 은 쓰지 않는다. */
+  /* 정지 · 해제를 받는 줄. 며칠인지와 이유를 같이 정한다 —
+     이유가 없으면 푸는 사람이 왜 멈췄는지 알 수 없다. */
+  function muteGate(m) {
+    var gate = el("div", "gate");
+
+    if (m.muted) {
+      gate.appendChild(el("b", null, m.name + " 님의 정지를 풉니다."));
+      gate.appendChild(el("span", "muted", m.mutedReason || "사유가 적혀 있지 않습니다"));
+      gate.appendChild(el("span", "grow"));
+
+      var no = el("button", "btn-sec", "그대로 두기");
+      no.type = "button";
+      no.addEventListener("click", function () { muteRow = -1; renderAdmin(); });
+      gate.appendChild(no);
+
+      var free = el("button", "btn-primary sm", "정지 풀기");
+      free.type = "button";
+      free.addEventListener("click", function () { applyMute(m, 0, ""); });
+      gate.appendChild(free);
+      return gate;
+    }
+
+    gate.appendChild(el("b", null, m.name + " 님의 쓰기를 멈춥니다."));
+    gate.appendChild(el("span", "muted", "읽기는 그대로입니다. 기한이 지나면 저절로 풀립니다."));
+
+    var days = 7;
+    var seg = el("div", "seg seg-s");
+    [[7, "7일"], [30, "30일"], [90, "90일"]].forEach(function (d) {
+      var b = el("button", null, d[1]);
+      b.type = "button";
+      b.setAttribute("aria-current", String(d[0] === days));
+      b.addEventListener("click", function () {
+        days = d[0];
+        [].forEach.call(seg.children, function (x) {
+          x.setAttribute("aria-current", String(x.textContent === d[1]));
+        });
+      });
+      seg.appendChild(b);
+    });
+    gate.appendChild(seg);
+
+    var why = el("input", "adm-find");
+    why.type = "text";
+    why.placeholder = "사유 · 본인에게는 보이지 않습니다";
+    why.setAttribute("aria-label", "정지 사유");
+    gate.appendChild(why);
+
+    gate.appendChild(el("span", "grow"));
+
+    var cancel = el("button", "btn-sec", "취소");
+    cancel.type = "button";
+    cancel.addEventListener("click", function () { muteRow = -1; renderAdmin(); });
+    gate.appendChild(cancel);
+
+    var yes = el("button", "btn-primary sm", "정지");
+    yes.type = "button";
+    yes.addEventListener("click", function () { applyMute(m, days, why.value.trim()); });
+    gate.appendChild(yes);
+    return gate;
+  }
+
+  function applyMute(m, days, reason) {
+    var was = { muted: m.muted, reason: m.mutedReason };
+    m.muted = days > 0;
+    m.mutedReason = days > 0 ? reason : null;
+    muteRow = -1;
+    renderAdmin();
+
+    send("PUT", "/admin/members/" + m.userId + "/muted", { days: days, reason: reason })
+      .catch(function (e) {
+        m.muted = was.muted;
+        m.mutedReason = was.reason;
+        renderAdmin();
+        failed(e);
+      });
+  }
+
   function deleteGate(p, close) {
     var gate = el("div", "gate");
     gate.appendChild(el("b", null, "이 글을 지웁니다."));

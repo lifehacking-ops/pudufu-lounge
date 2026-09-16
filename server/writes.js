@@ -13,6 +13,14 @@ const ATTACH_MAX = 10;   // 한 글에 붙일 수 있는 사진 장수
    === 로 비교하면 소유 판정이 조용히 전부 거짓이 된다. */
 const same = (a, b) => Number(a) === Number(b);
 
+/* 라운지가 붙어 있는 강의. 원본은 lounge.course_id 다 — ext_course 는 사본이라
+   동기화 전에는 비어 있을 수 있고, 그걸 거쳐 찾으면 아무것도 못 고친다. */
+async function courseOf(loungeId) {
+  const l = await one(`SELECT course_id, name FROM lounge WHERE id = $1`, [loungeId]);
+  if (!l) throw new Missing("없는 라운지입니다");
+  return { course_id: l.course_id, name: l.name };
+}
+
 class Denied extends Error {
   constructor(msg) { super(msg); this.code = 403; }
 }
@@ -451,10 +459,9 @@ async function addLesson(loungeId, userId, input) {
 async function addWeek(loungeId, userId, input) {
   await admin(loungeId, userId);
   onlyLocal();
-  const L = await one(
-    `SELECT c.id AS course_id, c.weeks
-       FROM ext_course c JOIN lounge l ON l.course_id = c.id
-      WHERE l.id = $1`, [loungeId]);
+  /* 강의 id 는 라운지가 들고 있다. ext_course 는 프드프에서 받아 온 사본일 뿐이라
+     아직 안 들어와 있을 수 있다 — 그때 join 으로 찾으면 통째로 500 이 난다. */
+  const L = await courseOf(loungeId);
   if (!input.title) throw new Denied("강의 제목은 있어야 합니다");
   if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
   const qs = (input.qs || []).filter((q) => q.q && q.q.trim());
@@ -475,7 +482,11 @@ async function addWeek(loungeId, userId, input) {
       [L.course_id, wk, `${wk}주차 미션 · ${input.mission}`, i + 1, q.q.trim(), (q.hint || "").trim() || null]);
   }
 
-  await rows(`UPDATE ext_course SET weeks = greatest(weeks, $2) WHERE id = $1`, [L.course_id, wk]);
+  /* 사본이 아직 없으면 만들어 둔다. 주차 수는 이 표가 들고 있다. */
+  await rows(
+    `INSERT INTO ext_course (id, title, weeks, synced_at) VALUES ($1, $2, $3, now())
+     ON CONFLICT (id) DO UPDATE SET weeks = greatest(ext_course.weeks, $3)`,
+    [L.course_id, L.name || ("강의 " + L.course_id), wk]);
   // 새 주차는 비공개로 연다. 열 준비가 되면 관리자가 게시한다.
   await rows(`INSERT INTO lounge_week (lounge_id, week, published) VALUES ($1, $2, false)
               ON CONFLICT (lounge_id, week) DO UPDATE SET published = false`, [loungeId, wk]);
@@ -583,9 +594,7 @@ async function setMission(loungeId, userId, week, input) {
   await admin(loungeId, userId);
   onlyLocal();
 
-  const L = await one(
-    `SELECT c.id AS course_id FROM ext_course c JOIN lounge l ON l.course_id = c.id
-      WHERE l.id = $1`, [loungeId]);
+  const L = await courseOf(loungeId);
 
   if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
   if (!input.qs || !input.qs.length) throw new Denied("질문이 하나는 있어야 합니다");

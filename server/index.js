@@ -245,8 +245,11 @@ async function handler(req, res) {
 
     send(res, 404, "없음");
   } catch (e) {
+    /* 기록은 서버에 남기고, 사람에게는 내부 메시지를 보이지 않는다.
+       API 호출이면 화면이 상자에 띄울 짧은 문장을, 페이지면 안내 화면을 준다. */
     console.error(e);
-    send(res, 500, "서버 오류: " + e.message);
+    if (p.startsWith("/l/") && p !== "/l") return json(res, 500, { error: "저장하지 못했습니다. 잠깐 뒤에 다시 해 주세요." });
+    send(res, 500, render.oops(), "text/html; charset=utf-8");
   }
 }
 

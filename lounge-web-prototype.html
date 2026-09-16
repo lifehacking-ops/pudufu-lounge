@@ -167,11 +167,11 @@
         <div class="rail-banner" id="railBanner">라운지 배너 자리 · 학원마케팅 올인원 강의</div>
         <h2 class="card-t" id="railName">학원마케팅 올인원 강의 라운지</h2>
         <dl class="stats">
-          <div class="stat"><dt>멤버</dt><dd class="tnum">24</dd></div>
-          <div class="stat"><dt>온라인</dt><dd class="tnum">7</dd></div>
-          <div class="stat"><dt>기수</dt><dd class="tnum">3</dd></div>
+          <div class="stat"><dt>멤버</dt><dd class="tnum" id="railStudents">24</dd></div>
+          <div class="stat"><dt>오늘 접속</dt><dd class="tnum" id="railToday">7</dd></div>
+          <div class="stat"><dt>기수</dt><dd class="tnum" id="railCohorts">3</dd></div>
         </dl>
-        <div class="avarow" aria-label="최근 활동 멤버">
+        <div class="avarow" id="railRecent" aria-label="최근 접속한 멤버">
           <span class="ava ava-24">이</span>
           <span class="ava ava-24">정</span>
           <span class="ava ava-24">박</span>
@@ -182,14 +182,14 @@
         </div>
       </section>
 
-      <section class="card pad-s" style="display:grid;gap:12px">
+      <section class="card pad-s" id="railMission" style="display:grid;gap:12px">
         <div class="row">
-          <span class="kicker grow">이번 주 과제 · <span class="disp">3</span>주차</span>
-          <span class="badge b-none">미제출</span>
+          <span class="kicker grow">이번 주 과제 · <span class="disp" id="railWk">3</span>주차</span>
+          <span class="badge b-none" id="railDone">미제출</span>
         </div>
         <div>
-          <h2 class="card-t">학부모가 검색하는 말로 블로그 글 한 편 쓰기</h2>
-          <p class="meta" style="margin:5px 0 0">정시 마감까지 · 금 18:00</p>
+          <h2 class="card-t" id="railMissionT">학부모가 검색하는 말로 블로그 글 한 편 쓰기</h2>
+          <p class="meta" id="railDueLabel" style="margin:5px 0 0">정시 마감까지 · 금 18:00</p>
           <p class="midnum tnum" id="countdown" style="margin:8px 0 0">--:--:--</p>
         </div>
         <div>
@@ -201,10 +201,10 @@
 
       <section class="card pad-s" style="display:grid;gap:10px">
         <div class="row">
-          <span class="kicker grow">8주 완주 현황</span>
-          <span class="meta-m"><span class="tnum">2</span>/<span class="tnum">8</span></span>
+          <span class="kicker grow" id="ribbonHead">8주 완주 현황</span>
+          <span class="meta-m" id="ribbonN"><span class="tnum">2</span>/<span class="tnum">8</span></span>
         </div>
-        <div class="ribbon" aria-label="8주 완주 현황">
+        <div class="ribbon" id="ribbon" aria-label="완주 현황">
           <div class="rcell r-ontime" title="1주차 · 정시 제출"></div>
           <div class="rcell r-late hatch" title="2주차 · 지각 제출"></div>
           <div class="rcell r-none" title="3주차 · 미제출"></div>
@@ -214,7 +214,7 @@
           <div class="rcell r-future" title="7주차 · 예정"></div>
           <div class="rcell r-future" title="8주차 · 예정"></div>
         </div>
-        <p class="meta-m">정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span> · 남은 주차 <span class="tnum">5</span></p>
+        <p class="meta-m" id="ribbonSum">정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span> · 남은 주차 <span class="tnum">5</span></p>
       </section>
 
       <section class="card pad-s" style="display:grid;gap:12px">

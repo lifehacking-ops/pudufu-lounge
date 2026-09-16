@@ -54,8 +54,9 @@ async function loungeData(loungeId, viewerId) {
       account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
 
-  const [submit, totalPosts, mine] = await Promise.all([
-    Q.weekSubmit(loungeId), Q.postCount(loungeId), Q.myMissions(loungeId, viewerId)]);
+  const [submit, totalPosts, mine, railN, recent] = await Promise.all([
+    Q.weekSubmit(loungeId), Q.postCount(loungeId), Q.myMissions(loungeId, viewerId),
+    Q.railStats(loungeId), Q.recentMembers(loungeId, 6)]);
 
   const [tp7, tp30, tpAll] = await Promise.all([
     Q.topPosts(loungeId, 7), Q.topPosts(loungeId, 30), Q.topPosts(loungeId, null)
@@ -246,8 +247,27 @@ async function loungeData(loungeId, viewerId) {
     stats: { students: submit.students, submitted: submit.submitted, posts: totalPosts.n },
 
     /* 내가 낸 과제. 피드 묶음 밖에 있어도 강의실이 '제출 완료' 를 알아야 한다. */
+    /* 지금 내가 있는 주차. 시청 기록으로 계산해 lounge_member.week 에 캐시된 값이다.
+       예전에는 화면에 3 이 박혀 있어서 모두가 3주차였다. */
+    currentWk: (meRow && meRow.week) || 1,
+
+    /* 주차별 마감. 라운지가 정한다. 없으면 카운트다운도 정시·지각도 없다. */
+    weekDue: Object.fromEntries(flags.filter((f) => f.due_at).map((f) => [f.week, f.due_at])),
+
+    rail: {
+      students: railN.students, today: railN.today, cohorts: railN.cohorts,
+      recent: recent.map((r) => r.nickname)
+    },
+
+    /* 내 순위 / 전체 수강생. '상위 12%' 가 마크업에 박혀 있었다. */
+    myRank: Object.fromEntries([["7", lb7], ["30", lb30], ["all", lbAll]].map(([k, list]) => {
+      const meName = meRow && meRow.nickname;
+      const i = list.findIndex((r) => r.name === meName && r.total > 0);
+      return [k, { rank: i < 0 ? null : i + 1, of: railN.students }];
+    })),
+
     myMissions: mine.map((m) => ({
-      id: m.id, wk: m.week, title: m.title, when: when(m.created_at, now),
+      id: m.id, wk: m.week, title: m.title, when: when(m.created_at, now), at: m.created_at,
       mission: m.answers || [],
       attach: (m.attach || []).map((a) => ({ type: a.kind, url: a.url || null,
                                              title: a.label, label: a.label }))

@@ -1222,6 +1222,7 @@
 
   /* 피드백권 칸 : 회수 · 잔량 · 지급 */
   .passcell { white-space: nowrap; }
+  .adm-due { margin-top: 0; width: 176px; font-size: 12px; }
   .passcell .fmove { width: 20px; height: 20px; font-size: 14px; }
   .passn { display: inline-block; min-width: 40px; text-align: center;
            font-variant-numeric: tabular-nums; font-weight: 700; }

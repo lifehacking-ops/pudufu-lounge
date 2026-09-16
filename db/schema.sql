@@ -347,9 +347,11 @@ CREATE TABLE lounge_week (
   lounge_id  bigint      NOT NULL REFERENCES lounge (id),
   week       smallint    NOT NULL,
   published  boolean     NOT NULL DEFAULT true,
+  due_at     timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (lounge_id, week)
 );
+COMMENT ON COLUMN lounge_week.due_at IS '과제 마감. NULL 이면 마감 없음 — 카운트다운도 정시·지각 구분도 없다';
 
 
 -- 어제 커뮤니티 요약 -----------------------------------------------------------

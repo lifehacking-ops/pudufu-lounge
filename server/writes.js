@@ -423,6 +423,18 @@ module.exports.setRights = setRights;
 const config = require("./config");
 const { unfurl, firstUrl } = require("./unfurl");
 
+/* 주차 마감. 비우면 마감 없음이다. */
+async function setWeekDue(loungeId, userId, week, dueAt) {
+  await admin(loungeId, userId);
+  const at = dueAt ? new Date(dueAt) : null;
+  if (dueAt && isNaN(at)) throw new Denied("마감 시각을 읽을 수 없습니다");
+  await rows(
+    `INSERT INTO lounge_week (lounge_id, week, due_at) VALUES ($1, $2, $3)
+     ON CONFLICT (lounge_id, week) DO UPDATE SET due_at = $3, updated_at = now()`,
+    [loungeId, week, at]);
+  return { ok: true, dueAt: at };
+}
+
 async function setWeekPublished(loungeId, userId, week, published) {
   await admin(loungeId, userId);
   await rows(
@@ -784,3 +796,4 @@ async function reportPost(loungeId, userId, postId, reason) {
 
 module.exports.setMuted = setMuted;
 module.exports.reportPost = reportPost;
+module.exports.setWeekDue = setWeekDue;

@@ -245,8 +245,21 @@ const topPosts = (loungeId, days) =>
      LIMIT 5`, [loungeId, days]);
 
 const weekFlags = (loungeId) =>
-  rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
+  rows(`SELECT week, published, due_at FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
+
+/* 우측 레일의 숫자. 예전에는 마크업에 24 · 7 · 3 이 박혀 있었다.
+   '온라인' 은 실시간이 아니라 오늘 접속한 사람이다 — 그렇게 부른다. */
+const railStats = (loungeId) =>
+  one(`SELECT count(*) FILTER (WHERE role = 'student')::int AS students,
+              count(*) FILTER (WHERE last_seen_at >= now() - interval '1 day')::int AS today,
+              count(DISTINCT cohort) FILTER (WHERE cohort IS NOT NULL)::int AS cohorts
+         FROM lounge_member WHERE lounge_id = $1`, [loungeId]);
+
+const recentMembers = (loungeId, n) =>
+  rows(`SELECT u.nickname FROM lounge_member m JOIN ext_user u ON u.id = m.user_id
+         WHERE m.lounge_id = $1 AND m.last_seen_at IS NOT NULL
+         ORDER BY m.last_seen_at DESC LIMIT $2`, [loungeId, n || 6]);
 
 module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
                    posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit,
-                   myMissions, comments, search, searchComments, received, topPosts, weekFlags, PAGE };
+                   myMissions, comments, search, searchComments, railStats, recentMembers, received, topPosts, weekFlags, PAGE };

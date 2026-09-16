@@ -186,6 +186,7 @@
   /* 지금 내가 진행 중인 주차. 실제로는 마지막으로 본 강의에서 나오는 값이고,
      이미 시스템이 아는 값이라 글쓰기에서 다시 물어보지 않는다. */
   var CURRENT_WK = D.currentWk || 3;
+  var WEEK_DUE = D.weekDue || {};   // 주차별 마감. 라운지가 정한다. 없으면 없다.
 
   /* 주차별 미션 양식. 강사는 질문과 예시만 갈아끼우면 된다.
      hint 는 칸의 placeholder 로만 쓰이고 저장되지 않는다 — 비계는 남기되 결과물에는 안 남는다. */
@@ -308,6 +309,7 @@
 
       // 강의실 과제 칸도 같이 고쳐 그린다. 안 그러면 낸 뒤에도 빈 양식이 남는다.
       mountClassMission();
+      paintRail();
     }).catch(failed);
   }
 
@@ -371,7 +373,17 @@
 
   var LB = D.leaderboard;
 
-  var MY_PCT = { "7": 12, "30": 21, "all": 34 };
+  /* 상위 몇 % 인가. 서버가 내 순위와 수강생 수를 준다. 프로토타입은 예시값.
+     순위가 없으면(받은 이모지 0) 숫자를 만들지 않는다 — '—' 로 둔다. */
+  var MY_PCT = (function () {
+    if (!D.myRank) return { "7": 12, "30": 21, "all": 34 };
+    var out = {};
+    Object.keys(D.myRank).forEach(function (k) {
+      var m = D.myRank[k];
+      out[k] = m && m.rank && m.of ? Math.max(1, Math.round(m.rank / m.of * 100)) : "—";
+    });
+    return out;
+  })();
 
   /* 강의는 카드가 아니라 '강' 단위로 찾는다.
      어느 주차 · 어느 섹션에 속한 강인지와, 교안에서 검색어가 걸린 대목을 같이 보여준다. */
@@ -463,9 +475,14 @@
 
   /* ================= 카운트다운 ================= */
 
-  var target = Date.now() + (2 * 24 + 6) * 3600e3 + 12 * 60e3 + 5e3;
+  /* 마감은 라운지가 정한다. 없으면 세지 않는다 — 예전에는 '지금 + 54시간' 이라는
+     가짜 시각을 항상 세고 있었다. 프로토타입에서만 예시로 하나 만든다. */
+  var target = WEEK_DUE[CURRENT_WK] ? Date.parse(WEEK_DUE[CURRENT_WK])
+    : (D.api ? null : Date.now() + (2 * 24 + 6) * 3600e3 + 12 * 60e3 + 5e3);
+
   /* 과제 카드는 다시 그려지므로 표시 대상을 그때그때 찾는다 */
   function tick() {
+    if (target == null) return;
     var s = Math.floor(Math.max(0, target - Date.now()) / 1000);
     var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
     var p = function (n) { return String(n).padStart(2, "0"); };
@@ -1272,6 +1289,107 @@
   var draft = { cat: DEFAULT_CAT, wk: CURRENT_WK, attach: [] };
 
   function syncComposer() { paintCat(); syncWkLine(); syncGate(); syncMission(); }
+
+  /* ISO 시각 → datetime-local 입력값(현지 시각). 비면 빈 문자열. */
+  function toLocalInput(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  function dueLabel(iso) {
+    var d = new Date(iso);
+    var days = ["일", "월", "화", "수", "목", "금", "토"];
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return days[d.getDay()] + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /* ----- 우측 레일 -----
+     예전에는 멤버 24 · 온라인 7 · 기수 3 · 3주차 · 상위 12% 가 전부 마크업에 박혀
+     있었다. 글이 0편인 라운지에서도 그대로 보였다. 전부 데이터에서 그린다. */
+  function paintRail() {
+    var set = function (id, v) { var e = $(id); if (e) e.textContent = String(v); };
+
+    if (D.rail) {
+      set("railStudents", D.rail.students);
+      set("railToday", D.rail.today);
+      set("railCohorts", D.rail.cohorts);
+      var row = $("railRecent");
+      if (row) {
+        row.textContent = "";
+        D.rail.recent.forEach(function (n) { row.appendChild(el("span", "ava ava-24", initial(n))); });
+        if (!D.rail.recent.length) row.appendChild(el("span", "meta-m", "아직 접속한 사람이 없습니다"));
+      }
+    }
+
+    /* 이번 주 과제 카드. 이 주차에 과제가 없으면 카드를 통째로 뺀다. */
+    var card = $("railMission");
+    var def = MISSIONS[CURRENT_WK];
+    if (card) {
+      if (!def) { card.hidden = true; }
+      else {
+        card.hidden = false;
+        set("railWk", CURRENT_WK);
+        set("railMissionT", String(def.title || "").replace(/^\d+주차 미션 · /, ""));
+        var done = !!myMissionPost(CURRENT_WK);
+        var badge = $("railDone");
+        if (badge) {
+          badge.textContent = done ? "제출함" : "미제출";
+          badge.className = "badge " + (done ? "b-ontime" : "b-none");
+        }
+        var due = WEEK_DUE[CURRENT_WK];
+        var lab = $("railDueLabel"), cd = $("countdown");
+        if (due) {
+          target = Date.parse(due);
+          if (lab) { lab.hidden = false; lab.textContent = "정시 마감까지 · " + dueLabel(due); }
+          if (cd) cd.hidden = false;
+          tick();
+        } else if (D.api) {
+          if (lab) { lab.hidden = false; lab.textContent = "마감 없음"; }
+          if (cd) cd.hidden = true;
+        }
+      }
+    }
+
+    paintRibbon();
+  }
+
+  /* 완주 리본. 낸 주차는 정시·지각으로, 안 낸 주차는 지났는지 남았는지로 가른다.
+     마감이 없는 주차는 제출이면 그냥 정시로 본다 — 늦었다고 말할 기준이 없다. */
+  function paintRibbon() {
+    var rib = $("ribbon");
+    if (!rib || !D.api) return;   // 프로토타입은 마크업의 예시 그대로
+    rib.textContent = "";
+
+    var total = WEEKS.length, ontime = 0, late = 0, left = 0;
+    for (var wk = 1; wk <= total; wk++) {
+      var mine = myMissionPost(wk);
+      var cell = el("div", "rcell");
+      if (mine) {
+        var due = WEEK_DUE[wk];
+        var isLate = due && mine.at && Date.parse(mine.at) > Date.parse(due);
+        cell.className += isLate ? " r-late hatch" : " r-ontime";
+        cell.title = wk + "주차 · " + (isLate ? "지각 제출" : "정시 제출");
+        if (isLate) late++; else ontime++;
+      } else if (wk < CURRENT_WK) {
+        cell.className += " r-none";
+        cell.title = wk + "주차 · 미제출";
+      } else {
+        cell.className += wk === CURRENT_WK ? " r-none" : " r-future";
+        cell.title = wk + "주차 · " + (wk === CURRENT_WK ? "이번 주" : "예정");
+        left++;
+      }
+      rib.appendChild(cell);
+    }
+    var set = function (id, v) { var e = $(id); if (e) e.textContent = v; };
+    set("ribbonHead", total + "주 완주 현황");
+    set("ribbonN", (ontime + late) + "/" + total);
+    set("ribbonSum", "정시 " + ontime + " · 지각 " + late + " · 남은 주차 " + left);
+    var sec = rib.closest("section");
+    if (sec) sec.hidden = total === 0;
+  }
 
   /* 우측 레일의 이번 주 제출 현황. 관리 화면 대시보드와 같은 함수로 세어
      두 화면의 숫자가 어긋나지 않게 한다. */
@@ -3544,7 +3662,7 @@
   function paintCourseTab(host) {
     var c = admCard("강의 게시", "공개 " + liveCourses().length + " / 전체 " + COURSES.length + "주차");
 
-    var t = admTable(["주차", "제목", "강", "상태", ""]);
+    var t = admTable(["주차", "제목", "강", "마감", "상태", ""]);
     var forms = [];
 
     COURSES.forEach(function (cr) {
@@ -3552,6 +3670,30 @@
       tr.appendChild(el("td", null, String(cr.wk)));
       tr.appendChild(el("td", null, cr.title));
       tr.appendChild(el("td", null, cr.sections[0].items.length + "개"));
+
+      /* 마감. 비우면 마감 없음이다 — 그 주차 카드에서 카운트다운이 사라지고
+         완주 리본도 정시·지각을 가르지 않는다. */
+      var dueTd = el("td");
+      var due = document.createElement("input");
+      due.type = "datetime-local";
+      due.className = "adm-find adm-due";
+      due.value = toLocalInput(WEEK_DUE[cr.wk]);
+      due.setAttribute("aria-label", cr.wk + "주차 마감");
+      due.addEventListener("change", function () {
+        var was = WEEK_DUE[cr.wk];
+        var iso = due.value ? new Date(due.value).toISOString() : null;
+        if (iso) WEEK_DUE[cr.wk] = iso; else delete WEEK_DUE[cr.wk];
+        paintRail();
+        send("PUT", "/admin/weeks/" + cr.wk + "/due", { dueAt: iso })
+          .catch(function (err) {
+            if (was) WEEK_DUE[cr.wk] = was; else delete WEEK_DUE[cr.wk];
+            due.value = toLocalInput(was);
+            paintRail();
+            failed(err);
+          });
+      });
+      dueTd.appendChild(due);
+      tr.appendChild(dueTd);
 
       var st = el("td");
       st.appendChild(el("span", "badge " + (cr.published ? "b-ontime" : "b-none"),
@@ -4974,6 +5116,7 @@
   }
 
   renderCourseList();
+  paintRail();
 
   /* 강의가 하나도 없는 라운지도 있다 — 막 만들었거나 아직 동기화 전이다.
      그때 강의실을 그리려다 부팅이 통째로 멈추면 커뮤니티까지 같이 죽는다. */

@@ -200,6 +200,9 @@ async function handler(req, res) {
           if (req.method === "PUT" && s[2] === "categories" && s[4] === "rights")
             return json(res, 200, await writes.setRights(L, me, +s[3], input));
 
+          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "due")
+            return json(res, 200, await writes.setWeekDue(L, me, +s[3], input.dueAt));
+
           if (req.method === "PUT" && s[2] === "weeks" && s[4] === "published")
             return json(res, 200, await writes.setWeekPublished(L, me, +s[3], input.published));
 

@@ -37,9 +37,11 @@ const OK_TYPES = {
   "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov"
 };
 
-/* 영상은 사진과 자릿수가 다르다. 1분짜리 화면 녹화가 이미 10MB 를 넘는다. */
+/* 영상은 사진과 자릿수가 다르다. 1분짜리 화면 녹화가 이미 10MB 를 넘는다.
+   상한 50MB 는 Supabase 무료 플랜의 파일 한도다 — 버킷 설정도 같은 값이어야
+   한다. 여기서 더 받아 줘도 보관소가 거절한다. */
 const MAX_IMAGE = 10 * 1024 * 1024;
-const MAX_VIDEO = 200 * 1024 * 1024;
+const MAX_VIDEO = 50 * 1024 * 1024;
 
 /* 브라우저가 바로 올릴 수 있는 주소를 만든다. 한 번 쓰고 마는 주소다. */
 async function signUpload(userId, mime, size) {
@@ -53,7 +55,7 @@ async function signUpload(userId, mime, size) {
   const video = mime.startsWith("video/");
   const cap = video ? MAX_VIDEO : MAX_IMAGE;
   if (size > cap) {
-    throw Object.assign(new Error((video ? "영상은 200MB" : "10MB") + " 까지 올릴 수 있습니다"), { code: 403 });
+    throw Object.assign(new Error((video ? "영상은 50MB" : "사진은 10MB") + " 까지 올릴 수 있습니다"), { code: 403 });
   }
 
   const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;

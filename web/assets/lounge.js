@@ -1024,7 +1024,7 @@
       box.appendChild(ta2);
 
       /* 글쓰기 창과 같은 첨부 줄. 주소를 그냥 적어도 카드가 된다. */
-      var att = attachRow((D.lounge && D.lounge.attach) || []);
+      var att = attachRow(((D.lounge && D.lounge.attach) || []).slice(), { zone: box });
       box.appendChild(att.el);
 
       /* 할 일은 한 줄에 하나로 적는다. 칸을 다섯 개 세워 두면 다섯 개를
@@ -1124,8 +1124,7 @@
     ta.value = "";
     autoGrow(ta);
     if (missionForm) missionForm.clear();
-    draft.attach = [];
-    paintAttach();
+    composerAtt.clear();
     draft.cat = DEFAULT_CAT;
     draft.wk = CURRENT_WK;
     syncComposer();
@@ -1140,37 +1139,16 @@
      파일은 서버를 통과하지 않는다. 서버에서 '올려도 되는 주소'를 받아
      브라우저가 보관소로 바로 올린다 — 서버리스는 본문 크기 제한이 있다. */
 
-  var fileInput = $("fileInput"), fileBtn = $("fileBtn"), attachNow = $("attachNow");
+  var fileInput = $("fileInput"), fileBtn = $("fileBtn");
 
   var ATTACH_MAX = 10;
-
-  function paintAttach() {
-    attachNow.textContent = "";
-    attachNow.hidden = !draft.attach.length;
-
-    draft.attach.forEach(function (a, i) {
-      var chip = el("span", "att-chip");
-      chip.appendChild(el("b", null, a.name || "첨부"));
-      var x = el("button", null, "×");
-      x.type = "button";
-      x.setAttribute("aria-label", (a.name || "첨부") + " 떼기");
-      x.addEventListener("click", function () {
-        draft.attach.splice(i, 1);
-        paintAttach();
-        updatePostBtn();
-      });
-      chip.appendChild(x);
-      attachNow.appendChild(chip);
-    });
-  }
-
-  if (fileBtn) fileBtn.addEventListener("click", function () { fileInput.click(); });
 
   /* 올리기 자체는 한 곳에만 둔다. 글쓰기 창과 강의실 과제 폼이 같이 쓴다. */
   function uploadFile(f, onProgress) {
     if (!API) {
-      // 프로토타입에는 보관소가 없다. 자리만 잡아 둔다.
-      return Promise.resolve({ type: "image", label: f.name, name: f.name });
+      // 프로토타입에는 보관소가 없다. 자리만 잡아 둔다 — 종류는 파일에서 읽는다.
+      var kind = f.type.indexOf("video/") === 0 ? "video" : f.type === "application/pdf" ? "link" : "image";
+      return Promise.resolve({ type: kind, label: f.name, name: f.name });
     }
     if (onProgress) onProgress({ name: f.name, uploading: true });
 
@@ -1184,96 +1162,184 @@
       });
   }
 
-  /* 첨부 줄 한 벌. 글쓰기 창 · 강의실 과제 · 라운지 소개가 같은 것을 쓴다.
-     붙이는 방법이 자리마다 다르면 자리마다 새로 익혀야 한다. */
-  function attachRow(initial) {
-    var list = (initial || []).slice();
+  /* 첨부 한 벌. 글쓰기 창 · 강의실 과제 · 라운지 소개가 같은 것을 쓴다.
+     붙이는 방법이 자리마다 다르면 자리마다 새로 익혀야 한다.
 
-    var wrap = el("div", "row att-row");
-    var pick = document.createElement("input");
-    pick.type = "file";
-    pick.hidden = true;
-    pick.multiple = true;
-    pick.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime";
+     올린 것은 이름표가 아니라 미리보기로 보여준다 — 무엇을 올렸는지 눈으로
+     확인해야 한다. 사진은 그림으로, 영상은 첫 프레임에 ▶ 표시로, PDF 는 파일
+     타일로. 올라가는 동안에도 자리는 먼저 잡힌다.
 
-    var add = el("button", "fadd-btn", "+ 파일 첨부");
-    add.type = "button";
+     끌어다 놓기와 붙여넣기(스크린샷)도 받는다. 파일 고르기 창까지 가는 길이
+     하나뿐이면 매번 세 번 눌러야 한다. */
+  var ACCEPT = {
+    "image/png": 1, "image/jpeg": 1, "image/gif": 1, "image/webp": 1,
+    "application/pdf": 1, "video/mp4": 1, "video/webm": 1, "video/quicktime": 1
+  };
+
+  function attachRow(list, opts) {
+    opts = opts || {};
+    list = list || [];   // 넘긴 배열을 그대로 쓴다 — 초안이 같은 것을 본다
+
+    var wrap = el("div", "att-block");
+
+    var pick = opts.input || document.createElement("input");
+    if (!opts.input) {
+      pick.type = "file"; pick.hidden = true; pick.multiple = true;
+      pick.accept = Object.keys(ACCEPT).join(",");
+      wrap.appendChild(pick);
+    }
+
+    var add = opts.button || null;
+    if (!add) {
+      add = el("button", "fadd-btn", "+ 파일 첨부");
+      add.type = "button";
+      wrap.appendChild(add);
+    }
     add.addEventListener("click", function () { pick.click(); });
 
-    var chips = el("span", "attach-now");
+    var strip = el("div", "att-strip");
+    strip.hidden = true;
+    wrap.appendChild(strip);
+
+    function kindOfFile(f) {
+      return f.type.indexOf("video/") === 0 ? "video" : f.type.indexOf("image/") === 0 ? "image" : "link";
+    }
+
+    function thumb(a, i) {
+      var t = el("div", "att-thumb" + (a.uploading ? " uploading" : ""));
+      var src = a.preview || a.url;
+      var kind = a.type || "image";
+
+      if (kind === "video" && src) {
+        var v = document.createElement("video");
+        v.src = src; v.muted = true; v.preload = "metadata"; v.playsInline = true;
+        t.appendChild(v);
+        t.appendChild(el("span", "att-play", "▶"));
+      } else if (kind === "image" && src) {
+        var im = document.createElement("img");
+        im.src = src; im.alt = a.name || a.label || "";
+        t.appendChild(im);
+      } else {
+        var f = el("div", "att-file");
+        var name = a.name || a.label || a.url || "파일";
+        f.appendChild(el("b", null, (name.split(".").pop() || "").toUpperCase().slice(0, 4) || "링크"));
+        f.appendChild(el("span", null, name));
+        t.appendChild(f);
+      }
+      if (a.uploading) t.appendChild(el("span", "att-wait", "올리는 중"));
+
+      var x = el("button", "att-x", "×");
+      x.type = "button";
+      x.setAttribute("aria-label", (a.name || a.label || "첨부") + " 떼기");
+      x.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (a.preview) URL.revokeObjectURL(a.preview);
+        list.splice(i, 1);
+        paint();
+        if (opts.onChange) opts.onChange();
+      });
+      t.appendChild(x);
+      return t;
+    }
 
     function paint() {
-      chips.textContent = "";
-      chips.hidden = !list.length;
-      add.hidden = list.length >= ATTACH_MAX;
+      strip.textContent = "";
+      strip.hidden = !list.length;
+      if (add) add.hidden = list.length >= ATTACH_MAX;
+      list.forEach(function (a, i) { strip.appendChild(thumb(a, i)); });
+    }
 
-      list.forEach(function (a, i) {
-        var chip = el("span", "att-chip");
-        chip.appendChild(el("b", null, a.name || a.label || "첨부"));
-        var x = el("button", null, "×");
-        x.type = "button";
-        x.setAttribute("aria-label", (a.name || a.label || "첨부") + " 떼기");
-        x.addEventListener("click", function () { list.splice(i, 1); paint(); });
-        chip.appendChild(x);
-        chips.appendChild(chip);
+    function addFiles(files) {
+      files = [].slice.call(files || []);
+      if (!files.length) return;
+      var room = ATTACH_MAX - list.length;
+      if (room <= 0) { failed(new Error("첨부는 " + ATTACH_MAX + "개까지입니다")); return; }
+
+      files.slice(0, room).forEach(function (f) {
+        if (!ACCEPT[f.type]) {
+          failed(new Error("'" + f.name + "' 은 올릴 수 없는 형식입니다. 사진 · 영상(mp4 · webm · mov) · PDF 만 됩니다."));
+          return;
+        }
+        var kind = kindOfFile(f);
+        /* 고른 자리를 먼저 잡아 두고 올라온 것으로 바꾼다. 그래야 여러 장을
+           같이 올릴 때 순서가 엎치락뒤치락하지 않는다. 미리보기는 파일 자체로
+           만들어 올라오기를 기다리지 않는다. */
+        var slot = { name: f.name, uploading: true, type: kind,
+                     preview: kind === "link" ? null : URL.createObjectURL(f) };
+        list.push(slot);
+        paint();
+
+        uploadFile(f)
+          .then(function (a) {
+            var i = list.indexOf(slot);
+            if (i < 0) { if (slot.preview) URL.revokeObjectURL(slot.preview); return; }   // 올라오기 전에 뗐다
+            a.preview = slot.preview;
+            list[i] = a;
+            paint();
+            if (opts.onChange) opts.onChange();
+          })
+          .catch(function (err) {
+            var i = list.indexOf(slot);
+            if (i > -1) list.splice(i, 1);
+            if (slot.preview) URL.revokeObjectURL(slot.preview);
+            paint();
+            failed(err);
+          });
       });
     }
 
-    pick.addEventListener("change", function () {
-      var files = [].slice.call(pick.files || []).slice(0, ATTACH_MAX - list.length);
-      pick.value = "";
+    pick.addEventListener("change", function () { addFiles(pick.files); pick.value = ""; });
 
-      files.forEach(function (f) {
-        var slot = { name: f.name, uploading: true };
-        list.push(slot);
-        paint();
-        uploadFile(f)
-          .then(function (a) { var i = list.indexOf(slot); if (i > -1) list[i] = a; paint(); })
-          .catch(function (err) { var i = list.indexOf(slot); if (i > -1) list.splice(i, 1); paint(); failed(err); });
+    function hasFiles(e) {
+      var t = e.dataTransfer;
+      return !!(t && t.types && [].indexOf.call(t.types, "Files") > -1);
+    }
+
+    /* 끌어다 놓는 자리. 글쓰기 카드 전체가 받는다 — 접혀 있어도. */
+    function bindZone(zone) {
+      if (!zone) return;
+      ["dragenter", "dragover"].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) {
+          if (!hasFiles(e)) return;
+          e.preventDefault();
+          zone.classList.add("dropping");
+        });
       });
-    });
+      zone.addEventListener("dragleave", function (e) {
+        if (!e.relatedTarget || !zone.contains(e.relatedTarget)) zone.classList.remove("dropping");
+      });
+      zone.addEventListener("drop", function (e) {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        zone.classList.remove("dropping");
+        addFiles(e.dataTransfer.files);
+        if (opts.onDrop) opts.onDrop();
+      });
+      // 스크린샷은 붙여넣는다. 파일로 저장해서 고르는 길은 너무 멀다.
+      zone.addEventListener("paste", function (e) {
+        var fs = e.clipboardData && e.clipboardData.files;
+        if (fs && fs.length) { e.preventDefault(); addFiles(fs); if (opts.onDrop) opts.onDrop(); }
+      });
+    }
+    bindZone(opts.zone);
 
-    wrap.appendChild(pick);
-    wrap.appendChild(add);
-    wrap.appendChild(chips);
     paint();
 
     return {
       el: wrap,
+      add: addFiles,
+      bindZone: bindZone,
+      paint: paint,
+      clear: function () {
+        list.forEach(function (a) { if (a.preview) URL.revokeObjectURL(a.preview); });
+        list.length = 0;
+        paint();
+      },
       value: function () { return list.filter(function (a) { return !a.uploading; }); }
     };
   }
 
-  if (fileInput) fileInput.addEventListener("change", function () {
-    var files = [].slice.call(fileInput.files || []);
-    fileInput.value = "";
-    if (!files.length) return;
 
-    var room = ATTACH_MAX - draft.attach.length;
-    if (room <= 0) { failed(new Error("사진은 " + ATTACH_MAX + "장까지 붙일 수 있습니다")); return; }
-    if (files.length > room) { files = files.slice(0, room); }
-
-    /* 고른 자리를 먼저 잡아 두고 올라온 것으로 바꾼다. 그래야 여러 장을
-       같이 올릴 때 순서가 엎치락뒤치락하지 않는다. */
-    files.forEach(function (f) {
-      var slot = { name: f.name, uploading: true };
-      draft.attach.push(slot);
-      paintAttach();
-
-      uploadFile(f)
-        .then(function (a) {
-          var i = draft.attach.indexOf(slot);
-          if (i > -1) draft.attach[i] = a;
-          paintAttach();
-        })
-        .catch(function (err) {
-          var i = draft.attach.indexOf(slot);
-          if (i > -1) draft.attach.splice(i, 1);
-          paintAttach();
-          failed(err);
-        });
-    });
-  });
 
   /* 글쓰기 상태. 주차는 사용자가 고르는 값이 아니라 맥락이 정하는 값이다.
      기본 카테고리는 양식이 안 붙는 것으로 둔다. 창을 열면 빈 종이여야 하고,
@@ -1287,6 +1353,18 @@
   }
 
   var draft = { cat: DEFAULT_CAT, wk: CURRENT_WK, attach: [] };
+
+  /* 글쓰기 창의 첨부. 툴바의 클립 단추와 숨은 파일 입력을 그대로 쓰고,
+     미리보기 줄은 본문 아래 · 툴바 위에 선다. 카드 전체가 끌어다 놓기 자리다. */
+  var composerAtt = attachRow(draft.attach, {
+    input: fileInput, button: fileBtn, zone: composer,
+    onChange: updatePostBtn,
+    onDrop: function () { setComposer(true); }
+  });
+  (function () {
+    var foot = composer.querySelector(".composer-foot");
+    if (foot) foot.parentNode.insertBefore(composerAtt.el, foot);
+  })();
 
   function syncComposer() { paintCat(); syncWkLine(); syncGate(); syncMission(); }
 
@@ -1647,8 +1725,7 @@
       wTitle.value = "";
       ta.value = "";
       autoGrow(ta);
-      draft.attach = [];
-      paintAttach();
+      composerAtt.clear();
       if (missionForm) missionForm.clear();
       draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
       draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
@@ -3212,63 +3289,15 @@
     if (posted) form.fill(posted.mission.map(function (a) { return a.a; }));
 
     /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많고,
-       전후 비교처럼 두 장이 있어야 말이 되는 것도 있다. */
-    var cmAttach = [];
-    var cmFile = document.createElement("input");
-    cmFile.type = "file";
-    cmFile.hidden = true;
-    cmFile.multiple = true;
-    cmFile.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime";
-
-    var cmRow = el("div", "row cm-attach");
-    var cmBtn = el("button", "fadd-btn", "+ 파일 첨부");
-    cmBtn.type = "button";
-    cmBtn.addEventListener("click", function () { cmFile.click(); });
-    var cmNow = el("span", "attach-now");
-    cmNow.hidden = true;
-
-    function paintCm() {
-      cmNow.textContent = "";
-      cmNow.hidden = !cmAttach.length;
-      cmBtn.hidden = cmAttach.length >= ATTACH_MAX;
-
-      cmAttach.forEach(function (a, i) {
-        var chip = el("span", "att-chip");
-        chip.appendChild(el("b", null, a.name || "첨부"));
-        var x = el("button", null, "×");
-        x.type = "button";
-        x.setAttribute("aria-label", (a.name || "첨부") + " 떼기");
-        x.addEventListener("click", function () { cmAttach.splice(i, 1); paintCm(); });
-        chip.appendChild(x);
-        cmNow.appendChild(chip);
-      });
-    }
-
-    cmFile.addEventListener("change", function () {
-      var files = [].slice.call(cmFile.files || []).slice(0, ATTACH_MAX - cmAttach.length);
-      cmFile.value = "";
-
-      files.forEach(function (f) {
-        var slot = { name: f.name, uploading: true };
-        cmAttach.push(slot);
-        paintCm();
-        uploadFile(f)
-          .then(function (a) { var i = cmAttach.indexOf(slot); if (i > -1) cmAttach[i] = a; paintCm(); })
-          .catch(function (err) { var i = cmAttach.indexOf(slot); if (i > -1) cmAttach.splice(i, 1); paintCm(); failed(err); });
-      });
-    });
-
-    cmRow.appendChild(cmFile);
-    cmRow.appendChild(cmBtn);
-    cmRow.appendChild(cmNow);
-    // 이미 낸 과제에 붙어 있던 파일은 그대로 이어 받는다
-    if (posted && posted.attach) { cmAttach = posted.attach.slice(); paintCm(); }
+       전후 비교처럼 두 장이 있어야 말이 되는 것도 있다. 이미 낸 과제의 파일은
+       그대로 이어 받는다. */
+    var cmAtt = attachRow(posted && posted.attach ? posted.attach.slice() : []);
 
     var confirmBox = el("div", "gate cm-confirm");
     confirmBox.hidden = true;
 
     function doSend(overwrite) {
-      publishMission(wk, form.answers(), null, overwrite, cmAttach);
+      publishMission(wk, form.answers(), null, overwrite, cmAtt.value());
       confirmBox.hidden = true;
     }
 
@@ -3307,7 +3336,8 @@
     row.appendChild(send);
 
     card.appendChild(form.el);
-    card.appendChild(cmRow);
+    card.appendChild(cmAtt.el);
+    cmAtt.bindZone(card);
     card.appendChild(row);
     card.appendChild(confirmBox);   // 확인은 누른 버튼 바로 아래에 뜬다
     classMission.appendChild(card);

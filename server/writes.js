@@ -137,10 +137,13 @@ async function createPost(loungeId, userId, input) {
       const found = firstUrl(hay);
       if (found) {
         const card = await unfurl(found);
-        await client.query(
-          `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
-          [id, card.kind, card.url, card.title || null]);
-        files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
+        // 내부 주소는 카드로 만들지 않는다. 글에는 글자로만 남는다.
+        if (!card.blocked) {
+          await client.query(
+            `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
+            [id, card.kind, card.url, card.title || null]);
+          files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
+        }
       }
     }
 
@@ -708,7 +711,7 @@ async function setLounge(loungeId, userId, input) {
       const found = firstUrl(String(input.intro || ""));
       if (found) {
         const card = await unfurl(found);
-        files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
+        if (!card.blocked) files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
       }
     }
     stored = files;

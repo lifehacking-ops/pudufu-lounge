@@ -70,7 +70,7 @@ const MAX_BYTES = 200000;   // 머리만 읽는다. 본문 전체를 받을 이�
 async function fetchPublic(url, signal) {
   let cur = url;
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
-    await assertPublic(cur);
+    await assertPublic(cur).catch((e) => { e.blocked = true; throw e; });
     const res = await fetch(cur, {
       signal, redirect: "manual",
       headers: { "user-agent": "Mozilla/5.0 (compatible; PudufuLounge/1.0)" }
@@ -158,6 +158,9 @@ async function unfurl(url) {
         /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)/i)
     };
   } catch (e) {
+    /* 내부 주소라 열지 않은 것과 남의 서버가 안 열린 것은 다르다.
+       앞의 것은 카드로 만들 이유가 없다 — 쓰는 쪽이 blocked 를 보고 건너뛴다. */
+    if (e && e.blocked) return { kind: "link", url, title: null, description: null, image: null, blocked: true };
     // 못 읽어도 주소는 살린다. 카드 대신 주소만 보여준다.
     return { kind: "link", url, title: null, description: null, image: null };
   } finally {

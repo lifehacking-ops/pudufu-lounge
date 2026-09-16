@@ -3801,6 +3801,8 @@
     grid.appendChild(rail);
     host.appendChild(grid);
 
+    var flagged = reported();
+    if (flagged.length) main.appendChild(reportCard(flagged));
     main.appendChild(feedbackCard(fb));
     main.appendChild(todayCard(un, ns, risk));
     if (isAdmin()) main.appendChild(funnelCard());
@@ -3844,6 +3846,27 @@
     show("community");   // 그리기 전에 띄운다 — 숨은 화면은 높이를 잴 수 없다
     render();
     openById(p.id);
+  }
+
+  /* 신고된 글. 알림 체계가 없으므로 누가 신고해도 관리자는 알 길이 없었다 —
+     게시물 관리 150줄에서 빨간 표를 눈으로 찾아야 했다. 대시보드 맨 위에 세운다. */
+  function reported() {
+    return allPosts().filter(function (p) { return p.reports > 0; })
+      .sort(function (a, b) { return b.reports - a.reports; });
+  }
+
+  function reportCard(list) {
+    var c = admCard("신고된 글", list.length + "건");
+    list.slice(0, 5).forEach(function (p) {
+      var b = el("button", "qrow");
+      b.type = "button";
+      b.appendChild(el("span", "badge b-late", p.reports + "건"));
+      b.appendChild(el("span", "qrow-t", p.title));
+      b.appendChild(el("span", "qrow-m", p.author));
+      b.addEventListener("click", function () { jumpTo(p); });
+      c.appendChild(b);
+    });
+    return c;
   }
 
   /* 피드백권으로 온 요청은 따로 세운다. 과제 답글은 선의지만 이건 약속이다.

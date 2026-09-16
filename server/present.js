@@ -223,9 +223,25 @@ async function loungeData(loungeId, viewerId) {
               attach: L.intro_att || [] },
     me: (function () {
       const m = mem.find((x) => Number(x.user_id) === Number(viewerId));
-      return m
-        ? { name: m.nickname, role: m.role, lounges: (m.staff_of || []).map(loungeKey) }
-        : { name: "손님", role: "student", lounges: [] };
+      if (!m) return { name: "손님", role: "student", lounges: [] };
+
+      /* 정지·만료도 같이 보낸다. 화면이 모르면 다 쓰고 나서 게시를 누른 순간에야
+         '쓸 수 없습니다' 를 만난다 — 쓴 사람은 그 앞에서 알았어야 한다. */
+      const muted = !!(m.muted_until && new Date(m.muted_until) > now);
+      const out = {
+        name: m.nickname, role: m.role,
+        lounges: (m.staff_of || []).map(loungeKey)
+      };
+      if (muted) {
+        out.muted = true;
+        out.mutedUntil = dayLabel(m.muted_until);
+        out.mutedReason = m.muted_reason || null;
+      }
+      if (m.expires_at && new Date(m.expires_at) < now) {
+        out.expired = true;
+        out.expiredAt = dayLabel(m.expires_at);
+      }
+      return out;
     })(),
     stats: { students: submit.students, submitted: submit.submitted, posts: totalPosts.n },
 
@@ -327,6 +343,15 @@ async function postOne(loungeId, viewerId, id) {
   if (!ps.length) return null;
   const cms = await Q.comments(loungeId, viewerId, [ps[0].id]);
   return shapePosts(ps, cms, new Date())[0];
+}
+
+/* 2026년 3월 4일 같은 날짜 한 줄. 정지 해제일처럼 '언제까지' 를 말할 때 쓴다. */
+function dayLabel(at) {
+  if (!at) return null;
+  const f = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric"
+  });
+  return f.format(new Date(at));
 }
 
 module.exports = { loungeData, postPage, postOne, when };

@@ -631,8 +631,10 @@
      소개와 글쓰기 창은 찾으러 온 사람에게는 방해물이다. */
   function setBrowsing(on) {
     feedArea.hidden = !on;
-    $("composer").hidden = !on;
+    $("composer").hidden = !on || writeLocked();
     $("intro").hidden = !on || !!introDismissed;
+    var lock = document.querySelector(".write-lock");
+    if (lock) lock.hidden = !on;
   }
 
   function closeSearchResults() {
@@ -1072,11 +1074,32 @@
   var postBtn = $("composerPost"), cancelBtn = $("composerCancel");
 
   function setComposer(on) {
+    if (on && writeLocked()) return;   // 잠긴 사람은 창이 열리지 않는다
     composer.classList.toggle("open", on);
     rest.hidden = on;
     openBox.hidden = !on;
     if (on) wTitle.focus();
   }
+
+  /* 정지된 사람에게 빈 종이를 내주면, 다 쓰고 게시를 누른 순간에야 막힌다.
+     쓰기 전에 말한다. 읽기는 그대로 두므로 화면을 가리지는 않는다. */
+  function writeLocked() { return !!(ME.muted); }
+
+  function paintWriteLock() {
+    var old = document.querySelector(".write-lock");
+    if (old) old.remove();
+    if (!writeLocked()) return;
+
+    rest.hidden = true;
+    var box = el("div", "gate write-lock");
+    box.appendChild(el("b", null, "활동이 정지되어 글과 댓글을 쓸 수 없습니다."));
+    box.appendChild(el("span", "muted",
+      (ME.mutedReason ? ME.mutedReason + " · " : "") +
+      (ME.mutedUntil ? ME.mutedUntil + "까지" : "") + " · 읽기는 그대로입니다"));
+    composer.parentNode.insertBefore(box, composer);
+    composer.hidden = true;
+  }
+  paintWriteLock();
 
   rest.addEventListener("click", function () { setComposer(true); });
   cancelBtn.addEventListener("click", function () {
@@ -2556,8 +2579,15 @@
   }
 
   function writeBox(placeholder, label, onSend) {
+    if (writeLocked()) {
+      var lock = el("div", "gate");
+      lock.appendChild(el("b", null, "활동이 정지되어 댓글을 쓸 수 없습니다."));
+      lock.appendChild(el("span", "muted", ME.mutedUntil ? ME.mutedUntil + "까지" : ""));
+      return { el: lock, field: null };
+    }
+
     var box = el("div", "cmt-new");
-    box.appendChild(el("span", "ava ava-34 ava-ink", "박"));
+    box.appendChild(el("span", "ava ava-34 ava-ink", initial(ME.name)));
 
     var grow = el("div", "grow");
     var field = document.createElement("textarea");
@@ -2716,7 +2746,9 @@
   $("crumbCourses").addEventListener("click", function () { show("courses"); });
 
   // 우측 레일 '강의 이어보기' 는 목록을 건너뛰고 보던 레슨으로 바로 (P1-6)
-  $("toCourseBtn").addEventListener("click", function () { show("lesson"); });
+  $("toCourseBtn").addEventListener("click", function () {
+    show(watchLocked() ? "courses" : "lesson");   // 만료면 안내가 있는 목록으로
+  });
 
   /* ================= 강의 목록 · 상세 ================= */
 
@@ -2756,9 +2788,20 @@
 
   /* ----- 강의 목록 : 주차 한 장씩 ----- */
 
+  /* 수강이 끝나면 강의 시청은 막고 라운지는 그대로 둔다 — 함께 정한 규칙이다.
+     스태프는 만료가 없다. */
+  function watchLocked() { return !!(ME.expired && !isStaff()); }
+
   function renderCourseList() {
     if (!courseList) return;
     courseList.textContent = "";
+
+    if (watchLocked()) {
+      var note = el("div", "gate");
+      note.appendChild(el("b", null, "수강 기간이 끝났습니다" + (ME.expiredAt ? " · " + ME.expiredAt : "")));
+      note.appendChild(el("span", "muted", "강의는 다시 볼 수 없지만 라운지는 그대로 쓰실 수 있습니다."));
+      courseList.appendChild(note);
+    }
 
     if (!shownCourses().length) {
       courseList.appendChild(el("p", "empty",
@@ -2810,6 +2853,7 @@
   function openWeek(wk) {
     var c = courseOf(wk);
     if (!c || (!c.published && !can("manage"))) return;
+    if (watchLocked()) return;   // 수강이 끝나면 강의는 다시 볼 수 없다
 
     viewWk = wk;
     show("lesson");
@@ -3012,6 +3056,14 @@
     var wk = viewWk;
     var def = MISSIONS[wk];
     if (!def) return;
+
+    if (watchLocked()) {
+      var over = el("div", "gate");
+      over.appendChild(el("b", null, "수강 기간이 끝나 과제를 낼 수 없습니다"));
+      over.appendChild(el("span", "muted", "이미 낸 과제는 라운지에 그대로 남아 있습니다."));
+      classMission.appendChild(over);
+      return;
+    }
 
     var posted = myMissionPost(wk);
     var card = el("div", "classmission");

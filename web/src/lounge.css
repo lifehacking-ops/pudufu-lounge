@@ -596,6 +596,9 @@
 
   .gate .adm-find { margin-top: 0; max-width: 260px; }
 
+  /* 정지된 사람에게 보이는 자리. 글쓰기 창이 있던 곳에 대신 선다. */
+  .write-lock { display: grid; gap: 4px; }
+
   .gate {
     display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
     border-radius: var(--radius-ctl); background: var(--late-bg); color: var(--late);

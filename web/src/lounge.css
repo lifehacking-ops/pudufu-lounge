@@ -349,6 +349,24 @@
     .grid-classroom .curric-col { order: -1; }
   }
 
+  /* 휴대폰. 상단 줄에 로고 · 라운지 · 검색 · 내 서재 · 이름을 다 세우면
+     390px 를 넘어 화면이 옆으로 밀린다. 덜 중요한 것부터 접는다. */
+  @media (max-width: 760px) {
+    .topbar-in { gap: 10px; padding: 0 14px; }
+    .brand { display: none; }
+    .lounge-btn { max-width: 42vw; }
+    .topbar-right .btn-sec { padding: 6px 10px; font-size: 13px; }
+    .who span { display: none; }                /* 이름은 아바타로 충분하다 */
+    .nav-in, .page { padding-left: 14px; padding-right: 14px; }
+  }
+
+  /* 더 좁아지면 '내 서재' 를 접는다. 검색 칸이 먼저다 — 매일 쓰는 쪽이 남는다. */
+  @media (max-width: 560px) {
+    .lounge-btn { max-width: 34vw; font-size: 12px; padding: 6px 9px; }
+    .searchbox { max-width: none; }
+    .topbar-right .btn-sec { display: none; }
+  }
+
   /* ================= 카드 ================= */
 
   .card {
@@ -1069,6 +1087,17 @@
   .adm-seg { margin-left: auto; flex: none; width: auto; }
   .adm-seg button { flex: none; padding: 7px 14px; white-space: nowrap; }
 
+  /* 탭 다섯 개는 휴대폰 폭에 안 들어간다. 줄이지 말고 옆으로 밀어 본다 —
+     글자를 줄이면 무슨 탭인지 알 수 없게 된다. */
+  @media (max-width: 760px) {
+    .adm-seg {
+      margin-left: 0; width: 100%; overflow-x: auto;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .adm-seg::-webkit-scrollbar { display: none; }
+    .adm-head { flex-wrap: wrap; }
+  }
+
   /* 스펙 시트용 .mt 규칙(번호 열 전제)을 관리 화면에서는 되돌린다 */
   .adm .mt { min-width: 0; }
   .adm .mt td:first-child { font-family: var(--font-sans); font-weight: 400; width: auto; }
@@ -1162,7 +1191,10 @@
   .mx-tog[disabled] { opacity: .4; cursor: default; }
 
   /* 필터 배치 */
-  .fcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .fcols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+
+  /* 세 칸을 휴대폰에 나란히 세우면 칩이 칸 밖으로 나간다. 위아래로 쌓는다. */
+  @media (max-width: 760px) { .fcols { grid-template-columns: minmax(0, 1fr); } }
   .fcol { border: 1px solid var(--hair); border-radius: var(--radius-card); padding: 13px; }
   .fcol-h { display: flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 600; }
   .fcol-h span { margin-left: auto; color: var(--mist); font-weight: 400; }

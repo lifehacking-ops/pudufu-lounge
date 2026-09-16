@@ -11,11 +11,23 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const SRC = path.join(ROOT, "lounge-web-prototype.html");
 
+/* 자산 주소에 내용 해시를 붙인다. 없으면 배포한 뒤에도 브라우저가 옛 CSS · JS 를
+   쥐고 있어서, 고친 것이 사용자에게는 며칠 뒤에 도착한다. 파일은 서버가 살아
+   있는 동안 바뀌지 않으므로 한 번만 센다. */
+const crypto = require("crypto");
+const VER = {};
+["lounge.css", "lounge.js", "data-mock.js"].forEach((f) => {
+  try {
+    VER[f] = crypto.createHash("md5").update(fs.readFileSync(path.join(ROOT, "web", "assets", f))).digest("hex").slice(0, 8);
+  } catch (e) { VER[f] = "0"; }
+});
+const asset = (f) => `/assets/${f}?v=${VER[f] || "0"}`;
+
 function shell(keepSwitcher) {
   let html = fs.readFileSync(SRC, "utf8");
 
   // 자산 경로를 서버 기준으로
-  html = html.replace(/(href|src)="web\/assets\//g, '$1="/assets/');
+  html = html.replace(/(href|src)="web\/assets\/([a-z0-9.-]+)"/g, (m, attr, f) => `${attr}="${asset(f)}"`);
 
   /* 역할 전환기는 프로토타입에만 있는 데모 장치다. 앱에서 역할은
      lounge_member 가 정하고 서버가 판정한다 — 브라우저에서 바꿀 수 있으면
@@ -37,7 +49,7 @@ function shell(keepSwitcher) {
 
 function page(data) {
   return shell(!!data.demo).replace(
-    '<script src="/assets/data-mock.js"></script>',
+    `<script src="${asset("data-mock.js")}"></script>`,
     "<script>window.LOUNGE_DATA=" +
       JSON.stringify(data).replace(/</g, "\\u003c") +
       ";</script>"
@@ -51,7 +63,7 @@ function locked() {
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>라운지 · 수강생 전용</title>
-<link rel="stylesheet" href="/assets/lounge.css">
+<link rel="stylesheet" href="${asset("lounge.css")}">
 <style>
   .lock { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
   .lock-in { max-width: 380px; text-align: center; display: grid; gap: 12px; }
@@ -74,7 +86,7 @@ function oops() {
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>라운지 · 잠시 문제가 생겼습니다</title>
-<link rel="stylesheet" href="/assets/lounge.css">
+<link rel="stylesheet" href="${asset("lounge.css")}">
 <style>
   .lock { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
   .lock-in { max-width: 380px; text-align: center; display: grid; gap: 12px; }

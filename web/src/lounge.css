@@ -133,6 +133,12 @@
   button, input, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
   button { cursor: pointer; background: none; border: 0; padding: 0; }
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  /* 입력 칸마다 outline: none 이 붙어 있어 키보드로 들어온 사람은 어디에 서 있는지
+     몰랐다. 마우스 포커스에는 테두리 색 변화로 충분하지만 키보드에는 고리가 필요하다.
+     아래 규칙들보다 뒤에서 이겨야 하므로 !important 로 못 박는다. */
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--brand) !important; outline-offset: 1px;
+  }
 
   /* 작성자 스타일의 display 가 UA 의 hidden{display:none} 을 덮는 것을 막는다 */
   [hidden] { display: none !important; }

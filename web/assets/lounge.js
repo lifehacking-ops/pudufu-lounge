@@ -252,10 +252,20 @@
 
   /* 라운지에 미션 글을 올리는 한 곳. 글쓰기 창과 강의실이 같이 부른다. */
   /* 내가 그 주차에 이미 올린 과제 글 */
+  /* 내가 낸 과제는 피드 묶음 밖에 있을 수 있다 — 150편이 쌓이면 첫 묶음에 없다.
+     서버가 내 것만 따로 보내 주므로 화면에 실린 글보다 그쪽을 먼저 믿는다. */
+  var MY_MISSIONS = (D.myMissions || []).map(function (m) {
+    return { id: m.id, cat: "과제", wk: m.wk, title: m.title, when: m.when,
+             mine: true, mission: m.mission, attach: m.attach && m.attach.length ? m.attach : undefined,
+             reactions: {}, myReact: null, thread: [], views: 0, body: "" };
+  });
+
   function myMissionPost(wk) {
-    return POSTS.filter(function (p) {
+    var inFeed = POSTS.filter(function (p) {
       return p.mine && p.cat === "과제" && p.wk === wk && p.mission;
     })[0];
+    if (inFeed) return inFeed;
+    return MY_MISSIONS.filter(function (p) { return p.wk === wk; })[0];
   }
 
   /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
@@ -275,7 +285,7 @@
         if (attach && attach.length) exist.attach = attach;
         if (r) exist.id = r.id;
       } else {
-        POSTS.unshift({
+        var fresh = {
           id: r ? r.id : undefined,
           cat: "과제", wk: wk,
           author: ME.name, when: "방금", state: "live",
@@ -283,10 +293,15 @@
           reactions: {}, myReact: null, thread: [],
           title: name, body: "", mission: answers,
           attach: attach && attach.length ? attach : undefined
-        });
+        };
+        POSTS.unshift(fresh);
+        MY_MISSIONS.push(fresh);
       }
       render();
       markMissionQuest(wk);
+
+      // 강의실 과제 칸도 같이 고쳐 그린다. 안 그러면 낸 뒤에도 빈 양식이 남는다.
+      mountClassMission();
     }).catch(failed);
   }
 
@@ -1412,6 +1427,8 @@
       body: post.body, mission: answers, attach: ready
     }).then(function (r) {
       if (r) post.id = r.id;
+      // 본문에 적은 주소를 서버가 카드로 폈으면 그것을 그대로 쓴다
+      if (r && r.attach && r.attach.length) post.attach = r.attach;
       POSTS.unshift(post);
 
       // 피드백권이 필요한 카테고리면 여기서 1회 차감된다

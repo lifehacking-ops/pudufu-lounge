@@ -111,7 +111,7 @@ async function createPost(loungeId, userId, input) {
 
     /* 사진은 여러 장 붙는다. 한 장만 받으면 '전후 비교' 같은 글을 쓸 수 없다.
        링크·영상 카드는 성질상 하나다 — 본문에서 처음 나온 주소 하나만 편다. */
-    const files = [].concat(input.attach || []).filter(Boolean).slice(0, ATTACH_MAX);
+    let files = [].concat(input.attach || []).filter(Boolean).slice(0, ATTACH_MAX);
     if (files.length) {
       for (const [i, a] of files.entries()) {
         await client.query(
@@ -132,13 +132,17 @@ async function createPost(loungeId, userId, input) {
         await client.query(
           `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
           [id, card.kind, card.url, card.title || null]);
+        files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
       }
     }
 
     await client.query("COMMIT");
 
     if (cat.pass_required) await spendPass(loungeId, L.course_id, me, id);
-    return { id };
+
+    /* 붙은 첨부를 그대로 돌려준다. 본문에 적은 주소를 서버가 카드로 폈을 때,
+       화면이 그걸 모르면 새로고침 전까지 카드가 안 보인다. */
+    return { id, attach: files };
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;

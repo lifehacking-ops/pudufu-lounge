@@ -127,6 +127,20 @@ const weekSubmit = (loungeId) =>
                   AND p.deleted_at IS NULL
                   AND p.created_at >= now() - interval '7 days') AS submitted`, [loungeId]);
 
+/* 내가 낸 과제는 묶음 밖에 있어도 알아야 한다. 안 그러면 오래전에 낸 주차가
+   '미제출' 로 보이고, 다시 내면 앞의 것이 덮여 사라진다. */
+const myMissions = (loungeId, userId) =>
+  rows(`SELECT p.id, p.week, p.title, p.created_at,
+               (SELECT json_agg(json_build_object('q', a.question, 'a', a.answer) ORDER BY a.seq)
+                  FROM post_answer a WHERE a.post_id = p.id) AS answers,
+               (SELECT json_agg(json_build_object('kind', t.kind, 'url', t.url, 'label', t.label)
+                                 ORDER BY t.sort)
+                  FROM attachment t WHERE t.post_id = p.id) AS attach
+          FROM post p JOIN category c ON c.id = p.category_id
+         WHERE p.lounge_id = $1 AND p.user_id = $2 AND c.name = '과제'
+           AND p.deleted_at IS NULL
+         ORDER BY p.week`, [loungeId, userId]);
+
 /* 남은 글이 더 있는지. 없는데 '더 보기' 가 떠 있으면 눌러 보게 된다. */
 const postCount = (loungeId) =>
   one(`SELECT count(*)::int AS n FROM post WHERE lounge_id = $1 AND deleted_at IS NULL`, [loungeId]);
@@ -200,4 +214,5 @@ const weekFlags = (loungeId) =>
   rows(`SELECT week, published FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
 
 module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
-                   posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit, comments, received, topPosts, weekFlags, PAGE };
+                   posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit,
+                   myMissions, comments, received, topPosts, weekFlags, PAGE };

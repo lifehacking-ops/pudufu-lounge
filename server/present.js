@@ -54,7 +54,8 @@ async function loungeData(loungeId, viewerId) {
       account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
     ]);
 
-  const [submit, totalPosts] = await Promise.all([Q.weekSubmit(loungeId), Q.postCount(loungeId)]);
+  const [submit, totalPosts, mine] = await Promise.all([
+    Q.weekSubmit(loungeId), Q.postCount(loungeId), Q.myMissions(loungeId, viewerId)]);
 
   const [tp7, tp30, tpAll] = await Promise.all([
     Q.topPosts(loungeId, 7), Q.topPosts(loungeId, 30), Q.topPosts(loungeId, null)
@@ -152,7 +153,16 @@ async function loungeData(loungeId, viewerId) {
   const pub = new Map(flags.map((f) => [f.week, f.published]));
   const weeks = [];
   const weekPublished = [];
-  for (let w = 1; w <= course.weeks; w++) {
+
+  /* 주차 수는 강의 정보에서 온다. 그게 비어 있어도 주차·강이 이미 들어와
+     있으면 그것을 믿는다 — 동기화 순서 때문에 강의 목록이 통째로 비면
+     수강생은 강의가 없어진 줄 안다. */
+  const lastWeek = Math.max(
+    Number(course.weeks) || 0,
+    ...(course.weekTitles || []).map((w) => w.week),
+    ...(course.lessons || []).map((l) => l.week), 0);
+
+  for (let w = 1; w <= lastWeek; w++) {
     weeks.push(byWeek.get(w) || `${w}주차`);
     weekPublished.push(pub.has(w) ? pub.get(w) : true);   // 행이 없으면 공개
   }
@@ -218,6 +228,14 @@ async function loungeData(loungeId, viewerId) {
         : { name: "손님", role: "student", lounges: [] };
     })(),
     stats: { students: submit.students, submitted: submit.submitted, posts: totalPosts.n },
+
+    /* 내가 낸 과제. 피드 묶음 밖에 있어도 강의실이 '제출 완료' 를 알아야 한다. */
+    myMissions: mine.map((m) => ({
+      id: m.id, wk: m.week, title: m.title, when: when(m.created_at, now),
+      mission: m.answers || [],
+      attach: (m.attach || []).map((a) => ({ type: a.kind, url: a.url || null,
+                                             title: a.label, label: a.label }))
+    })),
     more: ps.length >= Q.PAGE,   // 더 실을 글이 남았는가
     cursor: ps.length ? { at: ps[ps.length - 1].created_at, id: String(ps[ps.length - 1].id) } : null,
     postIndex: index,            // 스태프에게만. 대시보드와 게시물 관리가 센다

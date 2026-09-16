@@ -310,8 +310,7 @@ INSERT INTO ext_live (course_id, title, starts_at, synced_at) VALUES
 -- 보여주기 위해 같이 둔다.
 INSERT INTO lounge (id, course_id, name, intro) OVERRIDING SYSTEM VALUE VALUES
   (1, 1, '학원마케팅 올인원 강의', '강의를 듣기 전에 여기 먼저 들르는 곳입니다. 과제도, 피드백도, 등록 인증도 이 안에서 끝납니다. 잘 쓴 글보다 자주 들르는 게 중요합니다.'),
-  (2, 2, '올인원 AI', NULL),
-  (3, 3, '전자책 수익화', NULL);
+  (2, 2, '학원마케팅 올인원 강의 (샘플)', NULL);
 
 -- 주차 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.
 INSERT INTO lounge_week (lounge_id, week, published) VALUES
@@ -376,12 +375,10 @@ INSERT INTO lounge_category (lounge_id, category_id, placement, sort, student_ca
   (1, 6, 'more', 2, false, true),
   (2, 1, 'show', 0, true, true),
   (2, 2, 'show', 1, true, true),
-  (2, 5, 'more', 0, true, true),
-  (2, 6, 'more', 1, false, true),
-  (3, 1, 'show', 0, true, true),
-  (3, 4, 'show', 1, true, true),
-  (3, 5, 'show', 2, true, true),
-  (3, 6, 'more', 0, false, true);
+  (2, 4, 'show', 2, true, true),
+  (2, 3, 'more', 0, true, true),
+  (2, 5, 'more', 1, true, true),
+  (2, 6, 'more', 2, false, true);
 
 -- 글. 글쓴이는 user_id 로 판정하고 author_name 으로 표시한다.
 INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body, week, is_pinned, reaction_count, comment_count, view_count, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES

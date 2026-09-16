@@ -41,7 +41,7 @@ window.LOUNGE_DATA = {
     { name: "천유나", cohort: 3, role: "student", wk: 1, lastDays: 0, joined: 1, first: null, paid: true },
 
     { name: "김경원", cohort: 0, role: "instructor", wk: 8, lastDays: 0, joined: 120, first: null, paid: false, lounges: ["academy"] },
-    { name: "프드프 관리자", cohort: 0, role: "admin", wk: 8, lastDays: 0, joined: 400, first: null, paid: false, lounges: ["academy", "ai", "ebook"] }
+    { name: "프드프 관리자", cohort: 0, role: "admin", wk: 8, lastDays: 0, joined: 400, first: null, paid: false, lounges: ["academy", "sample"] }
   ],
 
   posts: [
@@ -348,15 +348,13 @@ window.LOUNGE_DATA = {
   ],
 
   lounges: [
+    /* 실제 서비스와 같은 구성 — 실사용 라운지 하나, 샘플 하나. */
     { id: "academy", name: "학원마케팅 올인원 강의",
       show: ["과제", "콘텐츠 피드백", "등록 인증"],
       more: ["문구 아이디어", "자유", "공지"] },
-    { id: "ai", name: "올인원 AI",
-      show: ["과제", "콘텐츠 피드백"],
-      more: ["자유", "공지"] },
-    { id: "ebook", name: "전자책 수익화",
-      show: ["과제", "등록 인증", "자유"],
-      more: ["공지"] }
+    { id: "sample", name: "학원마케팅 올인원 강의 (샘플)",
+      show: ["과제", "콘텐츠 피드백", "등록 인증"],
+      more: ["문구 아이디어", "자유", "공지"] }
   ],
 
   leaderboard: {

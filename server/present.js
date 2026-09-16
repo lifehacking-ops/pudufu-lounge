@@ -279,8 +279,10 @@ async function loungeData(loungeId, viewerId) {
   };
 }
 
-const KEYS = { 1: "academy", 2: "ai", 3: "ebook" };
-const loungeKey = (id) => KEYS[id] || String(id);
+/* 화면이 쓰는 라운지 열쇠. 양쪽(me.lounges · lounges[].id · lounge.id)이 같은
+   함수를 거치므로 무엇이든 된다. 이름을 박아 두면 라운지가 생기고 없어질 때마다
+   여기를 고쳐야 한다. */
+const loungeKey = (id) => String(id);
 
 /* 저장은 UTC 로 하고 보여줄 때만 한국 시각으로 옮긴다. */
 function liveWhen(at) {

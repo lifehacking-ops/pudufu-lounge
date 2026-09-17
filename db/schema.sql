@@ -189,9 +189,13 @@ CREATE TABLE post (
   updated_at     timestamptz  NOT NULL DEFAULT now(),
   edited_at      timestamptz,
   deleted_at     timestamptz,
-  deleted_by     bigint
+  deleted_by     bigint,
+  client_key     varchar(40)
 );
 COMMENT ON COLUMN post.author_name IS '작성 시점 닉네임 스냅샷';
+COMMENT ON COLUMN post.client_key  IS '화면이 글 한 편에 하나 붙이는 열쇠. 같은 열쇠가 두 번 오면 두 번째는 저장되지 않는다 — 느린 회선에서 게시를 두 번 눌러도 한 편이다';
+-- 같은 열쇠는 한 번만. NULL(열쇠 없는 옛 글 · 서버가 만든 글)은 여럿이어도 된다.
+CREATE UNIQUE INDEX uq_post_client_key ON post (client_key) WHERE client_key IS NOT NULL;
 COMMENT ON COLUMN post.body        IS '평문. 리치 텍스트 아님';
 COMMENT ON COLUMN post.week        IS '과제 글만. 그 외 NULL';
 COMMENT ON COLUMN post.edited_at   IS '사용자가 고친 시각. updated_at 과 다르다';
@@ -259,7 +263,9 @@ CREATE TABLE comment (
   updated_at     timestamptz NOT NULL DEFAULT now(),
   deleted_at     timestamptz,
   deleted_by     bigint
-);
+,
+  client_key     varchar(40));
+CREATE UNIQUE INDEX uq_comment_client_key ON comment (client_key) WHERE client_key IS NOT NULL;
 COMMENT ON COLUMN comment.parent_id IS 'NULL 이면 원댓글';
 
 CREATE INDEX ix_comment_post   ON comment (post_id, created_at) WHERE deleted_at IS NULL;

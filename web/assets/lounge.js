@@ -35,6 +35,28 @@
     });
   }
 
+  /* 보내는 동안 단추를 잠근다. 게시가 느리면 사람은 한 번 더 누르고, 그러면 두 편이
+     올라간다. 잠금은 화면의 일이고, 그래도 두 요청이 떠났을 때는 서버가 하나로 본다. */
+  /* 글 한 편 · 댓글 한 개에 열쇠 하나. 쓰기 시작할 때 만들고 저장되면 버린다.
+     같은 열쇠가 서버에 두 번 가면 서버가 하나로 본다 — 단추 잠금이 새는 경우
+     (느린 회선에서 두 요청이 이미 떠난 경우)까지 막는다. */
+  function newKey() {
+    return "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
+  function busy(btn, label, promise) {
+    if (!btn) return promise;
+    var was = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = label;
+    btn.setAttribute("aria-busy", "true");
+    return promise.finally(function () {
+      btn.disabled = false;
+      btn.textContent = was;
+      btn.removeAttribute("aria-busy");
+    });
+  }
+
   /* 저장이 실패하면 조용히 지나가지 않는다. 화면과 DB 가 어긋난 채로 두면
      무엇이 사실인지 알 수 없게 된다. 그 자리에 알리고 되읽게 한다. */
   function failed(e) {
@@ -276,15 +298,16 @@
   }
 
   /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
-  function publishMission(wk, answers, title, overwrite, attach) {
+  function publishMission(wk, answers, title, overwrite, attach, key) {
     var exist = myMissionPost(wk);
     var name = title || wk + "주차 과제 올립니다";
 
     // 과제는 주차마다 한 편이다. 덮어쓰기는 앞의 것을 지우고 새로 쓴다.
-    send("POST", "/posts", {
+    return send("POST", "/posts", {
       cat: "과제", wk: wk, title: name, body: "", mission: answers,
-      attach: attach || [], overwrite: !!(overwrite && exist)
+      attach: attach || [], overwrite: !!(overwrite && exist), key: key || newKey()
     }).then(function (r) {
+      if (r && r.duplicate && !(overwrite && exist)) return;   // 두 번 누른 것. 이미 올라가 있다
       if (overwrite && exist) {
         exist.mission = answers;
         exist.when = "방금 수정함";
@@ -1092,6 +1115,7 @@
 
   function setComposer(on) {
     if (on && writeLocked()) return;   // 잠긴 사람은 창이 열리지 않는다
+    if (on && !draft.key) draft.key = newKey();
     composer.classList.toggle("open", on);
     rest.hidden = on;
     openBox.hidden = !on;
@@ -1710,10 +1734,14 @@
     var ready = draft.attach.filter(function (a) { return !a.uploading; });
     if (ready.length) post.attach = ready;
 
-    send("POST", "/posts", {
+    if (postBtn.disabled) return;   // 이미 보내는 중이다
+    busy(postBtn, "게시 중…", send("POST", "/posts", {
       cat: post.cat, wk: post.wk || null, title: post.title,
-      body: post.body, mission: answers, attach: ready
-    }).then(function (r) {
+      body: post.body, mission: answers, attach: ready, key: draft.key || newKey()
+    })).then(function (r) {
+      draft.key = null;   // 이 글은 끝났다. 다음 글은 새 열쇠다.
+      // 서버가 같은 글로 봤으면 화면에 두 번 세우지 않는다
+      if (r && r.duplicate) { setComposer(false); return; }
       if (r) post.id = r.id;
       // 본문에 적은 주소를 서버가 카드로 폈으면 그것을 그대로 쓴다
       if (r && r.attach && r.attach.length) post.attach = r.attach;
@@ -2802,10 +2830,12 @@
     });
     field.addEventListener("focus", function () { send.hidden = false; });
 
+    var key = newKey();
     btn.addEventListener("click", function () {
       var t = field.value.trim();
-      if (!t) return;
-      onSend(t);
+      if (!t || btn.disabled) return;
+      var p = onSend(t, key);
+      if (p && p.then) busy(btn, "등록 중…", p.then(function () { key = newKey(); }));
     });
 
     grow.appendChild(field);
@@ -2815,13 +2845,18 @@
   }
 
   function newCommentBox() {
-    return writeBox("댓글 남기기", "댓글 등록", function (text) {
+    return writeBox("댓글 남기기", "댓글 등록", function (text, key) {
       var c = { author: ME.name, when: "방금", text: text, up: 0, replies: [] };
-      send("POST", "/posts/" + openRef.id + "/comments", { body: text })
-        .then(function (r) { if (r) c.id = r.id; }).catch(failed);
-      openRef.thread.push(c);
-      renderComments();
-      render();
+      var ref = openRef;
+      return send("POST", "/posts/" + ref.id + "/comments", { body: text, key: key })
+        .then(function (r) {
+          // 서버가 15초 안의 같은 댓글로 봤으면 두 번 세우지 않는다
+          if (r && r.duplicate) return;
+          if (r) c.id = r.id;
+          ref.thread.push(c);
+          renderComments();
+          render();
+        }).catch(failed);
     }).el;
   }
 
@@ -2829,14 +2864,17 @@
     var open = host.querySelector(".replybox");
     if (open) { host.removeChild(open); return; }
 
-    var w = writeBox(c.author + "님에게 답글", "답글 등록", function (text) {
+    var w = writeBox(c.author + "님에게 답글", "답글 등록", function (text, key) {
       c.replies = c.replies || [];
       var re = { author: ME.name, at: c.author, when: "방금", text: text, up: 0, replies: [] };
-      send("POST", "/posts/" + openRef.id + "/comments", { body: text, parentId: c.id })
-        .then(function (r) { if (r) re.id = r.id; }).catch(failed);
-      c.replies.push(re);
-      renderComments();
-      render();
+      return send("POST", "/posts/" + openRef.id + "/comments", { body: text, parentId: c.id, key: key })
+        .then(function (r) {
+          if (r && r.duplicate) return;
+          if (r) re.id = r.id;
+          c.replies.push(re);
+          renderComments();
+          render();
+        }).catch(failed);
     });
 
     w.el.classList.add("replybox");
@@ -3296,9 +3334,12 @@
     var confirmBox = el("div", "gate cm-confirm");
     confirmBox.hidden = true;
 
+    var cmKey = newKey();   // 이 폼에서 나가는 과제는 한 편이다
     function doSend(overwrite) {
-      publishMission(wk, form.answers(), null, overwrite, cmAtt.value());
+      if (send.disabled) return;
       confirmBox.hidden = true;
+      busy(send, "올리는 중…", publishMission(wk, form.answers(), null, overwrite, cmAtt.value(), cmKey)
+        .then(function () { cmKey = newKey(); }));
     }
 
     send.addEventListener("click", function () {

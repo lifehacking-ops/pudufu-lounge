@@ -91,6 +91,25 @@ async function createPost(loungeId, userId, input) {
 
   if (!input.title || !input.title.trim()) throw new Denied("제목이 없습니다");
 
+  /* 게시가 느리면 사람은 단추를 다시 누른다. 화면이 단추를 잠가도 두 요청이
+     이미 떠났을 수 있다. 같은 사람이 15초 안에 같은 제목 · 본문을 보내면 두 번째는
+     새 글이 아니라 첫 글의 답이다. */
+  const twin = await one(
+    `SELECT id FROM post
+      WHERE lounge_id = $1 AND user_id = $2 AND title = $3 AND coalesce(body, '') = $4
+        AND deleted_at IS NULL AND created_at > now() - interval '15 seconds'
+      ORDER BY id DESC LIMIT 1`,
+    [loungeId, userId, input.title.trim(), input.body || ""]);
+  if (twin) return { id: twin.id, attach: [], duplicate: true };
+
+  /* 화면이 글 한 편에 열쇠 하나를 붙여 보낸다. 같은 열쇠가 동시에 두 번 와도
+     고유 인덱스가 하나만 들여보낸다 — 15초 조회는 둘이 동시에 오면 못 잡는다. */
+  const key = String(input.key || "").slice(0, 40) || null;
+  if (key) {
+    const had = await one(`SELECT id FROM post WHERE client_key = $1`, [key]);
+    if (had) return { id: had.id, attach: [], duplicate: true };
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -105,10 +124,10 @@ async function createPost(loungeId, userId, input) {
     }
 
     const r = await client.query(
-      `INSERT INTO post (lounge_id, category_id, user_id, author_name, title, body, week)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      `INSERT INTO post (lounge_id, category_id, user_id, author_name, title, body, week, client_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [loungeId, cat.id, userId, me.nickname, input.title.trim(),
-       input.body || null, input.wk || null]);
+       input.body || null, input.wk || null, key]);
     const id = r.rows[0].id;
 
     for (const [i, a] of (input.mission || []).entries()) {
@@ -156,6 +175,10 @@ async function createPost(loungeId, userId, input) {
     return { id, attach: files };
   } catch (e) {
     await client.query("ROLLBACK");
+    if (e.code === "23505" && key) {   // 같은 열쇠가 먼저 들어갔다
+      const had = await one(`SELECT id FROM post WHERE client_key = $1`, [key]);
+      if (had) return { id: had.id, attach: [], duplicate: true };
+    }
     throw e;
   } finally {
     client.release();
@@ -216,6 +239,20 @@ async function createComment(loungeId, userId, postId, input) {
   if (!p) throw new Missing();
   if (!input.body || !input.body.trim()) throw new Denied("내용이 없습니다");
 
+  // 같은 댓글이 15초 안에 두 번 오면 하나다. 느린 회선에서 '등록' 을 두 번 누른 것이다.
+  const twin = await one(
+    `SELECT id FROM comment
+      WHERE post_id = $1 AND user_id = $2 AND body = $3
+        AND deleted_at IS NULL AND created_at > now() - interval '15 seconds'
+      ORDER BY id DESC LIMIT 1`, [postId, userId, input.body.trim()]);
+  if (twin) return { id: twin.id, duplicate: true };
+
+  const key = String(input.key || "").slice(0, 40) || null;
+  if (key) {
+    const had = await one(`SELECT id FROM comment WHERE client_key = $1`, [key]);
+    if (had) return { id: had.id, duplicate: true };
+  }
+
   // 답글의 답글은 만들지 않는다. 한 단계에서 멈춘다.
   let parent = null;
   if (input.parentId) {
@@ -226,10 +263,19 @@ async function createComment(loungeId, userId, postId, input) {
     if (parent.parent_id) parent = { id: parent.parent_id };
   }
 
-  const r = await one(
-    `INSERT INTO comment (post_id, parent_id, user_id, author_name, body)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [postId, parent ? parent.id : null, userId, me.nickname, input.body.trim()]);
+  let r;
+  try {
+    r = await one(
+      `INSERT INTO comment (post_id, parent_id, user_id, author_name, body, client_key)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [postId, parent ? parent.id : null, userId, me.nickname, input.body.trim(), key]);
+  } catch (e) {
+    if (e.code === "23505" && key) {   // 같은 열쇠가 동시에 먼저 들어갔다
+      const had = await one(`SELECT id FROM comment WHERE client_key = $1`, [key]);
+      if (had) return { id: had.id, duplicate: true };
+    }
+    throw e;
+  }
 
   await rows(`UPDATE post SET comment_count = comment_count + 1 WHERE id = $1`, [postId]);
   return { id: r.id };

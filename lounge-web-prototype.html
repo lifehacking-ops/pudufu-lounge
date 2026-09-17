@@ -15,15 +15,15 @@
 
     <button type="button" class="lounge-btn" id="loungeBtn" aria-expanded="false">
       <span id="loungeNow">학원마케팅 올인원 강의 라운지</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
 
     <div class="searchbox">
-      <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input type="text" class="search-field" id="searchField" autocomplete="off"
              placeholder="이 라운지에서 글, 강의, 교안, 멤버 검색" aria-label="라운지 통합 검색">
       <button type="button" class="search-x" id="searchClear" hidden aria-label="검색어 지우기">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </div>
 
@@ -33,7 +33,7 @@
       <!-- 세 시점을 바로 비교하기 위한 데모 장치. 실제 제품에는 없다. -->
       <div class="pick">
         <button type="button" class="pick-btn" id="roleBtn" aria-expanded="false">
-          <span id="roleNow">수강생</span><span class="caret" aria-hidden="true">▼</span>
+          <span id="roleNow">수강생</span><span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         </button>
         <div class="pick-menu" id="roleMenu" hidden></div>
       </div>
@@ -115,10 +115,10 @@
               <input type="file" id="fileInput" hidden multiple
                      accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/quicktime">
               <button type="button" class="attach-btn" id="fileBtn" title="파일 첨부" aria-label="파일 첨부">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
               <button type="button" class="attach-btn" id="emojiBtn" title="이모지" aria-label="이모지">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01"/><path d="M15 9.5h.01"/></svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
               </button>
             </div>
 
@@ -126,7 +126,7 @@
 
             <div class="pick">
               <button type="button" class="pick-btn" id="catBtn" aria-expanded="false">
-                <span id="catNow">과제</span><span class="caret" aria-hidden="true">▼</span>
+                <span id="catNow">과제</span><span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
               </button>
               <div class="pick-menu" id="catMenu" hidden></div>
             </div>
@@ -165,7 +165,7 @@
     <!-- 우측 레일 -->
     <aside class="rail">
 
-      <section class="card pad-s" style="display:grid;gap:12px">
+      <section class="card pad-s rail-card">
         <div class="rail-banner" id="railBanner">라운지 배너 자리 · 학원마케팅 올인원 강의</div>
         <h2 class="card-t" id="railName">학원마케팅 올인원 강의 라운지</h2>
         <dl class="stats">
@@ -184,24 +184,24 @@
         </div>
       </section>
 
-      <section class="card pad-s" id="railMission" style="display:grid;gap:12px">
+      <section class="card pad-s rail-card" id="railMission">
         <div class="row">
           <span class="kicker grow">이번 주 과제 · <span class="disp" id="railWk">3</span>주차</span>
           <span class="badge b-none" id="railDone">미제출</span>
         </div>
         <div>
           <h2 class="card-t" id="railMissionT">학부모가 검색하는 말로 블로그 글 한 편 쓰기</h2>
-          <p class="meta" id="railDueLabel" style="margin:5px 0 0">정시 마감까지 · 금 18:00</p>
-          <p class="midnum tnum" id="countdown" style="margin:8px 0 0">--:--:--</p>
+          <p class="meta due-label" id="railDueLabel">정시 마감까지 · 금 18:00</p>
+          <p class="midnum tnum countdown" id="countdown">--:--:--</p>
         </div>
         <div>
           <div class="track"><div class="fill" id="wkFill"></div></div>
-          <p class="meta-m" style="margin:6px 0 0" id="wkSubmit"></p>
+          <p class="meta-m wk-submit" id="wkSubmit"></p>
         </div>
         <button type="button" class="btn-primary sm" id="toCourseBtn">강의 이어보기</button>
       </section>
 
-      <section class="card pad-s" style="display:grid;gap:10px">
+      <section class="card pad-s rail-card">
         <div class="row">
           <span class="kicker grow" id="ribbonHead">8주 완주 현황</span>
           <span class="meta-m" id="ribbonN"><span class="tnum">2</span>/<span class="tnum">8</span></span>
@@ -219,7 +219,7 @@
         <p class="meta-m" id="ribbonSum">정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span> · 남은 주차 <span class="tnum">5</span></p>
       </section>
 
-      <section class="card pad-s" style="display:grid;gap:12px">
+      <section class="card pad-s rail-card">
         <span class="kicker">활동량 리더보드</span>
         <div class="seg" id="lbSeg" role="group" aria-label="리더보드 기간">
           <button type="button" aria-pressed="true" data-lb="7">7일</button>
@@ -245,7 +245,7 @@
 
   <div class="courses" id="courseList"></div>
 
-  <p class="meta-m" style="margin-top:16px">이 프로토타입에서는 <b style="color:var(--ink)">학원마케팅 올인원 강의</b>만 열립니다. 나머지 세 개는 목록에서 어떻게 보이는지 확인용입니다.</p>
+  <p class="meta-m courses-note">이 프로토타입에서는 <b>학원마케팅 올인원 강의</b>만 열립니다. 나머지 세 개는 목록에서 어떻게 보이는지 확인용입니다.</p>
 </div>
 
 <!-- ==================== 강의 상세 ==================== -->
@@ -260,19 +260,19 @@
 
     <!-- 좌측 커리큘럼 -->
     <div class="curric-col">
-      <div class="card pad-s curric" style="display:grid;gap:12px">
+      <div class="card pad-s curric">
         <div>
           <span class="kicker" id="weekKicker">학원마케팅 올인원 강의 · <span class="disp">3</span>주차</span>
-          <h2 class="card-t" style="margin-top:4px" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</h2>
+          <h2 class="card-t week-t" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</h2>
         </div>
 
         <div>
-          <div class="row" style="justify-content:space-between;margin-bottom:7px">
+          <div class="row pct-row">
             <span class="pctpill tnum" id="pctPill">38%</span>
             <span class="meta-m">퀘스트 <span class="tnum" id="qDone">3</span>/<span class="tnum" id="qAll">8</span></span>
           </div>
-          <div class="track"><div class="fill" id="pctFill" style="width:38%"></div></div>
-          <p class="meta-m" style="margin:7px 0 0">재생 시간이 아니라 스스로 체크한 퀘스트가 %를 채웁니다.</p>
+          <div class="track"><div class="fill" id="pctFill"></div></div>
+          <p class="meta-m pct-note">재생 시간이 아니라 스스로 체크한 퀘스트가 %를 채웁니다.</p>
         </div>
 
         <div id="curric"></div>
@@ -281,18 +281,18 @@
 
     <!-- 우측 콘텐츠 -->
     <div class="col">
-      <article class="card pad" style="display:grid;gap:16px">
+      <article class="card pad lesson-card">
         <div class="lessonhead">
-          <div class="grow" style="min-width:0">
+          <div class="grow lesson-head-t">
             <span class="kicker" id="lessonKicker">강의 · <span class="disp">02</span></span>
-            <h1 class="card-t" style="font-size:20px;margin-top:5px" id="lessonTitle">학부모는 블로그에서 무엇을 검색하는가</h1>
+            <h1 class="card-t lesson-t" id="lessonTitle">학부모는 블로그에서 무엇을 검색하는가</h1>
           </div>
           <button type="button" class="chip" id="lessonDone" aria-pressed="false">완료로 표시</button>
         </div>
 
         <div class="video" id="lessonVideo">
           <span>영상 자리 · 4:20</span>
-          <span style="font-size:11px" id="videoCap">학부모는 블로그에서 무엇을 검색하는가</span>
+          <span class="video-cap" id="videoCap">학부모는 블로그에서 무엇을 검색하는가</span>
         </div>
 
         <div class="prose" id="lessonProse">
@@ -373,7 +373,7 @@
 <section class="sheet">
   <div class="sheet-in">
     <h2>이 프로토타입이 무엇을 증명하는가</h2>
-    <p class="lead">기획안 8장의 P1 여덟 개를 <b>학원마케팅 올인원 강의 라운지</b> 하나에 담아 웹 화면으로 옮긴 것입니다. 레이아웃 골격은 Skool 커뮤니티·강의실과 프드프 현재 라운지를, 디자인 토큰과 컴포넌트 규칙은 <code>pudufu.net</code>에서 추출해 따랐습니다. 추출 근거는 저장소의 <code>DESIGN.md</code>에 있습니다.</p>
+    <p class="lead">기획안 8장의 P1 여덟 개를 <b>학원마케팅 올인원 강의 라운지</b> 하나에 담아 웹 화면으로 옮긴 것입니다. 레이아웃 골격은 Skool 커뮤니티·강의실과 프드프 현재 라운지를, 디자인 토큰과 컴포넌트 규칙은 <b>프드프 3.0 디자인 시스템 가이드</b>(색 · Radius · Shadow · Z-index · Breakpoint · Lucide 아이콘)를 따릅니다. 토큰 표는 저장소의 <code>DESIGN.md</code>에 있습니다.</p>
 
     <h3>먼저 라운지를 강의별로 쪼갠다</h3>
     <p class="lead">기획안 7장의 To-be는 &lsquo;강의별로 라운지가 있어야 함&rsquo;입니다. 현재 프드프는 라운지가 하나뿐이라 좌측 사이드바에 모든 강의의 게시판이 섞여 있습니다. 그 사이드바를 없애기 전에 라운지부터 한 주제로 좁혔습니다.</p>
@@ -652,7 +652,7 @@
     <div class="detail-head">
       <span class="t"></span>
       <button type="button" class="detail-x" id="detailClose" aria-label="닫기">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </div>
     <div class="detail-body" id="detailBody"></div>

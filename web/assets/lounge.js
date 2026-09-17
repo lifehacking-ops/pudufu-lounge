@@ -62,9 +62,9 @@
   function failed(e) {
     var box = $("saveError");
     if (!box) {
-      box = el("div", "gate");
+      box = el("div", "gate gate-block");
       box.id = "saveError";
-      box.style.margin = "12px 0";
+      box.dataset.tone = "error";
       document.querySelector(".grid-community").prepend(box);
     }
     box.textContent = "";
@@ -88,6 +88,46 @@
     return n;
   }
 
+  /* 아이콘은 Lucide 정본 경로를 그대로 쓴다(디자인 가이드 8절). 선 굵기 2, 색은 글자색.
+     장식이므로 aria-hidden — 뜻은 감싸는 버튼의 aria-label 이 말한다.
+     라이브러리를 싣지 않는 이유: 쓰는 아이콘이 열둘뿐이고, 파일만 열면 돌아야 한다. */
+  var ICONS = {
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>',
+    "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+    "chevron-left": '<path d="m15 18-6-6 6-6"/>',
+    "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    minus: '<path d="M5 12h14"/>',
+    "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+    "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/>'
+  };
+
+  function icon(name, size) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", size || 16);
+    svg.setAttribute("height", size || 16);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", name === "play" ? "currentColor" : "none");   // 재생만 채운 삼각형
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.innerHTML = ICONS[name];
+    return svg;
+  }
+
+  /* 요소 안에 아이콘 하나를 넣고 그 요소를 돌려준다 */
+  function iconIn(node, name, size) {
+    node.appendChild(icon(name, size));
+    return node;
+  }
+
   function initial(name) { return name.slice(0, 1); }
 
   /* 글이 길어지면 상자가 따라 늘어난다. 손잡이를 잡아끌 일이 없다.
@@ -103,10 +143,7 @@
     var wrap = el("span", "pin");
     wrap.title = "상단 고정";
     wrap.setAttribute("aria-label", "상단 고정");
-    wrap.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 16.5V22"/><path d="M8 3h8l-1.2 6.3 2.7 2.7v1.5H6.5V12l2.7-2.7z"/></svg>';
-    return wrap;
+    return iconIn(wrap, "pin", 13);
   }
 
   /* ================= 역할 · 권한 =================
@@ -683,9 +720,7 @@
   }
 
   function playMark() {
-    var p = el("span", "play");
-    p.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
-    return p;
+    return iconIn(el("span", "play"), "play", 14);
   }
 
   function postItem(p, tk) {
@@ -954,9 +989,7 @@
       chk.type = "button";
       chk.setAttribute("aria-pressed", "false");
       chk.setAttribute("aria-label", text);
-      chk.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-        'stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M20 6 9 17l-5-5"/></svg>';
+      chk.appendChild(icon("check", 12));
 
       chk.addEventListener("click", function () {
         var on = chk.getAttribute("aria-pressed") !== "true";
@@ -1238,7 +1271,7 @@
         var v = document.createElement("video");
         v.src = src; v.muted = true; v.preload = "metadata"; v.playsInline = true;
         t.appendChild(v);
-        t.appendChild(el("span", "att-play", "▶"));
+        t.appendChild(iconIn(el("span", "att-play"), "play", 12));
       } else if (kind === "image" && src) {
         var im = document.createElement("img");
         im.src = src; im.alt = a.name || a.label || "";
@@ -1252,7 +1285,7 @@
       }
       if (a.uploading) t.appendChild(el("span", "att-wait", "올리는 중"));
 
-      var x = el("button", "att-x", "×");
+      var x = iconIn(el("button", "att-x"), "x", 14);
       x.type = "button";
       x.setAttribute("aria-label", (a.name || a.label || "첨부") + " 떼기");
       x.addEventListener("click", function (e) {
@@ -1927,7 +1960,7 @@
         bar.appendChild(pill(key));
       });
 
-      var add = el("button", "react react-add", "+");
+      var add = iconIn(el("button", "react react-add"), "plus", 14);
       add.type = "button";
       add.setAttribute("aria-label", "반응 고르기");
       add.addEventListener("click", function () {
@@ -1989,8 +2022,7 @@
       var b = el("button", "shot-nav shot-" + dir);
       b.type = "button";
       b.setAttribute("aria-label", dir === "prev" ? "이전" : "다음");
-      b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
-        (dir === "prev" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7") + '"/></svg>';
+      b.appendChild(icon(dir === "prev" ? "chevron-left" : "chevron-right", 16));
       b.addEventListener("click", function (e) {
         e.stopPropagation();
         strip.scrollBy({ left: (dir === "prev" ? -1 : 1) * strip.clientWidth * 0.8, behavior: "smooth" });
@@ -2042,7 +2074,7 @@
     var stage = el("div", "viewer-stage");
     v.appendChild(stage);
 
-    var close = el("button", "viewer-x", "×");
+    var close = iconIn(el("button", "viewer-x"), "x", 22);
     close.type = "button";
     close.setAttribute("aria-label", "닫기");
     close.addEventListener("click", closeViewer);
@@ -2055,8 +2087,7 @@
       var b = el("button", "viewer-nav viewer-" + dir);
       b.type = "button";
       b.setAttribute("aria-label", dir === "prev" ? "이전" : "다음");
-      b.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
-        (dir === "prev" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7") + '"/></svg>';
+      b.appendChild(icon(dir === "prev" ? "chevron-left" : "chevron-right", 22));
       b.addEventListener("click", function () { step(dir === "prev" ? -1 : 1); });
       v.appendChild(b);
     });
@@ -2148,7 +2179,7 @@
 
       var hold = el("div", "att-vid");
       hold.appendChild(v);
-      hold.appendChild(el("span", "att-play", "▶"));
+      hold.appendChild(iconIn(el("span", "att-play"), "play", 18));
       box.appendChild(zoom(hold, a, siblings, compact));
       return box;
     }
@@ -2176,7 +2207,7 @@
       var play = el("button", "play");
       play.type = "button";
       play.setAttribute("aria-label", "영상 재생");
-      play.innerHTML = '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+      play.appendChild(icon("play", 19));
       stage.appendChild(play);
       stage.appendChild(el("span", "cap", a.url ? (a.title || "") : "영상 URL 을 넣으면 눌러서 바로 재생됩니다"));
 
@@ -2333,9 +2364,8 @@
 
       /* 수정 · 고정 · 삭제는 케밥 메뉴 안에 둔다. 셋을 늘어놓으면
          조작 버튼이 본문보다 먼저 눈에 든다. */
-      var feedGate = el("div", "gate");
+      var feedGate = el("div", "gate-slot");
       feedGate.hidden = true;
-      feedGate.style.marginTop = "10px";
 
       var menu = postMenu(p, {
         onEdit: function () { openPost(p); editPost(p); },
@@ -2466,9 +2496,8 @@
     if (detailAtt) detailBody.appendChild(detailAtt);
     detailBody.appendChild(reactionBar(p));
 
-    detailGate = el("div", "gate");
+    detailGate = el("div", "gate-slot");
     detailGate.hidden = true;
-    detailGate.style.marginTop = "14px";
     detailBody.appendChild(detailGate);
 
     renderComments();
@@ -2525,7 +2554,7 @@
 
     var now = el("span", null, current);
     btn.appendChild(now);
-    btn.appendChild(el("span", "caret", "▼"));
+    btn.appendChild(iconIn(el("span", "caret"), "chevron-down", 14));
 
     var menu = el("div", "pick-menu cat-pop");
     menu.hidden = true;
@@ -2735,8 +2764,8 @@
       var del = el("button", "del", "삭제");
       del.type = "button";
       del.addEventListener("click", function () {
-        var gate = el("div", "gate");
-        gate.style.marginTop = "8px";
+        var gate = el("div", "gate cmt-gate");
+        gate.dataset.tone = "error";
         gate.appendChild(el("b", null, "이 댓글을 지웁니다."));
         if (!isReply && c.replies && c.replies.length) {
           gate.appendChild(el("span", "muted", "답글 " + c.replies.length + "개도 같이 사라집니다."));
@@ -3031,6 +3060,7 @@
 
     if (watchLocked()) {
       var note = el("div", "gate");
+      note.dataset.tone = "info";
       note.appendChild(el("b", null, "수강 기간이 끝났습니다" + (ME.expiredAt ? " · " + ME.expiredAt : "")));
       note.appendChild(el("span", "muted", "강의는 다시 볼 수 없지만 라운지는 그대로 쓰실 수 있습니다."));
       courseList.appendChild(note);
@@ -3578,7 +3608,7 @@
       pair.appendChild(hi.el);
       row.appendChild(pair);
 
-      var x = el("button", "fmove", "×");
+      var x = iconIn(el("button", "fmove"), "x", 14);
       x.type = "button";
       x.setAttribute("aria-label", n + "번 질문 빼기");
       x.addEventListener("click", function () {
@@ -4008,7 +4038,6 @@
     host.appendChild(tiles);
 
     var grid = el("div", "adm-grid");
-    grid.style.marginTop = "18px";
     var main = el("div", "adm-col"), rail = el("div", "adm-col");
     grid.appendChild(main);
     grid.appendChild(rail);
@@ -4263,8 +4292,7 @@
     var box = el("pre", "digest", text);
     c.appendChild(box);
 
-    var row = el("div", "row");
-    row.style.marginTop = "13px";
+    var row = el("div", "row digest-row");
     row.appendChild(el("span", "sec-note", "카카오가 봇 연결을 막아 자동 발송이 안 됩니다. 복사해서 오픈채팅방에 붙여넣으세요."));
     row.appendChild(el("span", "grow"));
 
@@ -4324,8 +4352,7 @@
   function liveCard() {
     var c = admCard("다음 라이브");
     c.appendChild(el("p", "kicker", LIVE.when + " · D-" + LIVE.days));
-    var t = el("p", "card-t", LIVE.title);
-    t.style.marginTop = "6px";
+    var t = el("p", "card-t live-t");
     c.appendChild(t);
     return c;
   }
@@ -4418,12 +4445,12 @@
             .catch(function (e) { btn.disabled = false; failed(e); });
         }
 
-        var minus = el("button", "fmove", "−");
+        var minus = iconIn(el("button", "fmove"), "minus", 14);
         minus.type = "button";
         minus.setAttribute("aria-label", m.name + " 의 피드백권 한 장 회수");
         minus.addEventListener("click", function () { step(-1, minus); });
 
-        var plus = el("button", "fmove", "+");
+        var plus = iconIn(el("button", "fmove"), "plus", 14);
         plus.type = "button";
         plus.setAttribute("aria-label", m.name + " 에게 피드백권 한 장");
         plus.addEventListener("click", function () { step(1, plus); });
@@ -4465,7 +4492,7 @@
       var btn = el("button", "pick-btn");
       btn.type = "button";
       btn.appendChild(el("span", null, roleLabel(m.role)));
-      btn.appendChild(el("span", "caret", "▼"));
+      btn.appendChild(iconIn(el("span", "caret"), "chevron-down", 14));
       btn.setAttribute("aria-expanded", String(roleRow === i));
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -4544,7 +4571,7 @@
 
     /* 카테고리 × 역할 */
     var c2 = admCard("카테고리별 글쓰기 권한");
-    c2.style.marginTop = "18px";
+    c2.classList.add("adm-next");
     var t2 = admTable(["카테고리"].concat(ROLES.map(function (r) { return r.label; })));
 
     CATEGORIES.forEach(function (cat) {
@@ -4634,7 +4661,7 @@
         var order = ["show", "more", "off"];
         var at = order.indexOf(col.key);
 
-        var left = el("button", "fmove", "←");
+        var left = iconIn(el("button", "fmove"), "arrow-left", 14);
         left.type = "button";
         left.setAttribute("aria-label", name + " 왼쪽으로");
         /* 기본 노출이 상한에 닿으면 더 못 넣는다. 칩 줄이 접히면 필터가 있다는 사실 자체가 안 보인다. */
@@ -4642,7 +4669,7 @@
         left.addEventListener("click", function () { moveTo(name, order[at - 1]); });
         bs.appendChild(left);
 
-        var right = el("button", "fmove", "→");
+        var right = iconIn(el("button", "fmove"), "arrow-right", 14);
         right.type = "button";
         right.setAttribute("aria-label", name + " 오른쪽으로");
         right.disabled = at === order.length - 1;
@@ -4657,14 +4684,13 @@
 
           /* 이름은 미사용 칸에서 고친다. 글은 id 로 이어져 있어 흩어지지 않는다. */
           if (!cat.system) {
-            var ren = el("button", "fmove", "✎");
+            var ren = iconIn(el("button", "fmove"), "pencil", 13);
             ren.type = "button";
             ren.setAttribute("aria-label", name + " 이름 바꾸기");
             ren.addEventListener("click", function () {
               var inp = document.createElement("input");
               inp.className = "adm-find";
               inp.value = name;
-              inp.style.margin = "0";
               item.textContent = "";
               item.appendChild(inp);
               inp.focus();
@@ -4714,6 +4740,7 @@
     if (catDel) {
       var target = catDel;
       var gate = el("div", "gate");
+      gate.dataset.tone = "error";
       gate.appendChild(el("b", null, "\u201c" + target + "\u201d 카테고리를 지웁니다."));
       gate.appendChild(el("span", "muted", "글 0개 · 어느 라운지에서도 쓰지 않습니다. 되돌릴 수 없습니다."));
       gate.appendChild(el("span", "grow"));
@@ -4755,8 +4782,7 @@
     input.setAttribute("aria-label", "새 카테고리 이름");
     form.appendChild(input);
 
-    var row = el("div", "row");
-    row.style.marginTop = "10px";
+    var row = el("div", "row cat-add-row");
     row.appendChild(el("span", "sec-note", "새 카테고리는 모든 역할이 쓸 수 있게 시작합니다. 수강생 관리에서 좁힐 수 있습니다."));
     row.appendChild(el("span", "grow"));
 
@@ -4904,7 +4930,7 @@
     btn.type = "button";
     btn.setAttribute("aria-label", "이 글 관리");
     btn.setAttribute("aria-expanded", "false");
-    btn.textContent = "⋮";
+    btn.appendChild(icon("more", 16));
     wrap.appendChild(btn);
 
     var menu = el("div", "pick-menu kebab-menu");
@@ -4973,6 +4999,7 @@
     var gate = el("div", "gate");
 
     if (m.muted) {
+      gate.dataset.tone = "info";
       gate.appendChild(el("b", null, m.name + " 님의 정지를 풉니다."));
       gate.appendChild(el("span", "muted", m.mutedReason || "사유가 적혀 있지 않습니다"));
       gate.appendChild(el("span", "grow"));
@@ -5046,6 +5073,7 @@
 
   function deleteGate(p, close) {
     var gate = el("div", "gate");
+    gate.dataset.tone = "error";
     gate.appendChild(el("b", null, "이 글을 지웁니다."));
     gate.appendChild(el("span", "muted", "댓글 " + cmtCount(p) + "개도 같이 사라지고 되돌릴 수 없습니다."));
     gate.appendChild(el("span", "grow"));
@@ -5132,9 +5160,8 @@
       var tr = el("tr");
 
       var td0 = el("td");
-      var open = el("button", "qrow-t");
+      var open = el("button", "qrow-t wide");
       open.type = "button";
-      open.style.maxWidth = "380px";
       open.appendChild(mark(p.title, tk));
       open.addEventListener("click", function () { show("community"); openPost(p); });
       td0.appendChild(open);

@@ -67,9 +67,9 @@ function locked() {
 <style>
   .lock { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
   .lock-in { max-width: 380px; text-align: center; display: grid; gap: 12px; }
-  .lock-in h1 { font-size: 19px; margin: 0; }
-  .lock-in p { font-size: 13px; color: var(--slate); margin: 0; line-height: 1.7; }
-  .lock-in a { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--brand); }
+  .lock-in h1 { font-size: var(--text-19); margin: 0; }
+  .lock-in p { font-size: var(--text-13); color: var(--slate); margin: 0; line-height: 1.7; }
+  .lock-in a { display: inline-block; margin-top: var(--sp-6); font-size: var(--text-13); font-weight: 700; color: var(--brand); }
 </style></head>
 <body><div class="lock"><div class="lock-in">
   <h1>수강생만 들어올 수 있는 라운지입니다</h1>
@@ -90,9 +90,9 @@ function oops() {
 <style>
   .lock { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
   .lock-in { max-width: 380px; text-align: center; display: grid; gap: 12px; }
-  .lock-in h1 { font-size: 19px; margin: 0; }
-  .lock-in p { font-size: 13px; color: var(--slate); margin: 0; line-height: 1.7; }
-  .lock-in a { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--brand); }
+  .lock-in h1 { font-size: var(--text-19); margin: 0; }
+  .lock-in p { font-size: var(--text-13); color: var(--slate); margin: 0; line-height: 1.7; }
+  .lock-in a { display: inline-block; margin-top: var(--sp-6); font-size: var(--text-13); font-weight: 700; color: var(--brand); }
 </style></head>
 <body><div class="lock"><div class="lock-in">
   <h1>잠시 문제가 생겼습니다</h1>

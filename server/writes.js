@@ -139,6 +139,7 @@ async function createPost(loungeId, userId, input) {
     /* 사진은 여러 장 붙는다. 한 장만 받으면 '전후 비교' 같은 글을 쓸 수 없다.
        링크·영상 카드는 성질상 하나다 — 본문에서 처음 나온 주소 하나만 편다. */
     let files = [].concat(input.attach || []).filter(Boolean).slice(0, ATTACH_MAX);
+    let pending = null;
     if (files.length) {
       for (const [i, a] of files.entries()) {
         await client.query(
@@ -153,26 +154,18 @@ async function createPost(loungeId, userId, input) {
       const hay = [input.body || ""]
         .concat((input.mission || []).map((a) => a.a || ""))
         .join("\n");
-      const found = firstUrl(hay);
-      if (found) {
-        const card = await unfurl(found);
-        // 내부 주소는 카드로 만들지 않는다. 글에는 글자로만 남는다.
-        if (!card.blocked) {
-          await client.query(
-            `INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
-            [id, card.kind, card.url, card.title || null]);
-          files = [{ type: card.kind, url: card.url, title: card.title, label: card.title }];
-        }
-      }
+      /* 카드는 여기서 펴지 않는다. 남의 서버를 읽는 일은 느릴 수 있고, 그동안 글은
+         이미 저장돼 있는데 화면은 실패로 보였다(게시 30초 · 오류 · 새로고침하면 있음).
+         글은 바로 응답하고, 화면이 attachCard 를 따로 불러 카드를 붙인다. */
+      pending = firstUrl(hay);
     }
 
     await client.query("COMMIT");
 
     if (cat.pass_required) await spendPass(loungeId, L.course_id, me, id);
 
-    /* 붙은 첨부를 그대로 돌려준다. 본문에 적은 주소를 서버가 카드로 폈을 때,
-       화면이 그걸 모르면 새로고침 전까지 카드가 안 보인다. */
-    return { id, attach: files };
+    /* 붙은 첨부를 그대로 돌려준다. card 는 아직 펴지 않은 주소다 — 화면이 이어서 부른다. */
+    return { id, attach: files, card: pending || undefined };
   } catch (e) {
     await client.query("ROLLBACK");
     if (e.code === "23505" && key) {   // 같은 열쇠가 먼저 들어갔다
@@ -453,6 +446,31 @@ async function setRights(loungeId, userId, categoryId, rights) {
     [!!rights.student, !!rights.instructor, loungeId, categoryId]);
   return { ok: true };
 }
+
+/* ---------- 링크 카드 ----------
+   본문에 적힌 주소를 카드(제목 · 설명 · 이미지)로 펴서 글에 붙인다. 글 저장과 다른
+   요청으로 떼어 놓은 이유는 createPost 에 적혀 있다. 첨부가 이미 있는 글에는 붙이지 않는다 —
+   카드는 첨부를 따로 고르지 않은 글에만 편다는 규칙이 createPost 와 같다. */
+async function attachCard(loungeId, userId, postId, url) {
+  const p = await one(
+    `SELECT id, user_id FROM post WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [postId, loungeId]);
+  if (!p) throw new Denied("글이 없습니다");
+  const me = await membership(loungeId, userId);
+  if (!same(p.user_id, userId) && !me.staff) throw new Denied("내 글에만 붙일 수 있습니다");
+
+  const has = await one(`SELECT 1 FROM attachment WHERE post_id = $1 LIMIT 1`, [postId]);
+  if (has) return { attach: [] };
+
+  const found = firstUrl(String(url || ""));
+  if (!found) return { attach: [] };
+  const card = await unfurl(found);
+  if (card.blocked) return { attach: [] };   // 내부 주소. 글에는 글자로만 남는다
+
+  await rows(`INSERT INTO attachment (post_id, kind, url, label) VALUES ($1, $2, $3, $4)`,
+    [postId, card.kind, card.url, card.title || null]);
+  return { attach: [{ type: card.kind, url: card.url, title: card.title, label: card.title }] };
+}
+module.exports.attachCard = attachCard;
 
 module.exports.setRole = setRole;
 module.exports.addCategory = addCategory;

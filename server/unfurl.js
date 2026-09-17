@@ -41,8 +41,20 @@ function isPrivateIp(ip) {
   return false;
 }
 
+/* 이름 풀이에도 시한을 건다. dns.lookup 은 취소가 없어서, 응답 없는 이름 서버를 만나면
+   운영체제 기본값(수십 초)까지 기다린다 — 글 게시가 30초 넘게 걸린 원인이 이것이었다.
+   시한이 지나면 '못 찾음' 으로 본다. 검사를 못 했으니 열지 않는다. */
+function lookupWithin(host, signal) {
+  return new Promise((resolve, reject) => {
+    const bail = () => reject(new Error("주소를 찾는 데 시간이 너무 걸립니다"));
+    if (signal && signal.aborted) return bail();
+    if (signal) signal.addEventListener("abort", bail, { once: true });
+    dns.lookup(host, { all: true, verbatim: true }).then(resolve, () => resolve([]));
+  });
+}
+
 /* 열어도 되는 주소인가. 안 되면 이유를 던진다. */
-async function assertPublic(url) {
+async function assertPublic(url, signal) {
   let u;
   try { u = new URL(url); } catch (e) { throw new Error("주소가 아닙니다"); }
   if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("http(s) 만 엽니다");
@@ -57,7 +69,7 @@ async function assertPublic(url) {
     return u;
   }
   // 이름은 IP 로 풀어서 본다. 하나라도 내부 대역이면 연다고 볼 수 없다.
-  const found = await dns.lookup(host, { all: true, verbatim: true }).catch(() => []);
+  const found = await lookupWithin(host, signal);
   if (!found.length) throw new Error("주소를 찾을 수 없습니다");
   if (found.some((a) => isPrivateIp(a.address))) throw new Error("내부 주소입니다");
   return u;
@@ -70,7 +82,8 @@ const MAX_BYTES = 200000;   // 머리만 읽는다. 본문 전체를 받을 이�
 async function fetchPublic(url, signal) {
   let cur = url;
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
-    await assertPublic(cur).catch((e) => { e.blocked = true; throw e; });
+    // 내부 주소라 거절한 것만 blocked 다. 시한에 걸려 못 본 것은 그냥 실패 — 카드 없이 주소만 남는다.
+    await assertPublic(cur, signal).catch((e) => { if (!/시간/.test(e.message)) e.blocked = true; throw e; });
     const res = await fetch(cur, {
       signal, redirect: "manual",
       headers: { "user-agent": "Mozilla/5.0 (compatible; PudufuLounge/1.0)" }
@@ -126,14 +139,28 @@ const unescape = (s) => !s ? s : s
   .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
   .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&nbsp;/g, " ");
 
+const BUDGET = 6000;   // 남의 서버를 기다리는 시간의 상한. 이름 풀이 · 리다이렉트 · 본문까지 전부 포함
+
 async function unfurl(url) {
   const kind = kindOf(url);
   if (kind !== "link") return { kind, url, title: null, description: null, image: null };
 
+  const plain = { kind: "link", url, title: null, description: null, image: null };
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 6000);   // 남의 서버를 오래 기다리지 않는다
+  const timer = setTimeout(() => ctrl.abort(), BUDGET);
+  /* 어떤 경로로도 BUDGET 을 넘기지 않는다. abort 를 무시하는 단계가 하나라도 있으면
+     (예: 응답 스트림이 멎은 채 열려 있음) 여기서 끊고 주소만 남긴다. */
+  const guard = new Promise((resolve) => setTimeout(() => resolve(plain), BUDGET + 1000));
   try {
-    const got = await fetchPublic(url, ctrl.signal);
+    return await Promise.race([guard, fetchAndParse(url, ctrl.signal, plain)]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchAndParse(url, signal, plain) {
+  try {
+    const got = await fetchPublic(url, signal);
     const res = got.res;
     if (!res.ok) throw new Error(String(res.status));
 
@@ -160,11 +187,9 @@ async function unfurl(url) {
   } catch (e) {
     /* 내부 주소라 열지 않은 것과 남의 서버가 안 열린 것은 다르다.
        앞의 것은 카드로 만들 이유가 없다 — 쓰는 쪽이 blocked 를 보고 건너뛴다. */
-    if (e && e.blocked) return { kind: "link", url, title: null, description: null, image: null, blocked: true };
+    if (e && e.blocked) return Object.assign({}, plain, { blocked: true });
     // 못 읽어도 주소는 살린다. 카드 대신 주소만 보여준다.
-    return { kind: "link", url, title: null, description: null, image: null };
-  } finally {
-    clearTimeout(timer);
+    return plain;
   }
 }
 

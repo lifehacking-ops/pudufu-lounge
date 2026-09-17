@@ -152,6 +152,9 @@ async function handler(req, res) {
         if (req.method === "DELETE" && s[1] === "posts" && s.length === 3)
           return json(res, 200, await writes.deletePost(L, me, +s[2]));
 
+        if (req.method === "POST" && s[1] === "posts" && s[3] === "card")
+          return json(res, 200, await writes.attachCard(L, me, +s[2], input.url));
+
         if (req.method === "POST" && s[1] === "posts" && s[3] === "comments")
           return json(res, 200, await writes.createComment(L, me, +s[2], input));
 

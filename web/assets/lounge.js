@@ -334,6 +334,18 @@
     return MY_MISSIONS.filter(function (p) { return p.wk === wk; })[0];
   }
 
+  /* 글에 적힌 주소를 카드로 편다. 글 저장과 다른 요청이다 — 남의 서버가 느려도
+     글은 이미 올라가 있고, 카드는 도착하면 그 자리에 붙는다. 실패해도 글은 그대로다. */
+  function fetchCard(post, url) {
+    if (!post || !post.id) return;
+    send("POST", "/posts/" + post.id + "/card", { url: url }).then(function (r) {
+      if (!r || !r.attach || !r.attach.length) return;
+      post.attach = r.attach;
+      render();
+      if (openRef === post) openPost(post);
+    }).catch(function () { /* 카드는 있으면 좋은 것이다. 없어도 글은 읽힌다 */ });
+  }
+
   /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
   function publishMission(wk, answers, title, overwrite, attach, key) {
     var exist = myMissionPost(wk);
@@ -364,6 +376,7 @@
         POSTS.unshift(fresh);
         MY_MISSIONS.push(fresh);
       }
+      if (r && r.card) fetchCard(overwrite && exist ? exist : POSTS[0], r.card);
       render();
       markMissionQuest(wk);
 
@@ -1776,9 +1789,10 @@
       // 서버가 같은 글로 봤으면 화면에 두 번 세우지 않는다
       if (r && r.duplicate) { setComposer(false); return; }
       if (r) post.id = r.id;
-      // 본문에 적은 주소를 서버가 카드로 폈으면 그것을 그대로 쓴다
       if (r && r.attach && r.attach.length) post.attach = r.attach;
       POSTS.unshift(post);
+      // 본문에 적은 주소는 글이 선 뒤에 카드로 편다. 게시가 남의 서버를 기다리지 않는다.
+      if (r && r.card) fetchCard(post, r.card);
 
       // 피드백권이 필요한 카테고리면 여기서 1회 차감된다
       if (pass) pass.left -= 1;
@@ -2451,6 +2465,7 @@
     postModal.hidden = true;
     openRef = null;
     document.body.style.overflow = "";
+    remember(true);   // 닫힌 상태로 주소를 고쳐 쓴다. 뒤로가기가 닫은 글을 다시 열지 않게
   }
 
   function openPost(p) {
@@ -2502,6 +2517,7 @@
 
     renderComments();
     postModal.hidden = false;
+    remember();   // 글 하나가 한 걸음. 뒤로가기가 이 글을 닫는다
     document.body.style.overflow = "hidden";
   }
 
@@ -2929,12 +2945,7 @@
     if (e.key === "Escape" && !postModal.hidden) closePost();
   });
 
-  /* ?p=<id> 로 들어오면 그 글을 바로 편다. 케밥의 '링크 복사' 가 만드는 주소다.
-     필터에 걸려 피드에 없더라도 연다 — 받은 사람은 그 글을 보러 온 것이다. */
-  (function openFromUrl() {
-    var want = (location.search.match(/[?&]p=(\d+)/) || [])[1];
-    if (want) openById(want);
-  })();
+  /* ?p=<id> 로 들어오면 그 글을 바로 편다 — 파일 끝의 applyUrl() 이 맡는다. */
 
   /* ================= 리더보드 ================= */
 
@@ -2997,6 +3008,7 @@
     if (which === "admin") renderAdmin();
     if (which === "ranking") renderRanking();
     window.scrollTo(0, 0);
+    remember();
   }
 
   $("tabCommunity").addEventListener("click", function () { show("community"); });
@@ -3470,7 +3482,7 @@
       var b = el("button", null, t.label);
       b.type = "button";
       b.setAttribute("aria-pressed", String(admTab === t.key));
-      b.addEventListener("click", function () { admTab = t.key; roleRow = -1; delRow = -1; catDel = ""; catErr = ""; renderAdmin(); });
+      b.addEventListener("click", function () { admTab = t.key; roleRow = -1; delRow = -1; catDel = ""; catErr = ""; renderAdmin(); remember(); });
       admSeg.appendChild(b);
     });
 
@@ -5226,4 +5238,63 @@
     mountClassMission();
   }
   applyRole(ME.role);
+
+  /* ================= 주소와 뒤로가기 =================
+     탭 전환 · 강의실 · 글 열기는 같은 페이지 안에서 화면을 바꾸는 일이라 브라우저는
+     모른다. 그래서 뒤로가기가 라운지 밖으로 나갔다. 화면이 바뀔 때마다 주소를 남기고,
+     뒤로가기가 오면 그 주소대로 화면을 되돌린다. 새로고침해도 같은 화면이 뜨고,
+     주소를 복사하면 그 화면이 열린다.
+
+       /                 커뮤니티
+       /?t=courses       강의 목록          /?t=lesson&w=3    3주차 강의실
+       /?t=ranking       랭킹               /?t=admin&s=roles  관리 · 수강생 관리
+       …&p=123           그 위에 열린 글
+
+     필터 · 정렬은 주소에 남기지 않는다. 뒤로가기로 필터가 풀리면 오히려 헷갈린다. */
+  var navSilent = false;   // 되돌리는 동안에는 다시 기록하지 않는다
+
+  function urlNow() {
+    var q = [];
+    if (screenNow !== "community") q.push("t=" + screenNow);
+    if (screenNow === "lesson" && viewWk) q.push("w=" + viewWk);
+    if (screenNow === "admin" && admTab) q.push("s=" + admTab);
+    if (openRef && openRef.id) q.push("p=" + openRef.id);
+    return location.pathname + (q.length ? "?" + q.join("&") : "");
+  }
+
+  function remember(replace) {
+    if (navSilent) return;
+    var url = urlNow();
+    if (url === location.pathname + location.search) return;
+    history[replace ? "replaceState" : "pushState"](null, "", url);
+  }
+
+  function applyUrl() {
+    var get = function (k) { return (location.search.match(new RegExp("[?&]" + k + "=([^&]+)")) || [])[1]; };
+    var t = get("t") || "community", w = get("w"), s = get("s"), p = get("p");
+    var known = SCREENS.some(function (sc) { return sc.key === t; });
+    if (!known || (t === "admin" && !can("manage"))) t = "community";
+
+    navSilent = true;
+    try {
+      if (t === "admin" && s) admTab = s;
+      if (t === "lesson") {
+        if (w && courseOf(+w)) openWeek(+w);
+        if (screenNow !== "lesson") show(watchLocked() || !course() ? "courses" : "lesson");
+      } else {
+        show(t);
+      }
+      if (p) {
+        if (!openRef || String(openRef.id) !== String(p)) openById(p);
+      } else if (!postModal.hidden) {
+        closePost();
+      }
+    } finally {
+      navSilent = false;
+    }
+  }
+
+  window.addEventListener("popstate", applyUrl);
+  applyUrl();          // 들어온 주소대로 첫 화면을 세운다 (?p= 딥링크 포함)
+  remember(true);      // 첫 기록은 덮어쓴다. 뒤로가기 한 번에 사이트 밖으로 나가는 것은 그대로다
 })();

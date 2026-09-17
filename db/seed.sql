@@ -352,8 +352,7 @@ INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_
   (1, 25, 'instructor', NULL, now() - interval '120 days', NULL, now(), 8, now()),
   (1, 26, 'admin', NULL, now() - interval '400 days', NULL, now(), 8, now());
 INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at, week) VALUES
-  (2, 26, 'admin', now() - interval '400 days', now(), 1),
-  (3, 26, 'admin', now() - interval '400 days', now(), 1);
+  (2, 26, 'admin', now() - interval '400 days', now(), 1);
 
 -- 카테고리. 전역 풀이다.
 INSERT INTO category (id, name, is_system, pass_required) OVERRIDING SYSTEM VALUE VALUES

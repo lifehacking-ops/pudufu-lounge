@@ -28,8 +28,8 @@ const q = (v) => v == null ? "NULL" : "'" + String(v).replace(/\\/g, "\\\\").rep
 const n = (v) => v == null ? "NULL" : String(v);
 
 /* ---- 방언 ----
-   MySQL 로 되돌릴 일이 생기면 이 세 줄만 바꾸면 된다.
-   시드는 생성물이라 나머지는 자동으로 따라온다. */
+   MariaDB 판은 맨 아래 toMaria() 가 생성물을 통째로 바꾼다 (--mariadb).
+   시드는 생성물이라 데이터는 자동으로 따라온다. */
 const NOW = "now()";
 const back = (n, unit) => `${NOW} - interval '${n} ${unit}'`;
 const fwd  = (n, unit) => `${NOW} + interval '${n} ${unit}'`;
@@ -205,11 +205,14 @@ say(MEMBERS.map((m) => {
   return `  (1, ${uid[m.name]}, ${q(m.role)}, ${n(m.cohort || null)}, ${days(m.joined)}, ${exp}, ${days(m.lastDays)}, ${m.wk}, now())`;
 }).join(",\n") + ";");
 
-// 관리자는 세 라운지를 다 맡는다
+// 관리자는 모든 라운지를 맡는다. 첫 라운지는 위에서 이미 들어갔다.
+// 라운지 수를 여기 다시 적지 않는다 — 라운지를 줄였을 때 없는 라운지에 넣으려다 깨진 적이 있다.
 const admin = MEMBERS.find((m) => m.role === "admin");
-say(`INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at, week) VALUES
-  (2, ${uid[admin.name]}, 'admin', ${days(400)}, now(), 1),
-  (3, ${uid[admin.name]}, 'admin', ${days(400)}, now(), 1);`);
+if (LOUNGES.length > 1) {
+  say("INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at, week) VALUES");
+  say(LOUNGES.slice(1).map((_, i) =>
+    `  (${i + 2}, ${uid[admin.name]}, 'admin', ${days(400)}, now(), 1)`).join(",\n") + ";");
+}
 
 say(`
 -- 카테고리. 전역 풀이다.`);
@@ -349,7 +352,32 @@ UPDATE comment SET
 COMMIT;
 `);
 
-console.log(out.join("\n"));
+/* ---- MariaDB 판 ----
+   node db/make-seed.js --mariadb > db/seed.mariadb.sql
+   생성된 Postgres SQL 을 MariaDB 방언으로 바꾼다. 데이터를 두 벌 쓰지 않는다 —
+   원본은 여전히 data-mock.js 하나고, 방언 차이는 전부 이 함수에 모여 있다.
+   스키마 쪽 차이는 db/schema.mariadb.sql 머리 주석에 있다. */
+const UNIT = { minutes: "MINUTE", hours: "HOUR", days: "DAY" };
+function toMaria(sql) {
+  return sql
+    .replace("SET TIME ZONE 'UTC';", "SET time_zone = '+00:00';")
+    .replace(/^BEGIN;$/m, "START TRANSACTION;")
+    // TRUNCATE … RESTART IDENTITY CASCADE → 외래키 검사를 잠깐 끄고 표마다 TRUNCATE.
+    // MariaDB 의 TRUNCATE 는 AUTO_INCREMENT 도 되돌린다.
+    .replace(/TRUNCATE ([\s\S]*?) RESTART IDENTITY CASCADE;/g, (_, list) =>
+      list.split(",").map((t) => `TRUNCATE TABLE ${t.trim()};`).join("\n"))
+    .replace(/^(TRUNCATE TABLE [\s\S]*?;)(?=\n\n)/m, "SET FOREIGN_KEY_CHECKS = 0;\n$1\nSET FOREIGN_KEY_CHECKS = 1;")
+    .replace(/interval '(\d+) (minutes|hours|days)'/g, (_, k, u) => `INTERVAL ${k} ${UNIT[u]}`)
+    .replace(/date_trunc\('week', now\(\)\)::date/g, "DATE(NOW() - INTERVAL WEEKDAY(NOW()) DAY)")
+    .replace(/ OVERRIDING SYSTEM VALUE/g, "")
+    // id 를 직접 넣어도 AUTO_INCREMENT 는 저절로 그 다음으로 간다. 시퀀스 조정이 없다.
+    .replace(/^-- id 를 직접 넣었으므로 시퀀스를 다음 값으로 옮겨 둔다\.\n(SELECT setval\(.*\n)+/m, "")
+    .replace("-- db/make-seed.js 가 web/assets/data-mock.js 에서 뽑아 만든다. 직접 고치지 말 것.",
+             "-- db/make-seed.js --mariadb 가 web/assets/data-mock.js 에서 뽑아 만든다. 직접 고치지 말 것.\n-- MariaDB 판. 스키마는 db/schema.mariadb.sql.");
+}
+
+const MARIA = process.argv.includes("--mariadb");
+console.log(MARIA ? toMaria(out.join("\n")) : out.join("\n"));
 
 if (capped.length) console.error(`사람 수보다 많아 잘린 반응 ${capped.length}건: ${capped.slice(0,3).join(" · ")}${capped.length>3?" …":""}`);
 console.error(`사람 ${MEMBERS.length} · 글 ${pid} · 댓글 ${cmid} · 반응 ${reactRows.length} · 강 ${LESSONS.length} · 미션 ${mrows.length} · 시청 ${wrows.length}`);

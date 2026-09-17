@@ -7,6 +7,7 @@
     "css": "tailwindcss -i web/src/lounge.css -o web/assets/lounge.css --minify=false",
     "css:watch": "tailwindcss -i web/src/lounge.css -o web/assets/lounge.css --watch",
     "seed": "node db/make-seed.js > db/seed.sql",
+    "seed:mariadb": "node db/make-seed.js --mariadb > db/seed.mariadb.sql",
     "db:reset": "psql -d ${PGDATABASE:-lounge} -q -f db/schema.sql && psql -d ${PGDATABASE:-lounge} -q -f db/seed.sql",
     "db:push": "node -e \"const u=process.env.DATABASE_URL;if(!u){console.error('DATABASE_URL 이 없습니다. .env 를 보세요.');process.exit(1)}console.log('적용할 곳:', u.replace(/:[^:@]*@/, ':****@'))\" && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f db/schema.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f db/seed.sql && echo \"스키마와 시드 적용 완료\""
   },

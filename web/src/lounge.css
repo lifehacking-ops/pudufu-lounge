@@ -1559,6 +1559,8 @@
 
   .att-file { height: 100%; display: grid; align-content: center; justify-items: center; gap: 4px; padding: 8px; text-align: center; }
   .att-file b { font-size: var(--text-xs); color: var(--brand); letter-spacing: .02em; }
+  /* 주소 카드의 미리보기. 파일과 같은 칸에 서지만 배경을 살짝 파랗게 — 올린 것이 아니라 적은 것이다 */
+  .att-bm { background: var(--brand-lighter); }
   .att-file span {
     font-size: var(--text-2xs); line-height: 1.35; color: var(--slate); overflow-wrap: anywhere;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

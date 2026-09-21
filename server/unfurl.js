@@ -121,10 +121,30 @@ function kindOf(url) {
 }
 
 /* 첫 번째 주소만 본다. 글 하나에 카드 하나면 충분하고,
-   여러 개를 붙이면 본문이 카드에 묻힌다. */
+   여러 개를 붙이면 본문이 카드에 묻힌다.
+
+   http(s):// 가 없어도 찾는다 — 사람은 "open.kakao.com/o/abc" 라고 적고, 주소창에서
+   복사해도 스킴이 빠져 오는 브라우저가 있다. 대신 점이 든 낱말이 다 주소는 아니다.
+   report.pdf · lounge.js 같은 파일 이름은 건너뛰고, 이메일(a@b.com)의 뒷부분도 잡지 않는다.
+   web/assets/lounge.js 의 firstUrl 이 같은 규칙을 화면에서 쓴다 — 둘을 같이 고친다. */
+const URL_RE = /https?:\/\/[^\s<>"']+|(?<![\w@.\/])(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?(?:\/[^\s<>"']*)?/gi;
+const FILE_EXT = new Set(["pdf", "jpg", "jpeg", "png", "gif", "webp", "mp4", "mov", "webm", "txt", "doc", "docx",
+  "xls", "xlsx", "ppt", "pptx", "hwp", "zip", "js", "css", "json", "csv", "md", "exe", "dmg", "html", "htm"]);
+
 function firstUrl(text) {
-  const m = String(text || "").match(/https?:\/\/[^\s<>"']+/);
-  return m ? m[0].replace(/[.,;:)\]]+$/, "") : null;
+  const s = String(text || "");
+  URL_RE.lastIndex = 0;
+  let m;
+  while ((m = URL_RE.exec(s))) {
+    let u = m[0].replace(/[.,;:)\]]+$/, "");
+    if (!/^https?:\/\//i.test(u)) {
+      const tld = u.split(/[/:]/)[0].split(".").pop().toLowerCase();
+      if (FILE_EXT.has(tld)) continue;
+      u = "https://" + u;
+    }
+    return u;
+  }
+  return null;
 }
 
 const pick = (html, ...res) => {

@@ -89,6 +89,18 @@ async function handler(req, res) {
       return json(res, 200, await present.postPage(config.loungeId, viewer(req), before));
     }
 
+    /* 글을 쓰는 동안 주소를 카드로 미리 보여 준다. 저장은 하지 않는다 —
+       게시할 때 화면이 이 카드를 첨부로 같이 보낸다. */
+    if (p === "/l/unfurl" && req.method === "GET") {
+      if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });
+      const U = require("./unfurl");
+      const found = U.firstUrl(url.searchParams.get("url") || "");
+      if (!found) return json(res, 200, {});
+      const card = await U.unfurl(found);
+      if (card.blocked) return json(res, 200, {});
+      return json(res, 200, { type: card.kind, url: card.url, title: card.title, label: card.title });
+    }
+
     /* 검색. 화면에 실린 묶음만 뒤지면 30편 밖은 없는 것이 된다. */
     if (p === "/l/search" && req.method === "GET") {
       if (!(await allowed(req))) return json(res, 403, { error: "이 라운지의 멤버가 아닙니다" });

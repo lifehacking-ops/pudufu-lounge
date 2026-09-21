@@ -1095,8 +1095,11 @@
       ta2.setAttribute("aria-label", "라운지 소개글");
       box.appendChild(ta2);
 
-      /* 글쓰기 창과 같은 첨부 줄. 주소를 그냥 적어도 카드가 된다. */
-      var att = attachRow(((D.lounge && D.lounge.attach) || []).slice(), { zone: box });
+      /* 글쓰기 창과 같은 첨부 줄. 주소를 그냥 적어도 카드가 된다 — 쓰는 동안 바로. */
+      var attList = ((D.lounge && D.lounge.attach) || []).slice();
+      var att = attachRow(attList, { zone: box, onRemove: function (a) { introLinks.removed(a); } });
+      var introLinks = linkWatch(function () { return ta2.value; }, att, attList);
+      ta2.addEventListener("input", introLinks.poke);
       box.appendChild(att.el);
 
       /* 할 일은 한 줄에 하나로 적는다. 칸을 다섯 개 세워 두면 다섯 개를
@@ -1198,6 +1201,7 @@
     autoGrow(ta);
     if (missionForm) missionForm.clear();
     composerAtt.clear();
+    composerLinks.reset();
     draft.cat = DEFAULT_CAT;
     draft.wk = CURRENT_WK;
     syncComposer();
@@ -1205,7 +1209,7 @@
     setComposer(false);
   });
 
-  ta.addEventListener("input", function () { autoGrow(ta); updatePostBtn(); });
+  ta.addEventListener("input", function () { autoGrow(ta); updatePostBtn(); composerLinks.poke(); });
   wTitle.addEventListener("input", updatePostBtn);
 
   /* ----- 파일 첨부 -----
@@ -1292,6 +1296,12 @@
         var im = document.createElement("img");
         im.src = src; im.alt = a.name || a.label || "";
         t.appendChild(im);
+      } else if (kind === "link" && !a.name && !/\.pdf(\?|$)/i.test(a.url || "")) {
+        // 본문에 적은 주소의 카드. 제목이 오기 전에는 사이트 이름으로 선다.
+        var bm = el("div", "att-file att-bm");
+        bm.appendChild(el("b", null, "링크"));
+        bm.appendChild(el("span", null, a.title || a.label || hostOf(a.url)));
+        t.appendChild(bm);
       } else {
         var f = el("div", "att-file");
         var name = a.name || a.label || a.url || "파일";
@@ -1300,6 +1310,7 @@
         t.appendChild(f);
       }
       if (a.uploading) t.appendChild(el("span", "att-wait", "올리는 중"));
+      if (a.loading) t.appendChild(el("span", "att-wait", "불러오는 중"));
 
       var x = iconIn(el("button", "att-x"), "x", 14);
       x.type = "button";
@@ -1309,6 +1320,7 @@
         if (a.preview) URL.revokeObjectURL(a.preview);
         list.splice(i, 1);
         paint();
+        if (opts.onRemove) opts.onRemove(a);
         if (opts.onChange) opts.onChange();
       });
       t.appendChild(x);
@@ -1408,7 +1420,76 @@
         list.length = 0;
         paint();
       },
-      value: function () { return list.filter(function (a) { return !a.uploading; }); }
+      value: function () { return list.filter(function (a) { return !a.uploading && !a.loading; }); }
+    };
+  }
+
+  /* ---- 글 속의 주소 → 카드 ----
+     서버 unfurl.js 의 firstUrl 과 같은 규칙이다. http(s):// 가 없어도 찾고,
+     report.pdf 같은 파일 이름과 이메일 뒷부분은 건너뛴다. 둘을 같이 고친다. */
+  var URL_RE = /https?:\/\/[^\s<>"']+|(?<![\w@.\/])(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?(?:\/[^\s<>"']*)?/gi;
+  var FILE_EXT = { pdf: 1, jpg: 1, jpeg: 1, png: 1, gif: 1, webp: 1, mp4: 1, mov: 1, webm: 1, txt: 1, doc: 1, docx: 1,
+    xls: 1, xlsx: 1, ppt: 1, pptx: 1, hwp: 1, zip: 1, js: 1, css: 1, json: 1, csv: 1, md: 1, exe: 1, dmg: 1, html: 1, htm: 1 };
+
+  function firstUrl(text) {
+    var s = String(text || ""), m;
+    URL_RE.lastIndex = 0;
+    while ((m = URL_RE.exec(s))) {
+      var u = m[0].replace(/[.,;:)\]]+$/, "");
+      if (!/^https?:\/\//i.test(u)) {
+        var tld = u.split(/[/:]/)[0].split(".").pop().toLowerCase();
+        if (FILE_EXT[tld]) continue;
+        u = "https://" + u;
+      }
+      return u;
+    }
+    return null;
+  }
+
+  function hostOf(url) {
+    var m = String(url || "").match(/^https?:\/\/([^\/:?#]+)/i);
+    return m ? m[1].replace(/^www\./, "") : String(url || "");
+  }
+
+  /* 쓰는 동안 주소가 보이면 첨부 줄에 카드를 세운다. 사진을 붙이면 바로 썸네일이
+     서듯, 주소를 적으면 카드가 선다 — 게시하고 나서야 카드가 나타나면 무엇이 붙는지
+     모르고 올리는 것이다. 카드는 auto 표시로 첨부 목록에 들어가고, 주소를 지우면
+     같이 사라진다. 사람이 × 로 뗀 주소는 다시 세우지 않는다. */
+  function linkWatch(getText, att, list) {
+    var timer = null, dismissed = null, lastUrl = null;
+
+    function autoItem() { return list.filter(function (a) { return a.auto; })[0]; }
+    function drop() { var a = autoItem(); if (a) { list.splice(list.indexOf(a), 1); att.paint(); } }
+
+    function check() {
+      var url = firstUrl(getText());
+      if (url === lastUrl) return;
+      lastUrl = url;
+      drop();
+      if (!url || url === dismissed) return;
+      // 이미 붙어 있는 카드(저장된 글을 다시 여는 경우)와 같은 주소면 하나 더 세우지 않는다
+      if (list.some(function (a) { return a.type === "link" && (a.url === url || a.src === url); })) return;
+
+      var slot = { type: "link", url: url, src: url, title: hostOf(url), label: hostOf(url), auto: true, loading: !!API };
+      list.push(slot);
+      att.paint();
+      if (!API) return;   // 프로토타입은 서버가 없다. 사이트 이름으로 선다
+
+      send("GET", "/unfurl?url=" + encodeURIComponent(url)).then(function (c) {
+        var i = list.indexOf(slot);
+        if (i < 0) return;                                      // 기다리는 동안 뗐거나 주소가 바뀌었다
+        if (!c || !c.url) { list.splice(i, 1); att.paint(); return; }   // 내부 주소 등, 카드를 만들지 않는 것
+        list[i] = { type: c.type, url: c.url, src: url, title: c.title || hostOf(c.url), label: c.title || hostOf(c.url), auto: true };
+        att.paint();
+      }).catch(function () {
+        if (list.indexOf(slot) > -1) { slot.loading = false; att.paint(); }   // 제목은 못 얻었지만 카드는 선다
+      });
+    }
+
+    return {
+      poke: function () { clearTimeout(timer); timer = setTimeout(check, 600); },
+      reset: function () { clearTimeout(timer); lastUrl = null; dismissed = null; },
+      removed: function (a) { if (a && a.auto) dismissed = a.src || a.url; }
     };
   }
 
@@ -1432,12 +1513,20 @@
   var composerAtt = attachRow(draft.attach, {
     input: fileInput, button: fileBtn, zone: composer,
     onChange: updatePostBtn,
+    onRemove: function (a) { composerLinks.removed(a); },
     onDrop: function () { setComposer(true); }
   });
   (function () {
     var foot = composer.querySelector(".composer-foot");
     if (foot) foot.parentNode.insertBefore(composerAtt.el, foot);
   })();
+
+  // 본문과 과제 답변 어디에 적은 주소든 카드가 된다 — 게시할 때 서버가 훑는 범위와 같다
+  var composerLinks = linkWatch(function () {
+    var parts = [ta.hidden ? "" : ta.value];
+    if (missionForm) parts = parts.concat(missionForm.answers().map(function (a) { return a.a; }));
+    return parts.join("\n");
+  }, composerAtt, draft.attach);
 
   function syncComposer() { paintCat(); syncWkLine(); syncGate(); syncMission(); }
 
@@ -1723,7 +1812,7 @@
     }
 
     if (!missionForm || missionForm.wk !== cur.wk) {
-      missionForm = buildMissionForm(cur.wk, { onChange: updatePostBtn, headless: true });
+      missionForm = buildMissionForm(cur.wk, { onChange: function () { updatePostBtn(); composerLinks.poke(); }, headless: true });
       missionBox.textContent = "";
       missionBox.appendChild(missionForm.el);
     }
@@ -1804,6 +1893,7 @@
       ta.value = "";
       autoGrow(ta);
       composerAtt.clear();
+      composerLinks.reset();
       if (missionForm) missionForm.clear();
       draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
       draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
@@ -3365,7 +3455,8 @@
 
     var form = buildMissionForm(wk, {
       headless: true,
-      onChange: function (done) { send.disabled = !done; }
+      // cmLinks 는 아래에서 만든다. 그 전에 fill() 이 한 번 부르므로 있을 때만
+      onChange: function (done) { send.disabled = !done; if (cmLinks) cmLinks.poke(); }
     });
 
     // 이미 제출했다면 그때 쓴 답변을 그대로 불러온다
@@ -3374,7 +3465,12 @@
     /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많고,
        전후 비교처럼 두 장이 있어야 말이 되는 것도 있다. 이미 낸 과제의 파일은
        그대로 이어 받는다. */
-    var cmAtt = attachRow(posted && posted.attach ? posted.attach.slice() : []);
+    var cmList = posted && posted.attach ? posted.attach.slice() : [];
+    var cmAtt = attachRow(cmList, { onRemove: function (a) { cmLinks.removed(a); } });
+    // 답변에 적은 주소도 글쓰기 창과 똑같이 카드가 된다
+    var cmLinks = linkWatch(function () {
+      return form.answers().map(function (a) { return a.a; }).join("\n");
+    }, cmAtt, cmList);
 
     var confirmBox = el("div", "gate cm-confirm");
     confirmBox.hidden = true;

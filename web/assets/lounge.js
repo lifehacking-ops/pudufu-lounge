@@ -3244,7 +3244,7 @@
     renderSecMenu(sc);
   }
 
-  /* 전체 목차 드롭다운. 섹션 머리를 누르면 섹션 전부와 그 아래 레슨 전부가 내려온다.
+  /* 전체 목차 드롭다운. 챕터 · 레슨 제목 · 시청 여부만 — % 와 길이는 두지 않는다.
      레슨 줄 → 그 레슨. 섹션 줄 → 그 섹션의 첫 레슨. 관리자는 비공개 섹션도 본다. */
   function renderSecMenu(cur) {
     if (!secPick) return;
@@ -3254,14 +3254,13 @@
     menu.hidden = true;
     menu.setAttribute("role", "menu");
     shownSections().forEach(function (sc) {
-      var p = pctOf(sc);
       var sb = el("button", "sec");
       sb.type = "button";
       sb.setAttribute("role", "menuitem");
       sb.setAttribute("aria-current", String(sc === cur));
       sb.appendChild(el("span", "n disp", String(sc.seq)));
       sb.appendChild(el("span", "t", sc.title));
-      sb.appendChild(el("span", "p tnum", sc.published ? p.value + "%" : "비공개"));
+      if (!sc.published) sb.appendChild(el("span", "p", "비공개"));
       sb.addEventListener("click", function (e) { e.stopPropagation(); closePicks(); openLesson(sc.id); });
       menu.appendChild(sb);
       sc.lessons.forEach(function (l) {
@@ -3271,7 +3270,6 @@
         lb.setAttribute("aria-current", String(l === viewLesson));
         lb.appendChild(stateIcon(l));
         lb.appendChild(el("span", "t", l.title));
-        lb.appendChild(el("span", "d tnum", l.durationSec ? mmss(l.durationSec) : "교안"));
         lb.addEventListener("click", function (e) { e.stopPropagation(); closePicks(); openLesson(sc.id, l.id); });
         menu.appendChild(lb);
       });

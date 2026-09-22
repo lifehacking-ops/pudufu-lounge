@@ -1694,7 +1694,6 @@
   .sec-menu .sec[aria-current="true"] .p { color: var(--brand); }
   .sec-menu .les { padding-left: calc(var(--sp-11) + 22px); }
   .sec-menu .les .lstate { margin-top: 1px; }
-  .sec-menu .les .d { flex: none; font-family: var(--font-display); font-size: var(--text-11); color: var(--mist); padding-top: 2px; }
   .sec-menu .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .sec-menu .les[aria-current="true"] { color: var(--brand); font-weight: 700; }
   .pct-row { justify-content: flex-end; margin-bottom: var(--sp-7); }   /* 진도 % 는 막대 오른쪽 위 */

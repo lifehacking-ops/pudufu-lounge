@@ -241,7 +241,7 @@ say(lcrows.join(",\n") + ";");
 say(`
 -- 레슨의 과제. 관리자가 붙인 것. 질문 양식은 통째로 jsonb. id 는 목업 순서와 같다.`);
 say("INSERT INTO lesson_task (id, lounge_id, lesson_id, seq, title, questions) OVERRIDING SYSTEM VALUE VALUES");
-say(TASKS.map((t, i) => `  (${i + 1}, 1, ${t.lessonId}, 1, ${q(t.title)}, ${q(JSON.stringify(t.qs))})`).join(",\n") + ";");
+say(TASKS.map((t, i) => `  (${i + 1}, 1, ${t.lessonId}, ${t.seq || 1}, ${q(t.title)}, ${q(JSON.stringify(t.qs))})`).join(",\n") + ";");
 
 say(`
 -- 레슨의 자료. 파일 또는 링크.`);

@@ -3084,7 +3084,7 @@
      레슨을 누르면 그 아래로 과제 · 자료가 내려온다. 진도는 시청에서 나온다 — 체크하는 것이 없다. */
 
   var curric = $("curric"), courseList = $("courseList");
-  var pctPill = $("pctPill"), pctFill = $("pctFill"), qDone = $("qDone"), qAll = $("qAll");
+  var pctPill = $("pctPill"), pctFill = $("pctFill");
   var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle");
   var crumbCur = $("crumbCur"), weekTitle = $("weekTitle");
   var secPick = $("secPick"), secHeadBtn = $("secHeadBtn"), secHeadN = $("secHeadN");
@@ -3295,8 +3295,6 @@
     var p = pctOf(sc);
     pctPill.textContent = p.value + "%";
     pctFill.style.width = p.value + "%";
-    qDone.textContent = String(p.done);
-    qAll.textContent = String(p.all);
     renderCourseList();
   }
 
@@ -3507,11 +3505,29 @@
     tlBox.open = false;
   }
 
-  /* 교안 토글. 기본은 접힘. 모든 레슨에 자리가 있다. */
+  /* 글 속의 12:30 같은 시각을 눌러 이동하는 단추로 바꿔 넣는다. 영상이 없으면 글자 그대로. */
+  function withStamps(target, text, l) {
+    var re = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g, at = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > at) target.appendChild(document.createTextNode(text.slice(at, m.index)));
+      var sec = parseStamp(m[0]);
+      if (sec == null || !l.videoUrl) target.appendChild(document.createTextNode(m[0]));
+      else {
+        var b = el("button", "tl-tok", m[0]);
+        b.type = "button";
+        b.addEventListener("click", (function (x) { return function () { seekTo(x); }; })(sec));
+        target.appendChild(b);
+      }
+      at = m.index + m[0].length;
+    }
+    if (at < text.length) target.appendChild(document.createTextNode(text.slice(at)));
+  }
+
+  /* 교안 토글. 기본은 접힘. 모든 레슨에 자리가 있다. 교안 속 시각은 눌러서 그 시각으로. */
   function renderDoc(l) {
     proseEl.textContent = "";
     if (!l.doc) proseEl.appendChild(el("p", "tog-empty", "이 레슨의 교안은 아직 없습니다."));
-    else String(l.doc).split(/\n{2,}/).forEach(function (para) { proseEl.appendChild(el("p", null, para)); });
+    else String(l.doc).split(/\n{2,}/).forEach(function (para) { var pe = el("p"); withStamps(pe, para, l); proseEl.appendChild(pe); });
     docBox.open = false;
   }
 

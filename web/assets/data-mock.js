@@ -217,7 +217,7 @@ window.LOUNGE_DATA = {
     { section: 1, t: "우리 학원의 주인공은 누구인가", durationSec: 310, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "주인공 학생 한 명을 정하는 레슨입니다. 안 받을 학생을 먼저 말해 보면 주인공이 선명해집니다. 고객 정의는 1:43 부터, 과제 안내는 3:26 에 있습니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 103, label: "고객 정의" }, { t: 206, label: "정리 · 다음 레슨 예고" }],
-      doc: "여러분 학원의 주인공은 어떤 아이입니까. 그리고 뒤집어서, 안 받을 학생을 말할 수 있습니까. 학생을 정하면 학부모도 정해집니다. 그 학부모가 밤에 무엇을 검색하고, 상담 전화에서 무엇을 차마 못 묻는지까지 따라옵니다." },
+      doc: "여러분 학원의 주인공은 어떤 아이입니까. 그리고 뒤집어서, 안 받을 학생을 말할 수 있습니까. 학생을 정하면 학부모도 정해집니다(1:43). 그 학부모가 밤에 무엇을 검색하고, 상담 전화에서 무엇을 차마 못 묻는지까지 따라옵니다. 과제 안내는 3:26 부터입니다." },
 
     { section: 1, t: "옆 학원은 뭐라고 말하고 있는가", durationSec: 270, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "동네 학원 다섯 곳의 소개글을 나란히 놓고 빈자리를 찾습니다. 비교표 만드는 법은 1:30 부터입니다.",
@@ -227,7 +227,7 @@ window.LOUNGE_DATA = {
     { section: 1, t: "학원 소개 6문장 쓰기", durationSec: 380, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "1주차의 결론입니다. 여섯 문장 공식(2:06)을 따라 우리 학원 소개를 씁니다. 문장별 예시는 4:13 부터 보세요.",
       timeline: [{ t: 0, label: "인트로" }, { t: 126, label: "여섯 문장 공식" }, { t: 253, label: "문장별 예시" }],
-      doc: "타겟 선언, 진짜 문제, 우리의 방법, 증거, 차별점 한 방, 다음 행동 제안. 여섯 문장이 전부 주인공 정의에서 흘러나옵니다. 이 여섯 문장이 이후 블로그와 인스타와 상담 멘트의 기초가 됩니다." },
+      doc: "타겟 선언, 진짜 문제, 우리의 방법, 증거, 차별점 한 방, 다음 행동 제안(2:06). 여섯 문장이 전부 주인공 정의에서 흘러나옵니다. 문장별 예시는 4:13 부터. 이 여섯 문장이 이후 블로그와 인스타와 상담 멘트의 기초가 됩니다." },
 
     { section: 2, t: "학부모는 어떤 경로로 학원을 찾는가", durationSec: 255, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "소개받은 학부모도 등록 전에 검색합니다. 플레이스에서 리뷰, 블로그, 문의로 이어지는 여정을 1:25 부터 단계별로 봅니다.",
@@ -252,7 +252,7 @@ window.LOUNGE_DATA = {
     { section: 3, t: "콘텐츠 5기둥 — 올리는 모든 것의 분류함", durationSec: 245, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "올릴 글을 다섯 기둥으로 분류하는 기준을 배웁니다. 다섯 기둥 설명은 1:21, 실제 글 분류 연습은 2:43 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 81, label: "다섯 기둥" }, { t: 163, label: "분류 연습" }],
-      doc: "전문가로 실력을 증명하고, 철학으로 왜 이렇게 가르치는지 말하고, 증거로 변화 사례와 후기를 쌓고, 신뢰로 일상과 사람 냄새를 내고, 상품으로 모집과 안내를 합니다. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다." },
+      doc: "다섯 기둥(1:21) — 전문가로 실력을 증명하고, 철학으로 왜 이렇게 가르치는지 말하고, 증거로 변화 사례와 후기를 쌓고, 신뢰로 일상과 사람 냄새를 내고, 상품으로 모집과 안내를 합니다. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다." },
 
     { section: 4, t: "학부모는 3초 안에 판단한다", durationSec: 230, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "인스타 프로필 첫 화면에서 학부모가 보는 네 가지. 프로필 점검은 1:16 부터 따라 하세요.",
@@ -371,7 +371,16 @@ window.LOUNGE_DATA = {
         { q: "오늘 하루 원장님을 거쳐 간 결정을 세 개 적어보세요.", hint: "출결 확인, 학부모 답장, 강사 질문, 교재 주문" },
         { q: "그중 다른 사람이 결정해도 되는 것은 무엇인가요?", hint: "1차 판단은 중간 관리자가, 원장에게는 걸러진 것만" },
         { q: "우리 학원 원칙 세 개를 적어보세요.", hint: "결석 대응 · 보강 규정 · 컴플레인 1차 응대 · 환불 중에서" }
-      ] }
+      ] },
+    { section: 3, lesson: 8, title: "내 글 다섯 개를 5기둥으로 분류하기",
+      qs: [
+        { q: "최근 올린 글 다섯 개를 전문가 · 철학 · 증거 · 신뢰 · 상품 중 어디에 넣나요?", hint: "예: 1) 증거 2) 상품 3) 상품 4) 신뢰 5) 어디에도 안 들어감" },
+        { q: "비어 있는 기둥은 무엇이고, 다음 글은 어느 기둥으로 쓰나요?", hint: "예: 철학이 비어 있어서 '왜 숙제를 적게 내는가' 를 씁니다" }
+      ] },
+    { section: 3, lesson: 8, title: "이번 주 올릴 글 3편 제목 정하기",
+      qs: [
+        { q: "학부모가 밤에 검색할 말로 제목 세 개를 적어보세요.", hint: "예: 초4 수학 포기, 언제부터 학원 보내야 할까" }
+      ] },
   ],
 
   /* 자료. 파일 또는 링크. 레슨 번호(1부터)로 가리킨다. */
@@ -379,7 +388,9 @@ window.LOUNGE_DATA = {
     { lesson: 3, kind: "file", url: "https://example.com/files/intro-6-sentences.pdf", label: "학원 소개 6문장 워크시트 (PDF)" },
     { lesson: 5, kind: "link", url: "https://smartplace.naver.com/", label: "네이버 스마트플레이스 관리 페이지" },
     { lesson: 6, kind: "link", url: "https://keywordtool.io/", label: "키워드 조사 도구" },
-    { lesson: 7, kind: "file", url: "https://example.com/files/blog-3-templates.pdf", label: "블로그 3종 세트 템플릿 (PDF)" }
+    { lesson: 7, kind: "file", url: "https://example.com/files/blog-3-templates.pdf", label: "블로그 3종 세트 템플릿 (PDF)" },
+    { lesson: 8, kind: "file", url: "https://example.com/files/content-5-pillars.pdf", label: "콘텐츠 5기둥 분류표 (PDF)" },
+    { lesson: 8, kind: "link", url: "https://www.naver.com/", label: "학부모 질문 TOP 10 예시 모음" }
   ],
 
   /* 내 시청 기록(박현종 · 3섹션 진행 중). 앞 섹션은 다 봤고, 3섹션 첫 레슨을 40% 봤다. */
@@ -437,12 +448,14 @@ window.LOUNGE_DATA = {
 
   var myPosts = D.posts.filter(function (p) { return p.mine && p.task; });
   D.tasks.forEach(function (t, i) {
-    var last = (bySec[t.section] || []).slice(-1)[0];
+    // lesson 을 적으면 그 레슨에, 아니면 챕터의 마지막 레슨에 붙는다
+    var last = t.lesson ? lessons[t.lesson - 1] : (bySec[t.section] || []).slice(-1)[0];
     if (!last) return;
     var mine = myPosts.filter(function (p) { return p.task === i + 1; })[0];
     last.tasks.push({ id: i + 1, seq: last.tasks.length + 1, title: t.title, qs: t.qs,
                       submittedPostId: mine ? "m-task-" + (i + 1) : null });
     t.lessonId = last.id;
+    t.seq = last.tasks.length;
   });
   D.materials.forEach(function (m, i) {
     var l = lessons[m.lesson - 1]; if (!l) return;

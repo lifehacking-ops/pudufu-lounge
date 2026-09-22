@@ -1208,6 +1208,12 @@
   .tl-row:hover { background: var(--canvas); color: var(--ink); }
   .tl-t { font-family: var(--font-display); font-weight: 700; color: var(--brand); flex: none; min-width: 44px; }
   .tl-l { flex: 1; min-width: 0; }
+  /* 교안 글 속의 시각 단추 */
+  .tl-tok {
+    display: inline; padding: 0 4px; border-radius: var(--radius-xs); background: var(--brand-tint); color: var(--brand);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--text-13);
+  }
+  .tl-tok:hover { background: var(--brand); color: var(--surface); }
 
   /* ---- 관리 · 강의 탭의 레슨 목록 ---- */
   .adm-lessons { margin-top: var(--sp-14); }

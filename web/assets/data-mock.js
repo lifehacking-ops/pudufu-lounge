@@ -212,100 +212,100 @@ window.LOUNGE_DATA = {
       thread: [] }
   ],
 
-  /* 레슨. section = 섹션 번호(1부터). 영상이 없는 레슨은 교안만 있다. */
+  /* 레슨. section = 섹션 번호(1부터). 설명란은 레슨 소개 문장이고, 안의 mm:ss 는 눌러 이동한다. 타임라인은 따로. */
   lessons: [
     { section: 1, t: "우리 학원의 주인공은 누구인가", durationSec: 310, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:43 고객 정의 · 3:26 정리",
+      description: "주인공 학생 한 명을 정하는 레슨입니다. 안 받을 학생을 먼저 말해 보면 주인공이 선명해집니다. 고객 정의는 1:43 부터, 과제 안내는 3:26 에 있습니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 103, label: "고객 정의" }, { t: 206, label: "정리 · 다음 레슨 예고" }],
       doc: "여러분 학원의 주인공은 어떤 아이입니까. 그리고 뒤집어서, 안 받을 학생을 말할 수 있습니까. 학생을 정하면 학부모도 정해집니다. 그 학부모가 밤에 무엇을 검색하고, 상담 전화에서 무엇을 차마 못 묻는지까지 따라옵니다." },
 
     { section: 1, t: "옆 학원은 뭐라고 말하고 있는가", durationSec: 270, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:30 경쟁사 분석 · 3:00 정리",
+      description: "동네 학원 다섯 곳의 소개글을 나란히 놓고 빈자리를 찾습니다. 비교표 만드는 법은 1:30 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 90, label: "경쟁사 분석" }, { t: 180, label: "정리 · 다음 레슨 예고" }],
       doc: "우리 동네 학원 다섯 곳의 소개글을 나란히 놓으면 이름을 가려도 구분이 됩니까. 경쟁 분석의 목적은 이기는 게 아니라 빈자리를 찾는 것입니다. 다들 상위권과 소수정예를 외칠 때 아무도 안 서 있는 자리는 어디인가." },
 
     { section: 1, t: "학원 소개 6문장 쓰기", durationSec: 380, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 2:06 여섯 문장 공식 · 4:13 문장별 예시",
+      description: "1주차의 결론입니다. 여섯 문장 공식(2:06)을 따라 우리 학원 소개를 씁니다. 문장별 예시는 4:13 부터 보세요.",
       timeline: [{ t: 0, label: "인트로" }, { t: 126, label: "여섯 문장 공식" }, { t: 253, label: "문장별 예시" }],
       doc: "타겟 선언, 진짜 문제, 우리의 방법, 증거, 차별점 한 방, 다음 행동 제안. 여섯 문장이 전부 주인공 정의에서 흘러나옵니다. 이 여섯 문장이 이후 블로그와 인스타와 상담 멘트의 기초가 됩니다." },
 
     { section: 2, t: "학부모는 어떤 경로로 학원을 찾는가", durationSec: 255, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:25 검색 여정 · 2:50 정리",
+      description: "소개받은 학부모도 등록 전에 검색합니다. 플레이스에서 리뷰, 블로그, 문의로 이어지는 여정을 1:25 부터 단계별로 봅니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 85, label: "검색 여정" }, { t: 170, label: "정리 · 다음 레슨 예고" }],
       doc: "소개받은 학부모도 등록 전에 반드시 하는 행동이 있습니다. 검색입니다. 검색에서 플레이스 목록, 사진과 리뷰 훑기, 블로그 확인, 그리고 문의. 이 여정의 각 단계마다 학부모가 이탈합니다." },
 
     { section: 2, t: "플레이스 전면 재세팅", durationSec: 245, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:21 플레이스 · 2:43 정리",
+      description: "플레이스 상위노출 요소를 하나씩 손봅니다. 소개글 · 사진 · 리뷰 순서로, 실제 화면은 1:21 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 81, label: "플레이스" }, { t: 163, label: "정리 · 다음 레슨 예고" }],
       doc: "상위노출을 결정하는 요소들. 소개글은 새로 쓰는 게 아니라 1주차 여섯 문장을 축약해서 붙이는 것입니다. 사진은 학부모가 확인하고 싶은 것 순서대로 공간, 수업, 아이들. 리뷰는 요청하는 법과 답글 다는 법." },
 
     { section: 3, t: "학부모는 블로그에서 무엇을 검색하는가", durationSec: 260, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:26 키워드 · 2:53 정리",
+      description: "학원 소식이 아니라 학부모의 고민이 키워드입니다. 지역 키워드와 고민 키워드를 모으는 법은 1:26 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 86, label: "키워드" }, { t: 173, label: "정리 · 다음 레슨 예고" }],
       doc: "학부모는 학원 소식을 검색하지 않습니다. 1주차 주인공 학부모가 밤에 검색하는 말들이 곧 키워드입니다. 지역 키워드와 고민 키워드 두 갈래로 모읍니다." },
 
     { section: 3, t: "블로그 3종 세트 — 이것부터 쓰면 된다", durationSec: 295, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:38 블로그 3종 세트 · 3:16 정리",
+      description: "소개하기 · 학부모 질문 TOP 10 · 고객의 언어, 세 편만 먼저 씁니다. 각 편의 뼈대는 1:38 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 98, label: "블로그 3종 세트" }, { t: 196, label: "정리 · 다음 레슨 예고" }],
       doc: "소개하기는 1주차 여섯 문장을 글 한 편으로 풀어낸 것입니다. 학부모 질문 TOP 10은 상담 전화에서 실제로 받는 질문에 미리 답하기. 고객의 언어는 학부모가 차마 못 묻는 걱정을 먼저 꺼내서 답하기." },
 
     { section: 3, t: "콘텐츠 5기둥 — 올리는 모든 것의 분류함", durationSec: 245, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:21 다섯 기둥 · 2:43 분류 연습",
+      description: "올릴 글을 다섯 기둥으로 분류하는 기준을 배웁니다. 다섯 기둥 설명은 1:21, 실제 글 분류 연습은 2:43 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 81, label: "다섯 기둥" }, { t: 163, label: "분류 연습" }],
       doc: "전문가로 실력을 증명하고, 철학으로 왜 이렇게 가르치는지 말하고, 증거로 변화 사례와 후기를 쌓고, 신뢰로 일상과 사람 냄새를 내고, 상품으로 모집과 안내를 합니다. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다." },
 
     { section: 4, t: "학부모는 3초 안에 판단한다", durationSec: 230, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:16 프로필 · 2:33 정리",
+      description: "인스타 프로필 첫 화면에서 학부모가 보는 네 가지. 프로필 점검은 1:16 부터 따라 하세요.",
       timeline: [{ t: 0, label: "인트로" }, { t: 76, label: "프로필" }, { t: 153, label: "정리 · 다음 레슨 예고" }],
       doc: "학부모는 피드를 안 내립니다. 프로필 화면 하나 보고 나갈지 말지 정합니다. 프로필 첫 화면에서 보이는 것은 프로필 사진과 소개글과 하이라이트와 최근 게시물 아홉 개입니다." },
 
     { section: 4, t: "소개글 4줄 공식", durationSec: 280, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:33 4줄 공식 · 3:06 이름 짓기",
+      description: "여섯 문장을 네 줄로 줄이는 공식(1:33)과 검색되는 계정 이름 짓기(3:06)입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 93, label: "4줄 공식" }, { t: 186, label: "이름 짓기" }],
       doc: "누구를 위한 학원인지, 뭐가 다른지, 믿을 근거는 무엇인지, 뭘 하면 되는지. 1주차 여섯 문장의 압축판입니다. 여기서도 새로 쓰는 게 아니라 있는 재료를 줄이는 것입니다. 검색되는 이름 짓기도 같이 합니다." },
 
     { section: 5, t: "상담은 예약 순간부터 시작된다", durationSec: 250, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:23 상담 준비 · 2:46 정리",
+      description: "예약 응대의 톤과 확인 연락, 오시는 길 안내까지. 상담 전 준비 목록은 1:23 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 83, label: "상담 준비" }, { t: 166, label: "정리 · 다음 레슨 예고" }],
       doc: "예약 응대의 톤, 확인 연락, 오시는 길 안내까지. 학부모는 학원에 도착하기 전에 이미 절반을 판단합니다." },
 
     { section: 5, t: "환영받은 기분 — 도착 후 3분의 설계", durationSec: 330, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:50 도착 3분 · 3:40 정리",
+      description: "학부모가 문을 열고 3분 안에 느끼는 것을 설계합니다. 장치 하나하나는 1:50 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 110, label: "도착 3분" }, { t: 220, label: "정리 · 다음 레슨 예고" }],
       doc: "문 앞까지 나가 기다리기, 환영의 인사, 꽃 한 송이, 메뉴판. 이 학원은 우리를 기다렸구나를 만드는 장치들입니다. 비용은 거의 안 들고 효과는 즉시 나타납니다." },
 
     { section: 5, t: "등록하시겠어요 — CTA는 문구다", durationSec: 225, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:15 클로징 문장 · 2:30 거절 응대",
+      description: "클로징은 화법이 아니라 준비된 한 문장입니다. 문장 예시는 1:15, 거절이 나올 때 응대는 2:30 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 75, label: "클로징 문장" }, { t: 150, label: "거절 응대" }],
       doc: "클로징을 화법이 아니라 준비된 한 문장으로 합니다. 어물어물 넘기다 연락드릴게요로 끝나는 상담과, 자연스럽게 등록을 묻는 상담의 차이입니다." },
 
     { section: 6, t: "갑자기 그만두는 학생은 없다", durationSec: 265, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:28 퇴원 징후 · 2:56 정리",
+      description: "퇴원은 갑자기 오지 않습니다. 놓치기 쉬운 네 가지 신호를 1:28 부터 봅니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 88, label: "퇴원 징후" }, { t: 176, label: "정리 · 다음 레슨 예고" }],
       doc: "결석과 지각 패턴의 변화, 숙제 질 저하, 학부모 답장 톤의 변화, 요즘 애가 힘들어해서요라는 말. 퇴원은 갑자기 오지 않습니다. 신호를 놓쳤을 뿐입니다." },
 
     { section: 6, t: "학부모 리포트와 소개가 나오는 구조", durationSec: 290, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:36 리포트 양식 · 3:13 소개가 나오는 순간",
+      description: "월간 리포트 양식(1:36)과 소개가 자연스럽게 나오는 순간(3:13)을 다룹니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 96, label: "리포트 양식" }, { t: 193, label: "소개가 나오는 순간" }],
       doc: "신규 한 명 데려오는 비용보다 재원생 한 명 지키는 비용이 훨씬 쌉니다. 구멍 난 독에 물 붓기를 멈추는 것이 먼저입니다." },
 
     { section: 7, t: "채널 6종 성격표", durationSec: 305, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:41 채널 성격 · 3:23 정리",
+      description: "유튜브 · 쓰레드 · 맘카페 · 당근 · 파워링크 · 오프라인. 채널별 성격표는 1:41 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 101, label: "채널 성격" }, { t: 203, label: "정리 · 다음 레슨 예고" }],
       doc: "유튜브 롱폼, 쓰레드, 맘카페, 당근, 파워링크, 전단지와 현수막. 각각 누가 보는가, 성과까지 걸리는 시간, 원장 시간 소요, 어떤 학원에 맞는가." },
 
     { section: 7, t: "모든 길은 한 곳으로", durationSec: 255, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:25 채널 두 개 고르기 · 2:50 문의 동선",
+      description: "우리 학원에 맞는 채널 두 개를 고르고(1:25), 어느 문으로 들어와도 문의로 이어지는 동선(2:50)을 그립니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 85, label: "채널 두 개 고르기" }, { t: 170, label: "문의 동선" }],
       doc: "채널을 늘리는 게 성장이 아닙니다. 어설픈 여섯 개보다 제대로 된 두 개입니다. 어느 문으로 들어와도 플레이스와 블로그를 거쳐 문의는 상담 시스템이 받습니다." },
 
     { section: 8, t: "정보가 원장을 거치지 않고도 원장에게 닿게", durationSec: 340, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:53 소통 체계 · 3:46 정리",
+      description: "출결 · 특이사항 · 컴플레인 보고 체계를 일원화합니다. 양식 예시는 1:53 부터입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 113, label: "소통 체계" }, { t: 226, label: "정리 · 다음 레슨 예고" }],
       doc: "출결, 학생 특이사항, 학부모 컴플레인이 생기면 강사는 어디로 어떤 형식으로 보고하는가. 보고 체계를 일원화하고 양식화합니다. 그래서 원장만 모르는 일이 없게 만듭니다." },
 
     { section: 8, t: "학원의 결정은 원장이 아니라 원칙이 한다", durationSec: 275, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
-      description: "0:00 인트로 · 1:31 원칙 목록 · 3:03 환불 · 보강 규정",
+      description: "원장이 없어도 같은 결정이 나오는 원칙 목록(1:31)과 환불 · 보강 규정 예시(3:03)입니다.",
       timeline: [{ t: 0, label: "인트로" }, { t: 91, label: "원칙 목록" }, { t: 183, label: "환불 · 보강 규정" }],
       doc: "매뉴얼은 두꺼운 문서가 아니라 우리 학원의 원칙 목록입니다. 결석 대응, 보강 규정, 컴플레인 1차 응대, 환불. 원장이 없어도 같은 결정이 나오게 합니다." }
   ],

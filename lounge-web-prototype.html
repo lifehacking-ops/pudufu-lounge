@@ -274,7 +274,7 @@
       </div>
     </div>
 
-    <!-- 우측 콘텐츠 : 영상 → 타임라인(접힘) → 설명란 → 교안(접힘) -->
+    <!-- 우측 콘텐츠 : 영상 → 설명란 → 타임라인(접힘) → 교안(접힘) -->
     <div class="col">
       <article class="card pad lesson-card">
         <div class="lessonhead">
@@ -286,9 +286,10 @@
 
         <div class="video" id="lessonVideo"></div>
 
-        <details class="tog" id="lessonTimeline"></details>
-
+        <!-- 설명란 : 레슨 소개. 안의 12:30 은 눌러 이동 -->
         <p class="lesson-desc" id="lessonDesc" hidden></p>
+
+        <details class="tog" id="lessonTimeline"></details>
 
         <details class="tog" id="lessonDoc">
           <summary class="tog-head"><span>강의 교안</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>

@@ -4294,18 +4294,20 @@
     });
     main.appendChild(c);
 
-    /* 내 자리 — 목록 밖에 있어도 보여야 한다.
+    /* 내 순위 — 목록 밖에 있어도 보여야 한다.
        강사 · 관리자는 순위 대상이 아니다. 그때도 왜 없는지는 말해 준다 —
        아무 말도 없으면 빠진 것처럼 보인다. */
     var me = list.filter(function (r) { return r.name === ME.name; })[0];
     if (!me && isStaff()) {
-      var sc = admCard("내 자리");
-      sc.appendChild(el("p", "sec-note",
-        roleLabel(ME.role) + "는 순위에 들어가지 않습니다. 공지에 반응이 몰리면 순위가 뒤집힙니다."));
+      var sc = admCard("내 순위");
+      var none = el("p", "rank-mine");
+      none.appendChild(el("b", null, "순위 밖"));
+      none.appendChild(el("span", null, roleLabel(ME.role)));
+      sc.appendChild(none);
       rail.appendChild(sc);
     }
     if (me) {
-      var mc = admCard("내 자리");
+      var mc = admCard("내 순위");
       var big = el("p", "rank-mine");
       big.appendChild(el("b", null, me.total ? me.rank + "위" : "아직 없음"));
       big.appendChild(el("span", null, me.total + "개 받음"));

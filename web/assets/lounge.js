@@ -3166,7 +3166,6 @@
       var foot = el("div", "course-foot");
       var left = el("span");
       left.appendChild(el("span", "course-pct", p.value + "%"));
-      left.appendChild(document.createTextNode(" · 레슨 " + p.all + "개" + (totalDur(sc) ? " · " + durLabel(totalDur(sc)) : "")));
       foot.appendChild(left);
 
       var badge = el("span", "badge " + (state === "done" ? "b-ontime" : state === "live" ? "b-live" : "b-none"));
@@ -3184,7 +3183,10 @@
         toc.type = "button";
         toc.setAttribute("aria-expanded", String(!!openTOC[sc.id]));
         toc.appendChild(el("span", null, "레슨 " + sc.lessons.length + "개"));
-        toc.appendChild(icon("chevron-down", 14));
+        var tail = el("span", "toc-tail");
+        if (totalDur(sc)) tail.appendChild(el("span", "toc-dur tnum", durLabel(totalDur(sc))));
+        tail.appendChild(icon("chevron-down", 14));
+        toc.appendChild(tail);
         toc.addEventListener("click", function (e) {
           e.stopPropagation();
           openTOC[sc.id] = !openTOC[sc.id];

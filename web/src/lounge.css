@@ -1168,6 +1168,8 @@
     margin-top: auto; padding: 12px 20px; border-top: 1px solid var(--hair);
     font-size: var(--text-xs); font-weight: 600; color: var(--slate);
   }
+  .toc-btn .toc-tail { display: inline-flex; align-items: center; gap: var(--sp-9); }
+  .toc-btn .toc-dur { font-weight: 400; color: var(--mist); font-family: var(--font-display); }
   .toc-btn:hover { color: var(--ink); background: var(--canvas); }
   .toc-btn svg { color: var(--mist); transition: transform var(--transition-normal); }
   .toc-btn[aria-expanded="true"] svg { transform: rotate(180deg); }

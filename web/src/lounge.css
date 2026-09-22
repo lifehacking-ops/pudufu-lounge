@@ -665,7 +665,7 @@
   .cm-confirm .btn-ghost { color: var(--late); }
 
   #courseList .course { cursor: pointer; }
-  #courseList .kicker { display: block; margin-bottom: 4px; }
+  #courseList .kicker { display: block; min-height: 1.4em; line-height: 1.4; margin-bottom: 8px; }
   #classMission .classdone { justify-items: start; gap: var(--sp-9); }
   #classMission .classdone p { margin: 0; }
 
@@ -1049,23 +1049,28 @@
   .pagehead h1 { font-size: var(--text-22); font-weight: 700; letter-spacing: normal; margin: 0; }
 
   /* 강의 4개가 한 줄을 정확히 채우도록 4열. 마지막 카드가 혼자 남지 않는다. */
-  .courses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .courses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
 
   @media (max-width: 1024px) { .courses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 768px) { .courses { grid-template-columns: minmax(0, 1fr); } }
 
   .course {
-    display: block; width: 100%; text-align: left; overflow: hidden; padding: 0;
+    display: flex; flex-direction: column; width: 100%; text-align: left; overflow: hidden; padding: 0;
     transition: transform var(--transition-normal), box-shadow var(--transition-normal);
   }
 
   .course[data-open="true"]:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
   .course[data-open="false"] { border-style: dashed; box-shadow: none; cursor: default; }
 
-  .course-in { padding: 16px var(--sp-18); display: grid; gap: var(--sp-11); }
-  .course-t { font-size: var(--text-15); font-weight: 700; letter-spacing: normal; margin: 0; }
+  /* 카드 안 영역은 고정이다 — kicker 한 줄 · 제목 두 줄 · 막대 · 발 · 목차 단추.
+     제목이 한 줄이어도 두 줄 자리를 비워 두어 옆 카드와 막대 · 목차 위치가 같다. */
+  .course-in { padding: 20px 20px 16px; display: grid; gap: 12px; width: 100%; text-align: left; align-content: start; }
+  .course-t {
+    font-size: var(--text-base); font-weight: 700; letter-spacing: normal; margin: 0; line-height: 1.4;
+    min-height: 2.8em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
   .course-d { font-size: var(--text-xs); color: var(--slate); margin: 0; }
-  .course-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-10); font-size: var(--text-11); color: var(--mist); }
+  .course-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--text-xs); color: var(--mist); }
   .course-pct { font-family: var(--font-display); font-weight: 700; color: var(--ink); }
 
   .crumb { display: flex; align-items: center; gap: var(--sp-7); font-size: var(--text-xs); margin-bottom: var(--sp-14); }
@@ -1098,7 +1103,7 @@
   .sechead svg { color: var(--mist); transition: transform var(--transition-normal); flex: none; }
   .sechead[aria-expanded="false"] svg { transform: rotate(-90deg); }
 
-  .lessons { list-style: none; margin: 0 0 var(--sp-10); padding: 0; display: grid; gap: 2px; }
+  .lessons { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 
   .lesson {
     display: flex; align-items: center; gap: var(--sp-9);
@@ -1113,9 +1118,9 @@
     width: 2px; border-radius: 2px; background: var(--brand);
   }
 
-  .lesson .t { flex: 1; min-width: 0; font-size: var(--text-13); color: var(--slate); text-align: left; }
+  .lesson .t { flex: 1; min-width: 0; font-size: var(--text-13); line-height: 1.45; overflow-wrap: anywhere; color: var(--slate); text-align: left; }
   .lesson[data-cur="true"] .t { color: var(--brand); font-weight: 700; }
-  .lesson .d { font-family: var(--font-display); font-size: var(--text-11); color: var(--mist); flex: none; }
+  .lesson .d { font-family: var(--font-display); font-size: var(--text-11); line-height: 1.45; padding-top: 2px; color: var(--mist); flex: none; }
 
   .check {
     display: grid; place-items: center; width: 18px; height: 18px; flex: none;
@@ -1130,41 +1135,45 @@
 
   /* ---- 레슨 줄 : 시청 상태 표시(체크가 아니라 표시) + 아래로 내려오는 과제 · 자료 ---- */
   .lesson { display: block; padding: 0; }
-  .lesson-row { display: flex; align-items: center; gap: var(--sp-9); padding: 8px var(--sp-10); border-radius: var(--radius-ctl); }
+  /* 제목이 길면 줄을 바꾼다. 아이콘 · 길이는 첫 줄에 붙는다 */
+  .lesson-row { display: flex; align-items: flex-start; gap: var(--sp-9); padding: 8px var(--sp-10); border-radius: var(--radius-ctl); }
   .lesson[data-cur="true"] .lesson-row { background: var(--brand-tint); }
   .lesson:hover .lesson-row { background: var(--canvas); }
   .lesson[data-cur="true"]:hover .lesson-row { background: var(--brand-tint); }
 
   .lstate {
     display: grid; place-items: center; width: 18px; height: 18px; flex: none;
-    border-radius: 999px; border: 1.5px solid var(--line); color: transparent; background: var(--surface);
+    border-radius: 999px; border: 1.5px solid var(--line); color: transparent; background: var(--surface); margin-top: 1px;
   }
   .lstate.is-part { border-color: var(--brand); background: linear-gradient(90deg, var(--brand-tint) 50%, var(--surface) 50%); }
   .lstate.is-done { background: var(--brand); border-color: var(--brand); color: var(--surface); }
 
-  .lesson-sub { list-style: none; margin: 2px 0 var(--sp-6) 27px; padding: 0; display: grid; gap: 2px; }
+  .lesson-sub { list-style: none; margin: 2px 0 var(--sp-6) 27px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .sub-row .sub-t {
-    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; line-height: 1.45;
     padding: var(--sp-6) var(--sp-10); border-radius: var(--radius-ctl);
     font-size: var(--text-13); color: var(--slate); text-decoration: none;
   }
   .sub-row .sub-t:hover { background: var(--canvas); color: var(--ink); }
   .sub-row.is-cur .sub-t { background: var(--brand-tint); color: var(--brand); font-weight: 700; }
-  .sub-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub-row .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .sub-row .d { font-size: var(--text-11); color: var(--mist); flex: none; }
-  .sub-k { font-size: var(--text-11); font-weight: 700; color: var(--brand); flex: none; }
-  .sub-row .badge { flex: none; }
+  .sub-k { font-size: var(--text-11); font-weight: 700; color: var(--brand); flex: none; padding-top: 2px; }
+  .sub-row .badge { flex: none; margin-top: 1px; }
+  .sub-row .d { padding-top: 2px; }
 
   /* ---- 강의 카드의 목차 토글 ---- */
   .toc-btn {
     display: flex; align-items: center; justify-content: space-between; width: 100%;
-    padding: var(--sp-10) var(--sp-18); border-top: 1px solid var(--hair);
+    margin-top: auto; padding: 12px 20px; border-top: 1px solid var(--hair);
     font-size: var(--text-xs); font-weight: 600; color: var(--slate);
   }
   .toc-btn:hover { color: var(--ink); background: var(--canvas); }
   .toc-btn svg { color: var(--mist); transition: transform var(--transition-normal); }
   .toc-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
-  .toc { list-style: none; margin: 0; padding: 0 var(--sp-10) var(--sp-10); display: grid; gap: 2px; }
+  .toc { list-style: none; margin: 0; padding: 0 12px 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  /* 한 열로 쌓이는 폰에서는 옆 카드가 없으니 제목 두 줄 자리를 비워 두지 않는다 */
+  @media (max-width: 768px) { .course-t { min-height: 0; } }
   .toc-t {
     display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
     padding: var(--sp-6) 8px; border-radius: var(--radius-ctl); font-size: var(--text-13); color: var(--slate);
@@ -1173,7 +1182,6 @@
   .toc-row[data-done="true"] .toc-t .t { color: var(--mist); }
   .toc-t .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .toc-t .d { font-size: var(--text-11); color: var(--mist); flex: none; font-family: var(--font-display); }
-  .course .course-in { display: block; width: 100%; text-align: left; }
 
   /* ---- 본문 : 플레이어 · 토글 · 설명란 · 타임라인 ---- */
   .video.has-player { border: 0; background: var(--ink); padding: 0; display: block; overflow: hidden; }
@@ -1191,7 +1199,8 @@
   .tog[open] .tog-head { border-bottom: 1px solid var(--hair); }
   .tog .prose { padding: 4px 16px 16px; }
 
-  .tl-list { list-style: none; margin: 0; padding: var(--sp-6); display: grid; gap: 2px; }
+  .tl-list { list-style: none; margin: 0; padding: var(--sp-6); display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .tog-empty { margin: 0; padding: 12px 16px; font-size: var(--text-13); color: var(--mist); }
   .tl-row {
     display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
     padding: var(--sp-6) var(--sp-10); border-radius: var(--radius-ctl); font-size: var(--text-13); color: var(--slate);
@@ -1676,10 +1685,9 @@
   .wk-submit { margin: var(--sp-6) 0 0; }
   .courses-note { margin-top: 16px; }
   .courses-note b { color: var(--ink); }
-  .curric { display: grid; gap: 12px; }
+  .curric { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .week-t { margin-top: 4px; }
   .pct-row { justify-content: space-between; margin-bottom: var(--sp-7); }
-  .pct-note { margin: var(--sp-7) 0 0; }
   .lesson-card { display: grid; gap: 16px; }
   .lesson-head-t { min-width: 0; }
   .lesson-t { font-size: var(--text-xl); margin-top: var(--sp-5); }

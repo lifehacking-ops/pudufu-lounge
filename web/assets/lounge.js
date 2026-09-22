@@ -3151,8 +3151,8 @@
       main.addEventListener("click", function () { openLesson(sc.id); });
 
       var head = el("div");
-      // 제목이 '3주차 …' 처럼 자기 순서를 말하면 kicker 는 접는다
-      if (!/^\d+\s*주차/.test(sc.title)) head.appendChild(el("span", "kicker", "섹션 " + sc.seq));
+      // 제목이 '3주차 …' 처럼 자기 순서를 말하면 kicker 글자는 비운다. 자리는 남겨 카드 높이를 맞춘다
+      head.appendChild(el("span", "kicker", /^\d+\s*주차/.test(sc.title) ? "" : "섹션 " + sc.seq));
       head.appendChild(el("h2", "course-t", sc.title));
       main.appendChild(head);
 
@@ -3458,16 +3458,15 @@
     if (at < text.length) descBox.appendChild(document.createTextNode(text.slice(at)));
   }
 
-  /* 타임라인 토글. 기본은 접힘. 구간이 없으면 토글 자체가 없다. */
+  /* 타임라인 토글. 기본은 접힘. 모든 레슨에 자리가 있고, 구간이 없으면 그렇다고 말한다. */
   function renderTimeline(l) {
     tlBox.textContent = "";
     var tl = (l.timeline || []).filter(function (x) { return x && x.label; });
-    if (!tl.length || !l.videoUrl) { tlBox.hidden = true; return; }
-    tlBox.hidden = false;
     var sum = el("summary", "tog-head");
-    sum.appendChild(el("span", null, "타임라인 " + tl.length + "개"));
+    sum.appendChild(el("span", null, tl.length ? "타임라인 " + tl.length + "개" : "타임라인"));
     sum.appendChild(icon("chevron-down", 14));
     tlBox.appendChild(sum);
+    if (!tl.length) { tlBox.appendChild(el("p", "tog-empty", "이 레슨의 타임라인은 아직 없습니다.")); tlBox.open = false; return; }
     var ul = el("ul", "tl-list");
     tl.forEach(function (x) {
       var li = el("li");
@@ -3483,12 +3482,11 @@
     tlBox.open = false;
   }
 
-  /* 교안 토글. 기본은 접힘. */
+  /* 교안 토글. 기본은 접힘. 모든 레슨에 자리가 있다. */
   function renderDoc(l) {
     proseEl.textContent = "";
-    if (!l.doc) { docBox.hidden = true; return; }
-    docBox.hidden = false;
-    String(l.doc).split(/\n{2,}/).forEach(function (para) { proseEl.appendChild(el("p", null, para)); });
+    if (!l.doc) proseEl.appendChild(el("p", "tog-empty", "이 레슨의 교안은 아직 없습니다."));
+    else String(l.doc).split(/\n{2,}/).forEach(function (para) { proseEl.appendChild(el("p", null, para)); });
     docBox.open = false;
   }
 

@@ -3172,7 +3172,7 @@
       var badge = el("span", "badge " + (state === "done" ? "b-ontime" : state === "live" ? "b-live" : "b-none"));
       if (state === "live") badge.appendChild(el("span", "dot"));
       badge.appendChild(document.createTextNode(
-        state === "done" ? "완료" : state === "live" ? "진행중" : state === "draft" ? "비공개" : "예정"));
+        state === "done" ? "수강 완료" : state === "live" ? "수강 중" : state === "draft" ? "비공개" : "수강 전"));
       foot.appendChild(badge);
       main.appendChild(foot);
       card.appendChild(main);
@@ -3183,7 +3183,7 @@
         var toc = el("button", "toc-btn");
         toc.type = "button";
         toc.setAttribute("aria-expanded", String(!!openTOC[sc.id]));
-        toc.appendChild(el("span", null, "목차 " + sc.lessons.length + "개"));
+        toc.appendChild(el("span", null, "레슨 " + sc.lessons.length + "개"));
         toc.appendChild(icon("chevron-down", 14));
         toc.addEventListener("click", function (e) {
           e.stopPropagation();

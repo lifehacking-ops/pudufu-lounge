@@ -247,16 +247,13 @@
     <!-- 좌측 커리큘럼 : 이 섹션의 레슨. 레슨을 누르면 그 아래로 과제 · 자료가 내려온다 -->
     <div class="curric-col">
       <div class="card pad-s curric">
-        <!-- 섹션 머리 전체가 단추다. 누르면 섹션 전부와 그 아래 레슨 전부(전체 목차)가 내려온다.
-             레슨을 누르면 그 레슨으로, 섹션을 누르면 그 섹션의 첫 레슨으로. -->
+        <!-- 챕터 머리 : [챕터 N] 배지 + 제목이 한 덩어리, 오른쪽 '목차' 단추를 누르면 전체 목차(챕터 전부 · 레슨 전부)가 내려온다.
+             레슨을 누르면 그 레슨으로, 챕터를 누르면 그 챕터의 첫 레슨으로. -->
         <div class="pick sechead-wrap" id="secPick">
-          <button class="sechead-btn" type="button" id="secHeadBtn" aria-expanded="false" aria-haspopup="menu">
-            <span class="grow">
-              <span class="kicker">챕터 <span class="disp" id="secHeadN">3</span></span>
-              <span class="card-t week-t" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</span>
-            </span>
-            <span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
-          </button>
+          <div class="sechead">
+            <h2 class="card-t week-t"><span class="chap" id="secHeadN">챕터 3</span><span id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</span></h2>
+            <button class="pick-btn tocbtn" type="button" id="secHeadBtn" aria-expanded="false" aria-haspopup="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg><span>목차</span></button>
+          </div>
         </div>
 
         <div>
@@ -454,7 +451,7 @@
         <thead><tr><th>단계</th><th>화면</th><th>내용</th></tr></thead>
         <tbody>
           <tr><td>1</td><td>강의 목록</td><td>챕터 카드 &mdash; 제목 · 레슨 수 · 총 시간 · 진도 % · 상태(수강 전 / 수강 중 / 수강 완료). 카드 아래 <code>레슨 N개</code> 를 펴면 레슨 줄이 카드 안에 내려오고, 줄을 누르면 그 레슨으로 바로 간다. 커버 사진은 두지 않는다 &mdash; 읽으러 오는 자리지 보러 오는 자리가 아니다</td></tr>
-          <tr><td>2</td><td>강의 상세</td><td>좌측 카드 머리(챕터 번호 · 제목)가 단추 — 누르면 <b>전체 목차</b>(챕터 전부와 그 아래 레슨 전부)가 내려오고, 레슨을 누르면 그 레슨으로, 챕터을 누르면 첫 레슨으로. 그 아래 이 챕터의 레슨 목록(누르면 그 아래로 과제 · 자료가 내려온다) + 우측 영상 → 타임라인(접힘, 눌러 이동) → 교안(접힘)</td></tr>
+          <tr><td>2</td><td>강의 상세</td><td>좌측 카드 머리의 <b>목차</b> 단추를 누르면 <b>전체 목차</b>(챕터 전부와 그 아래 레슨 전부)가 내려오고, 레슨을 누르면 그 레슨으로, 챕터을 누르면 첫 레슨으로. 그 아래 이 챕터의 레슨 목록(누르면 그 아래로 과제 · 자료가 내려온다) + 우측 영상 → 타임라인(접힘, 눌러 이동) → 교안(접힘)</td></tr>
           <tr><td>3</td><td>진도</td><td>스스로 체크하는 것이 없다. <b>영상을 끝까지 보면</b> 레슨 완료, 챕터 % = 완료 레슨 / 레슨. 시청 시간의 원본은 프드프다</td></tr>
           <tr><td>4</td><td>건너뛰기</td><td>우측 레일 &lsquo;이어보기&rsquo;는 목록을 지나치고 마지막으로 본 레슨으로 바로 간다. 매일 오는 사람은 목록을 볼 이유가 없다</td></tr>
         </tbody>

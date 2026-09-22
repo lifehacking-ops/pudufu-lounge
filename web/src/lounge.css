@@ -1686,18 +1686,17 @@
   .courses-note b { color: var(--ink); }
   .curric { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .week-t { margin-top: 4px; }
-  /* 커리큘럼 카드 머리 : 섹션 번호 · 제목 전체가 단추. 누르면 전체 목차가 내려온다 */
-  .sechead-wrap { margin: -4px -8px 0; }
-  .sechead-btn {
-    display: flex; align-items: flex-start; gap: var(--sp-9); width: 100%; text-align: left;
-    padding: 4px 8px; border-radius: var(--radius-ctl);
+  /* 커리큘럼 카드 머리 : [챕터 N] 배지 + 제목 한 덩어리, 오른쪽에 '목차' 단추 */
+  .sechead { display: flex; align-items: flex-start; gap: var(--sp-10); }
+  .sechead .week-t { flex: 1; min-width: 0; margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
+  .chap {
+    display: inline-block; vertical-align: 2px; margin-right: var(--sp-6); padding: 1px var(--sp-6);
+    border-radius: var(--radius-sm); background: var(--brand-tint); color: var(--brand);
+    font-size: var(--text-11); font-weight: 700; white-space: nowrap;
   }
-  .sechead-btn:hover { background: var(--canvas); }
-  .sechead-btn .grow { min-width: 0; display: grid; gap: 4px; }
-  .sechead-btn .kicker { display: block; }
-  .sechead-btn .week-t { display: block; margin: 0; }
-  .sechead-btn .caret { color: var(--mist); flex: none; margin-top: 2px; transition: transform var(--transition-normal); }
-  .sechead-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+  .tocbtn { flex: none; padding: var(--sp-5) var(--sp-9); gap: var(--sp-5); font-size: var(--text-xs); color: var(--slate); }
+  .tocbtn svg { color: var(--mist); }
+  .tocbtn[aria-expanded="true"] { border-color: var(--brand); color: var(--brand); }
   .sec-menu { left: 0; right: 0; max-height: 60vh; overflow-y: auto; }
   .sec-menu button { gap: var(--sp-9); align-items: flex-start; line-height: 1.45; }
   .sec-menu .sec { font-weight: 700; color: var(--ink); margin-top: 4px; }
@@ -1710,7 +1709,7 @@
   .sec-menu .les .d { flex: none; font-family: var(--font-display); font-size: var(--text-11); color: var(--mist); padding-top: 2px; }
   .sec-menu .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .sec-menu .les[aria-current="true"] { color: var(--brand); font-weight: 700; }
-  .pct-row { justify-content: space-between; margin-bottom: var(--sp-7); }
+  .pct-row { justify-content: flex-end; margin-bottom: var(--sp-7); }   /* 진도 % 는 막대 오른쪽 위 */
   .lesson-card { display: grid; gap: 16px; }
   .lesson-head-t { min-width: 0; }
   .lesson-t { font-size: var(--text-xl); margin-top: var(--sp-5); }

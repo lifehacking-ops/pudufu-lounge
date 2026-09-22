@@ -3237,7 +3237,7 @@
     var sc = section();
     if (!sc) return;   // 아직 강의가 없는 라운지. 강의실은 빈 화면으로 둔다.
     crumbCur.textContent = sc.title;
-    secHeadN.textContent = String(sc.seq);
+    secHeadN.textContent = "챕터 " + sc.seq;
     weekTitle.textContent = sc.title;
     renderSecMenu(sc);
   }

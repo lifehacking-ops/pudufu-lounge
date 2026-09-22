@@ -521,7 +521,7 @@ async function setSectionPublished(loungeId, userId, sectionId, published) {
 async function assertSection(loungeId, sectionId) {
   const L = await courseOf(loungeId);
   const s = await one(`SELECT id FROM ext_section WHERE id = $1 AND course_id = $2`, [sectionId, L.course_id]);
-  if (!s) throw new Missing("이 강의의 섹션이 아닙니다");
+  if (!s) throw new Missing("이 강의의 챕터가 아닙니다");
   return L;
 }
 async function assertLesson(loungeId, lessonId) {
@@ -626,7 +626,7 @@ async function addSection(loungeId, userId, input) {
   onlyLocal();
   const L = await courseOf(loungeId);
   const title = String(input.title || "").trim();
-  if (!title) throw new Denied("섹션 제목은 있어야 합니다");
+  if (!title) throw new Denied("챕터 제목은 있어야 합니다");
   await rows(`INSERT INTO ext_course (id, title, synced_at) VALUES ($1, $2, now())
               ON CONFLICT (id) DO NOTHING`, [L.course_id, L.name]);
   const next = await one(`SELECT coalesce(max(seq), 0) + 1 AS s FROM ext_section WHERE course_id = $1`, [L.course_id]);

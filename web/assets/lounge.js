@@ -275,7 +275,7 @@
   }
   function sectionLabel(id) {
     var sc = sectionById(id);
-    return sc ? "섹션 " + sc.seq : "—";
+    return sc ? "챕터 " + sc.seq : "—";
   }
   /* 8:05 처럼. 한 시간을 넘으면 1:02:05 */
   function mmss(sec) {
@@ -1032,7 +1032,7 @@
     set("railBanner", "라운지 배너 자리 · " + D.lounge.name);
     set("whoLounge", full);
     set("whoName", ME.name);
-    set("classMeta", full + " · 섹션 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개");
+    set("classMeta", full + " · 챕터 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개");
 
     // 라운지 전환 목록에서 '지금' 은 진짜 지금 보는 것에 붙어야 한다
     var menu = $("loungeMenu");
@@ -1674,7 +1674,7 @@
     var box = el("div", "wkpick");
     var input = document.createElement("input");
     input.type = "text";
-    input.placeholder = "섹션 · 레슨 · 과제 제목으로 찾기";
+    input.placeholder = "챕터 · 레슨 · 과제 제목으로 찾기";
     var list = el("div", "list");
 
     function paint(q) {
@@ -3129,11 +3129,11 @@
     }
 
     var meta = $("classMeta");
-    if (meta) meta.textContent = loungeName() + " · 섹션 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개";
+    if (meta) meta.textContent = loungeName() + " · 챕터 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개";
 
     if (!shownSections().length) {
       courseList.appendChild(el("p", "empty",
-        can("manage") ? "아직 등록된 강의가 없습니다. 관리 › 강의 · 과제에서 섹션을 만드세요."
+        can("manage") ? "아직 등록된 강의가 없습니다. 관리 › 강의 · 과제에서 챕터을 만드세요."
                       : "아직 열린 강의가 없습니다."));
       return;
     }
@@ -3153,7 +3153,7 @@
 
       var head = el("div");
       // 제목이 '3주차 …' 처럼 자기 순서를 말하면 kicker 글자는 비운다. 자리는 남겨 카드 높이를 맞춘다
-      head.appendChild(el("span", "kicker", /^\d+\s*주차/.test(sc.title) ? "" : "섹션 " + sc.seq));
+      head.appendChild(el("span", "kicker", /^\d+\s*주차/.test(sc.title) ? "" : "챕터 " + sc.seq));
       head.appendChild(el("h2", "course-t", sc.title));
       main.appendChild(head);
 
@@ -3308,7 +3308,7 @@
     if (!sc) return;
 
     if (!sc.lessons.length) {
-      curric.appendChild(el("p", "empty", "이 섹션에는 아직 레슨이 없습니다."));
+      curric.appendChild(el("p", "empty", "이 챕터에는 아직 레슨이 없습니다."));
       return;
     }
 
@@ -3538,7 +3538,7 @@
     prevLesson.disabled = i <= 0;
     var nx = sc.lessons[i + 1];
     var nextSec = !nx && nextSection(sc);
-    nextLesson.textContent = nx ? "다음 레슨" : nextSec ? "다음 섹션으로" : "마지막 레슨";
+    nextLesson.textContent = nx ? "다음 레슨" : nextSec ? "다음 챕터으로" : "마지막 레슨";
     nextLesson.disabled = !nx && !nextSec;
 
     renderCurric();
@@ -4004,7 +4004,7 @@
       f.el.hidden = true;
     }
 
-    f.foot("이 섹션에 레슨 추가", function () {
+    f.foot("이 챕터에 레슨 추가", function () {
       if (!title.val()) { f.say("레슨 제목은 있어야 합니다."); return; }
       var timeline = tl.val().split("\n").map(function (line) {
         var m = line.trim().match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
@@ -4034,19 +4034,19 @@
 
   function sectionForm() {
     var wrap = el("div", "fadd");
-    var open = el("button", "fadd-btn", "+ 새 섹션 만들기");
+    var open = el("button", "fadd-btn", "+ 새 챕터 만들기");
     open.type = "button";
     wrap.appendChild(open);
 
-    var f = cForm("섹션 만들기");
+    var f = cForm("챕터 만들기");
     f.el.hidden = true;
-    var title = cField("섹션 제목", "예: 9주차 · 학부모 후기를 자산으로 만들기");
+    var title = cField("챕터 제목", "예: 9주차 · 학부모 후기를 자산으로 만들기");
     f.el.appendChild(title.el);
 
     function close() { f.say(""); f.el.hidden = true; open.hidden = false; }
 
     f.foot("만들고 비공개로 두기", function () {
-      if (!title.val()) { f.say("섹션 제목은 있어야 합니다."); return; }
+      if (!title.val()) { f.say("챕터 제목은 있어야 합니다."); return; }
       function put(r) {
         SECTIONS.push({ id: r.id, seq: r.seq || SECTIONS.length + 1, title: title.val(), published: false, lessons: [] });
         close();
@@ -4067,9 +4067,9 @@
 
   function paintCourseTab(host) {
     var nLes = allLessons().length, nTask = allTasks().length;
-    var c = admCard("강의 · 과제", "공개 " + liveSections().length + " / 전체 " + SECTIONS.length + "섹션 · 레슨 " + nLes + " · 과제 " + nTask);
+    var c = admCard("강의 · 과제", "공개 " + liveSections().length + " / 전체 " + SECTIONS.length + "챕터 · 레슨 " + nLes + " · 과제 " + nTask);
 
-    var t = admTable(["섹션", "레슨", "과제", "자료", "상태", ""]);
+    var t = admTable(["챕터", "레슨", "과제", "자료", "상태", ""]);
     var forms = [];
     var below = el("div");
 
@@ -4215,8 +4215,8 @@
     c.appendChild(below);
 
     c.appendChild(el("p", "sec-note",
-      "섹션 · 레슨 · 영상 · 타임라인 · 교안은 프드프에서 옵니다. 여기서는 어느 섹션을 열지, 레슨에 무슨 과제와 자료를 붙일지를 정합니다. " +
-      "비공개로 내리면 수강생의 강의 목록 · 검색 · 과제 고르기에서 즉시 사라지고, 그 섹션의 과제는 진행률에서도 빠집니다."));
+      "챕터 · 레슨 · 영상 · 타임라인 · 교안은 프드프에서 옵니다. 여기서는 어느 챕터을 열지, 레슨에 무슨 과제와 자료를 붙일지를 정합니다. " +
+      "비공개로 내리면 수강생의 강의 목록 · 검색 · 과제 고르기에서 즉시 사라지고, 그 챕터의 과제는 진행률에서도 빠집니다."));
 
     if (D.editableCourse) c.appendChild(sectionForm());
     host.appendChild(c);
@@ -4575,7 +4575,7 @@
      커리큘럼을 고칠 근거는 후자에서 나온다. */
   function funnelCard() {
     var stu = students();
-    var c = admCard("섹션별 이탈", "수강생 " + stu.length + "명");
+    var c = admCard("챕터별 이탈", "수강생 " + stu.length + "명");
     var seqOf = function (m) { var sc = sectionById(m.section); return sc ? sc.seq : 1; };
 
     var rows = [];
@@ -4592,7 +4592,7 @@
     var bars = el("div", "bars");
     rows.forEach(function (r) {
       var row = el("div", "bar");
-      var k = el("span", "bar-k", "섹션 " + r.sc.seq);
+      var k = el("span", "bar-k", "챕터 " + r.sc.seq);
       k.title = r.sc.title;
       row.appendChild(k);
 
@@ -4613,7 +4613,7 @@
     c.appendChild(bars);
 
     var legend = el("p", "legend");
-    legend.appendChild(el("span", "lg lg-stay", "다음 섹션으로 넘어감"));
+    legend.appendChild(el("span", "lg lg-stay", "다음 챕터으로 넘어감"));
     legend.appendChild(el("span", "lg lg-lost", "여기서 멈춤"));
     c.appendChild(legend);
 
@@ -4782,7 +4782,7 @@
     });
     c1.appendChild(mfind);
 
-    var t = admTable(["닉네임", "기수", "가입", "섹션", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
+    var t = admTable(["닉네임", "기수", "가입", "챕터", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
 
     var mtk = tokensOf(memQ.trim());
     var mrows = MEMBERS.filter(function (m) {

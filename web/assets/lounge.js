@@ -3087,8 +3087,7 @@
   var pctPill = $("pctPill"), pctFill = $("pctFill"), qDone = $("qDone"), qAll = $("qAll");
   var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle");
   var crumbCur = $("crumbCur"), weekTitle = $("weekTitle");
-  var secPick = $("secPick"), secPickBtn = $("secPickBtn"), secPickN = $("secPickN");
-  var allProgT = $("allProgT"), allProgFill = $("allProgFill");
+  var secPick = $("secPick"), secHeadBtn = $("secHeadBtn"), secHeadN = $("secHeadN");
   var videoBox = $("lessonVideo"), tlBox = $("lessonTimeline"), descBox = $("lessonDesc");
   var docBox = $("lessonDoc"), proseEl = $("lessonProse");
   var classMission = $("classMission"), nextLesson = $("nextLesson"), prevLesson = $("prevLesson");
@@ -3238,13 +3237,13 @@
     var sc = section();
     if (!sc) return;   // 아직 강의가 없는 라운지. 강의실은 빈 화면으로 둔다.
     crumbCur.textContent = sc.title;
-    secPickN.textContent = String(sc.seq);
+    secHeadN.textContent = String(sc.seq);
     weekTitle.textContent = sc.title;
     renderSecMenu(sc);
   }
 
-  /* 섹션 전환 드롭다운. 강의 탭으로 나가지 않고도 어느 섹션으로든 간다.
-     줄마다 상태 표시 · 번호 · 제목 · 진도 %. 관리자는 비공개 섹션도 본다. */
+  /* 전체 목차 드롭다운. 섹션 머리를 누르면 섹션 전부와 그 아래 레슨 전부가 내려온다.
+     레슨 줄 → 그 레슨. 섹션 줄 → 그 섹션의 첫 레슨. 관리자는 비공개 섹션도 본다. */
   function renderSecMenu(cur) {
     if (!secPick) return;
     var old = secPick.querySelector(".pick-menu");
@@ -3254,30 +3253,40 @@
     menu.setAttribute("role", "menu");
     shownSections().forEach(function (sc) {
       var p = pctOf(sc);
-      var b = el("button");
-      b.type = "button";
-      b.setAttribute("role", "menuitem");
-      b.setAttribute("aria-current", String(sc === cur));
-      var st = el("span", "lstate " + (p.value === 100 ? "is-done" : p.done > 0 ? "is-part" : ""));
-      st.setAttribute("aria-hidden", "true");
-      if (p.value === 100) st.appendChild(icon("check", 11));
-      b.appendChild(st);
-      b.appendChild(el("span", "n disp", String(sc.seq)));
-      b.appendChild(el("span", "t", sc.title));
-      b.appendChild(el("span", "p tnum", sc.published ? p.value + "%" : "비공개"));
-      b.addEventListener("click", function (e) { e.stopPropagation(); closePicks(); openLesson(sc.id); });
-      menu.appendChild(b);
+      var sb = el("button", "sec");
+      sb.type = "button";
+      sb.setAttribute("role", "menuitem");
+      sb.setAttribute("aria-current", String(sc === cur));
+      sb.appendChild(el("span", "n disp", String(sc.seq)));
+      sb.appendChild(el("span", "t", sc.title));
+      sb.appendChild(el("span", "p tnum", sc.published ? p.value + "%" : "비공개"));
+      sb.addEventListener("click", function (e) { e.stopPropagation(); closePicks(); openLesson(sc.id); });
+      menu.appendChild(sb);
+      sc.lessons.forEach(function (l) {
+        var lb = el("button", "les");
+        lb.type = "button";
+        lb.setAttribute("role", "menuitem");
+        lb.setAttribute("aria-current", String(l === viewLesson));
+        lb.appendChild(stateIcon(l));
+        lb.appendChild(el("span", "t", l.title));
+        lb.appendChild(el("span", "d tnum", l.durationSec ? mmss(l.durationSec) : "교안"));
+        lb.addEventListener("click", function (e) { e.stopPropagation(); closePicks(); openLesson(sc.id, l.id); });
+        menu.appendChild(lb);
+      });
     });
-    secPickBtn.insertAdjacentElement("afterend", menu);
+    secHeadBtn.insertAdjacentElement("afterend", menu);
   }
-  if (secPickBtn) secPickBtn.addEventListener("click", function (e) {
+  if (secHeadBtn) secHeadBtn.addEventListener("click", function (e) {
     e.stopPropagation();
     var menu = secPick.querySelector(".pick-menu");
     if (!menu) return;
     var open = menu.hidden;
     closePicks();
+    if (open) renderSecMenu(section());   // 지금 레슨이 표시되게 새로 그린다
+    menu = secPick.querySelector(".pick-menu");
     menu.hidden = !open;
-    secPickBtn.setAttribute("aria-expanded", String(open));
+    secHeadBtn.setAttribute("aria-expanded", String(open));
+    if (open) { var c = menu.querySelector('.les[aria-current="true"]'); if (c) c.scrollIntoView({ block: "nearest" }); }
   });
 
   function updateProgress() {
@@ -3288,17 +3297,6 @@
     pctFill.style.width = p.value + "%";
     qDone.textContent = String(p.done);
     qAll.textContent = String(p.all);
-    // 전체 진도 : 공개 섹션의 레슨 전부 중 끝까지 본 것
-    var all = 0, done = 0;
-    liveSections().forEach(function (s) { var q = pctOf(s); all += q.all; done += q.done; });
-    var v = all ? Math.round((done / all) * 100) : 0;
-    if (allProgT) {
-      allProgT.textContent = "";
-      allProgT.appendChild(el("span", "tnum", done + "/" + all));
-      allProgT.appendChild(document.createTextNode(" 레슨 · "));
-      allProgT.appendChild(el("span", "tnum", v + "%"));
-      allProgFill.style.width = v + "%";
-    }
     renderCourseList();
   }
 

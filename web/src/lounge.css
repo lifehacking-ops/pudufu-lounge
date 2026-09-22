@@ -1687,22 +1687,30 @@
   .courses-note b { color: var(--ink); }
   .curric { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .week-t { margin-top: 4px; }
-  /* 커리큘럼 카드 머리 : 전체 진도 한 줄, 그 아래 '섹션 N' 단추(kicker 자리) */
-  .allprog .pct-row { margin-bottom: var(--sp-7); }
-  .secpick { display: inline-block; }
-  .secpick-btn {
-    padding: 2px var(--sp-7) 2px var(--sp-9); gap: 4px; border-color: var(--hair);
-    font-size: var(--text-11); font-weight: 600; letter-spacing: .06em; color: var(--mist);
+  /* 커리큘럼 카드 머리 : 섹션 번호 · 제목 전체가 단추. 누르면 전체 목차가 내려온다 */
+  .sechead-wrap { margin: -4px -8px 0; }
+  .sechead-btn {
+    display: flex; align-items: flex-start; gap: var(--sp-9); width: 100%; text-align: left;
+    padding: 4px 8px; border-radius: var(--radius-ctl);
   }
-  .secpick-btn:hover { color: var(--ink); border-color: var(--mist); }
-  .secpick-btn .caret { color: var(--mist); }
-  .sec-menu { left: 0; right: auto; width: min(320px, calc(100vw - 48px)); max-height: 60vh; overflow-y: auto; }
+  .sechead-btn:hover { background: var(--canvas); }
+  .sechead-btn .grow { min-width: 0; display: grid; gap: 4px; }
+  .sechead-btn .kicker { display: block; }
+  .sechead-btn .week-t { display: block; margin: 0; }
+  .sechead-btn .caret { color: var(--mist); flex: none; margin-top: 2px; transition: transform var(--transition-normal); }
+  .sechead-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+  .sec-menu { left: 0; right: 0; max-height: 60vh; overflow-y: auto; }
   .sec-menu button { gap: var(--sp-9); align-items: flex-start; line-height: 1.45; }
-  .sec-menu .lstate { margin-top: 1px; }
-  .sec-menu .n { flex: none; min-width: 14px; font-weight: 700; color: var(--mist); }
+  .sec-menu .sec { font-weight: 700; color: var(--ink); margin-top: 4px; }
+  .sec-menu .sec:first-child { margin-top: 0; }
+  .sec-menu .sec .n { flex: none; min-width: 14px; color: var(--mist); }
+  .sec-menu .sec .p { flex: none; font-weight: 700; color: var(--slate); }
+  .sec-menu .sec[aria-current="true"] .p { color: var(--brand); }
+  .sec-menu .les { padding-left: calc(var(--sp-11) + 22px); }
+  .sec-menu .les .lstate { margin-top: 1px; }
+  .sec-menu .les .d { flex: none; font-family: var(--font-display); font-size: var(--text-11); color: var(--mist); padding-top: 2px; }
   .sec-menu .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  .sec-menu .p { flex: none; font-weight: 700; color: var(--slate); }
-  .sec-menu button[aria-current="true"] .p { color: var(--brand); }
+  .sec-menu .les[aria-current="true"] { color: var(--brand); font-weight: 700; }
   .pct-row { justify-content: space-between; margin-bottom: var(--sp-7); }
   .lesson-card { display: grid; gap: 16px; }
   .lesson-head-t { min-width: 0; }

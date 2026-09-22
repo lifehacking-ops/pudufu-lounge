@@ -247,8 +247,18 @@
     <!-- 좌측 커리큘럼 : 이 섹션의 레슨. 레슨을 누르면 그 아래로 과제 · 자료가 내려온다 -->
     <div class="curric-col">
       <div class="card pad-s curric">
+        <!-- 전체 진도 : 공개 섹션의 모든 레슨 중 끝까지 본 것 -->
+        <div class="allprog">
+          <div class="row pct-row"><span class="kicker">전체 진도</span><span class="meta-m" id="allProgT"><span class="tnum">0/0</span> 레슨 · <span class="tnum">0%</span></span></div>
+          <div class="track"><div class="fill" id="allProgFill"></div></div>
+        </div>
+        <div class="hr"></div>
+
+        <!-- 섹션 머리. '섹션 N' 이 단추다 — 누르면 섹션 전부가 진도와 함께 내려오고, 고르면 화면 이동 없이 그 섹션으로 -->
         <div>
-          <span class="kicker" id="weekKicker">학원마케팅 올인원 강의 · 섹션 <span class="disp">3</span></span>
+          <div class="pick secpick" id="secPick">
+            <button class="pick-btn secpick-btn" type="button" id="secPickBtn" aria-expanded="false" aria-haspopup="menu"><span>섹션 <span class="disp" id="secPickN">3</span></span><span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></button>
+          </div>
           <h2 class="card-t week-t" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</h2>
         </div>
 
@@ -450,7 +460,7 @@
         <thead><tr><th>단계</th><th>화면</th><th>내용</th></tr></thead>
         <tbody>
           <tr><td>1</td><td>강의 목록</td><td>섹션 카드 &mdash; 제목 · 레슨 수 · 총 시간 · 진도 % · 상태(완료 / 진행중 / 예정). 카드 아래 <code>목차</code> 를 펴면 레슨 줄이 카드 안에 내려오고, 줄을 누르면 그 레슨으로 바로 간다. 커버 사진은 두지 않는다 &mdash; 읽으러 오는 자리지 보러 오는 자리가 아니다</td></tr>
-          <tr><td>2</td><td>강의 상세</td><td>좌측 이 섹션의 레슨 목록(누르면 그 아래로 과제 · 자료가 내려온다) + 우측 영상 → 타임라인(접힘, 눌러 이동) → 설명란(<code>12:30</code> 도 눌러 이동) → 교안(접힘)</td></tr>
+          <tr><td>2</td><td>강의 상세</td><td>좌측 카드 머리에 전체 진도와 <b>섹션 전환</b>(&lsquo;섹션 N&rsquo; 을 누르면 섹션 전부가 진도와 함께 내려온다), 그 아래 이 섹션의 레슨 목록(누르면 그 아래로 과제 · 자료가 내려온다) + 우측 영상 → 타임라인(접힘, 눌러 이동) → 설명란(<code>12:30</code> 도 눌러 이동) → 교안(접힘)</td></tr>
           <tr><td>3</td><td>진도</td><td>스스로 체크하는 것이 없다. <b>영상을 끝까지 보면</b> 레슨 완료, 섹션 % = 완료 레슨 / 레슨. 시청 시간의 원본은 프드프다</td></tr>
           <tr><td>4</td><td>건너뛰기</td><td>우측 레일 &lsquo;이어보기&rsquo;는 목록을 지나치고 마지막으로 본 레슨으로 바로 간다. 매일 오는 사람은 목록을 볼 이유가 없다</td></tr>
         </tbody>

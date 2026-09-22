@@ -1687,6 +1687,22 @@
   .courses-note b { color: var(--ink); }
   .curric { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .week-t { margin-top: 4px; }
+  /* 커리큘럼 카드 머리 : 전체 진도 한 줄, 그 아래 '섹션 N' 단추(kicker 자리) */
+  .allprog .pct-row { margin-bottom: var(--sp-7); }
+  .secpick { display: inline-block; }
+  .secpick-btn {
+    padding: 2px var(--sp-7) 2px var(--sp-9); gap: 4px; border-color: var(--hair);
+    font-size: var(--text-11); font-weight: 600; letter-spacing: .06em; color: var(--mist);
+  }
+  .secpick-btn:hover { color: var(--ink); border-color: var(--mist); }
+  .secpick-btn .caret { color: var(--mist); }
+  .sec-menu { left: 0; right: auto; width: min(320px, calc(100vw - 48px)); max-height: 60vh; overflow-y: auto; }
+  .sec-menu button { gap: var(--sp-9); align-items: flex-start; line-height: 1.45; }
+  .sec-menu .lstate { margin-top: 1px; }
+  .sec-menu .n { flex: none; min-width: 14px; font-weight: 700; color: var(--mist); }
+  .sec-menu .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .sec-menu .p { flex: none; font-weight: 700; color: var(--slate); }
+  .sec-menu button[aria-current="true"] .p { color: var(--brand); }
   .pct-row { justify-content: space-between; margin-bottom: var(--sp-7); }
   .lesson-card { display: grid; gap: 16px; }
   .lesson-head-t { min-width: 0; }

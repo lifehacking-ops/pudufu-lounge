@@ -212,7 +212,7 @@ window.LOUNGE_DATA = {
       thread: [] }
   ],
 
-  /* 레슨. section = 섹션 번호(1부터). 설명란은 레슨 소개 문장이고, 안의 mm:ss 는 눌러 이동한다. 타임라인은 따로. */
+  /* 레슨. section = 섹션 번호(1부터). description 은 검색에만 쓰인다(화면에 없음). 타임라인은 영상 아래 토글. */
   lessons: [
     { section: 1, t: "우리 학원의 주인공은 누구인가", durationSec: 310, videoUrl: "https://www.youtube.com/watch?v=d3RNpwbWaJU",
       description: "주인공 학생 한 명을 정하는 레슨입니다. 안 받을 학생을 먼저 말해 보면 주인공이 선명해집니다. 고객 정의는 1:43 부터, 과제 안내는 3:26 에 있습니다.",

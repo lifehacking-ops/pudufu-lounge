@@ -3088,7 +3088,7 @@
   var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle");
   var crumbCur = $("crumbCur"), weekTitle = $("weekTitle");
   var secPick = $("secPick"), secHeadBtn = $("secHeadBtn"), secHeadN = $("secHeadN");
-  var videoBox = $("lessonVideo"), tlBox = $("lessonTimeline"), descBox = $("lessonDesc");
+  var videoBox = $("lessonVideo"), tlBox = $("lessonTimeline");
   var docBox = $("lessonDoc"), proseEl = $("lessonProse");
   var classMission = $("classMission"), nextLesson = $("nextLesson"), prevLesson = $("prevLesson");
 
@@ -3483,28 +3483,6 @@
     return m[3] != null ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
   }
 
-  /* 설명란. mm:ss 토큰은 눌러서 그 시각으로 가는 단추가 된다. */
-  function renderDesc(l) {
-    descBox.textContent = "";
-    var text = l.description || "";
-    if (!text.trim()) { descBox.hidden = true; return; }
-    descBox.hidden = false;
-    var re = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g, at = 0, m;
-    while ((m = re.exec(text))) {
-      if (m.index > at) descBox.appendChild(document.createTextNode(text.slice(at, m.index)));
-      var sec = parseStamp(m[0]);
-      if (sec == null || !l.videoUrl) { descBox.appendChild(document.createTextNode(m[0])); }
-      else {
-        var b = el("button", "tl-tok", m[0]);
-        b.type = "button";
-        b.addEventListener("click", (function (x) { return function () { seekTo(x); }; })(sec));
-        descBox.appendChild(b);
-      }
-      at = m.index + m[0].length;
-    }
-    if (at < text.length) descBox.appendChild(document.createTextNode(text.slice(at)));
-  }
-
   /* 타임라인 토글. 기본은 접힘. 모든 레슨에 자리가 있고, 구간이 없으면 그렇다고 말한다. */
   function renderTimeline(l) {
     tlBox.textContent = "";
@@ -3554,7 +3532,6 @@
     classMission.hidden = true;
     mountPlayer(l);
     renderTimeline(l);
-    renderDesc(l);
     renderDoc(l);
 
     var i = sc.lessons.indexOf(l);
@@ -3605,7 +3582,6 @@
     lessonTitle.textContent = task.title;
     videoBox.hidden = true;
     tlBox.hidden = true;
-    descBox.hidden = true;
     docBox.hidden = true;
     classMission.hidden = false;
     classMission.textContent = "";

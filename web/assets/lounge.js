@@ -3340,7 +3340,7 @@
           b.type = "button";
           b.appendChild(el("span", "sub-k", "과제"));
           b.appendChild(el("span", "t", tk.title));
-          b.appendChild(el("span", "badge " + (tk.submittedPostId ? "b-ontime" : "b-none"), tk.submittedPostId ? "제출함" : "미제출"));
+          b.appendChild(el("span", "d st" + (tk.submittedPostId ? " is-done" : ""), tk.submittedPostId ? "제출함" : "미제출"));
           b.addEventListener("click", function () { mountTask(tk); });
           row.appendChild(b);
           sub.appendChild(row);
@@ -3546,6 +3546,8 @@
     lessonTitle.textContent = l.title;
 
     videoBox.hidden = false;
+    tlBox.hidden = false;    // 과제 모듈이 숨긴 것을 되돌린다
+    docBox.hidden = false;
     classMission.hidden = true;
     mountPlayer(l);
     renderTimeline(l);

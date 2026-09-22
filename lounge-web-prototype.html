@@ -247,11 +247,14 @@
     <!-- 좌측 커리큘럼 : 이 섹션의 레슨. 레슨을 누르면 그 아래로 과제 · 자료가 내려온다 -->
     <div class="curric-col">
       <div class="card pad-s curric">
-        <!-- 챕터 머리 : [챕터 N] 배지 + 제목이 한 덩어리, 오른쪽 '목차' 단추를 누르면 전체 목차(챕터 전부 · 레슨 전부)가 내려온다.
+        <!-- 챕터 머리 : 챕터 N 위에, 제목 아래에. 오른쪽 '목차' 단추를 누르면 전체 목차(챕터 전부 · 레슨 전부)가 내려온다.
              레슨을 누르면 그 레슨으로, 챕터를 누르면 그 챕터의 첫 레슨으로. -->
         <div class="pick sechead-wrap" id="secPick">
           <div class="sechead">
-            <h2 class="card-t week-t"><span class="chap" id="secHeadN">챕터 3</span><span id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</span></h2>
+            <div class="grow sechead-t">
+              <span class="kicker" id="secHeadN">챕터 3</span>
+              <h2 class="card-t week-t" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</h2>
+            </div>
             <button class="pick-btn tocbtn" type="button" id="secHeadBtn" aria-expanded="false" aria-haspopup="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg><span>목차</span></button>
           </div>
         </div>

@@ -292,14 +292,14 @@
         <!-- 목록에서 과제를 고르면 위 영상 · 교안 대신 이 칸이 열린다. -->
         <div id="classMission" hidden></div>
 
-        <div class="hr"></div>
-
-        <div class="row">
-          <button type="button" class="btn-sec" id="prevLesson">이전 레슨</button>
-          <span class="grow"></span>
-          <button type="button" class="btn-primary sm" id="nextLesson">다음 레슨</button>
-        </div>
       </article>
+
+      <!-- 이전 · 다음은 본문 카드 밖에. 카드 안은 영상 · 타임라인 · 교안(또는 과제)만 -->
+      <div class="row lesson-nav">
+        <button type="button" class="btn-sec" id="prevLesson">이전 레슨</button>
+        <span class="grow"></span>
+        <button type="button" class="btn-primary sm" id="nextLesson">다음 레슨</button>
+      </div>
     </div>
   </div>
 </div>

@@ -1710,6 +1710,7 @@
   .sec-menu .les[aria-current="true"] { color: var(--brand); font-weight: 700; }
   .pct-row { justify-content: flex-end; margin-bottom: var(--sp-7); }   /* 진도 % 는 막대 오른쪽 위 */
   .lesson-card { display: grid; gap: 16px; }
+  .lesson-nav { padding: 0 4px; }
   .lesson-head-t { min-width: 0; }
   .lesson-t { font-size: var(--text-xl); margin-top: var(--sp-5); }
   .video-cap { font-size: var(--text-11); }

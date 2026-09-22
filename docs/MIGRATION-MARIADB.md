@@ -65,7 +65,10 @@ SQL 은 이 세 파일에만 있다. 나머지 서버 코드(`present.js`, `inde
 | `INSERT … RETURNING id` | writes 128 · 270 · 377 · 514 | 그대로 (10.5+). 또는 `result.insertId` |
 | `INSERT … ON CONFLICT (…) DO UPDATE SET …` | writes 441 · 482 · 491 · 549 · 605 · 841 | `INSERT … ON DUPLICATE KEY UPDATE col = VALUES(col)` |
 | `INSERT … ON CONFLICT DO NOTHING RETURNING post_id` (첫 조회 판정) | writes 577 | `INSERT IGNORE … RETURNING post_id` — 이미 있으면 빈 결과 |
-| `ON CONFLICT (lounge_id, week) DO UPDATE SET published = false` | writes 553 | `ON DUPLICATE KEY UPDATE published = FALSE` |
+| `ON CONFLICT (lounge_id, section_id) DO UPDATE …` (섹션 게시) | writes setSectionPublished | `ON DUPLICATE KEY UPDATE published = VALUES(published)` |
+| `ext_watch` upsert with `greatest(watched_sec, $3)`, `is_complete OR $4` | writes markWatched | `ON DUPLICATE KEY UPDATE watched_sec = GREATEST(watched_sec, VALUES(watched_sec)), is_complete = is_complete OR VALUES(is_complete)` |
+| `jsonb` 컬럼 `lesson_task.questions` · `ext_lesson.timeline` | present | JSON 문자열 → `JSON.parse` (present.js 는 이미 문자열도 받게 되어 있다) |
+| 부분 유니크 `uq_post_task_user` | schema | 생성 컬럼 `live_task` + UNIQUE(live_task, user_id) — 스키마에 들어 있다 |
 | `UPDATE … RETURNING view_count` / `quota_per, used` / `muted_until` | writes 581 · 715 · 822 | **MariaDB 는 UPDATE 에 RETURNING 이 없다.** UPDATE 뒤 SELECT 한 번 |
 | `coalesce · least · greatest` | writes 549 등 | 그대로 |
 | `WITH got AS (…)` | queries 224 | 그대로 (10.2+) |

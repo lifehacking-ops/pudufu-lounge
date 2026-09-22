@@ -14,11 +14,11 @@ SET TIME ZONE 'UTC';
 
 BEGIN;
 
-TRUNCATE lounge_week, lounge_digest, feedback_pass_use, post_view, reaction, comment,
-  attachment, post_answer, post, lounge_category, category, lounge_member,
-  lounge RESTART IDENTITY CASCADE;
-TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase, ext_mission,
-  ext_lesson, ext_week, ext_course, ext_user RESTART IDENTITY CASCADE;
+TRUNCATE lounge_section, lounge_digest, feedback_pass_use, post_view, reaction, comment,
+  attachment, post_answer, post, lesson_material, lesson_task, lounge_category, category,
+  lounge_member, lounge RESTART IDENTITY CASCADE;
+TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase,
+  ext_lesson, ext_section, ext_course, ext_user RESTART IDENTITY CASCADE;
 
 
 -- =============================================================================
@@ -55,68 +55,41 @@ INSERT INTO ext_user (id, nickname, email, synced_at) VALUES
   (26, '프드프 관리자', 'user26@example.com', now());
 
 -- 강의
-INSERT INTO ext_course (id, title, weeks, synced_at) VALUES
-  (1, '학원마케팅 올인원 강의', 8, now());
+INSERT INTO ext_course (id, title, synced_at) VALUES
+  (1, '학원마케팅 올인원 강의', now());
 
--- 주차 제목. 강의 목록의 카드 제목이 된다.
-INSERT INTO ext_week (course_id, week, title, synced_at) VALUES
-  (1, 1, '옆 학원 말고, 왜 우리 학원인데?', now()),
-  (1, 2, '원장님 학원, 검색하면 나와요?', now()),
-  (1, 3, '블로그 100개 썼는데, 왜 문의는 0건일까요?', now()),
-  (1, 4, '선택이 아닌 필수, 학원 인스타', now()),
-  (1, 5, '99% 등록으로 이루어지는 상담의 기술', now()),
-  (1, 6, '신규 100명보다 더 중요한 재원생 관리', now()),
-  (1, 7, '유튜브 · 맘카페 · 당근 채널 확장 전략', now()),
-  (1, 8, '원장 수업 없는 학원 시스템 만들기', now());
+-- 섹션. 강의 목록의 카드 하나. id 는 목업 순서와 같다.
+INSERT INTO ext_section (id, course_id, seq, title, synced_at) OVERRIDING SYSTEM VALUE VALUES
+  (1, 1, 1, '옆 학원 말고, 왜 우리 학원인데?', now()),
+  (2, 1, 2, '원장님 학원, 검색하면 나와요?', now()),
+  (3, 1, 3, '블로그 100개 썼는데, 왜 문의는 0건일까요?', now()),
+  (4, 1, 4, '선택이 아닌 필수, 학원 인스타', now()),
+  (5, 1, 5, '99% 등록으로 이루어지는 상담의 기술', now()),
+  (6, 1, 6, '신규 100명보다 더 중요한 재원생 관리', now()),
+  (7, 1, 7, '유튜브 · 맘카페 · 당근 채널 확장 전략', now()),
+  (8, 1, 8, '원장 수업 없는 학원 시스템 만들기', now());
 
--- 주차별 강. 교안 본문이 통합 검색의 대상이 된다.
-INSERT INTO ext_lesson (course_id, week, seq, chapter, title, duration, video_url, doc, synced_at) VALUES
-  (1, 1, 1, '고객 정의', '우리 학원의 주인공은 누구인가', '5:10', 'https://customer-xxxx.cloudflarestream.com/1-1-1/iframe', '여러분 학원의 주인공은 어떤 아이입니까. 그리고 뒤집어서, 안 받을 학생을 말할 수 있습니까. 학생을 정하면 학부모도 정해집니다. 그 학부모가 밤에 무엇을 검색하고, 상담 전화에서 무엇을 차마 못 묻는지까지 따라옵니다.', now()),
-  (1, 1, 2, '경쟁사 분석', '옆 학원은 뭐라고 말하고 있는가', '4:30', 'https://customer-xxxx.cloudflarestream.com/1-1-2/iframe', '우리 동네 학원 다섯 곳의 소개글을 나란히 놓으면 이름을 가려도 구분이 됩니까. 경쟁 분석의 목적은 이기는 게 아니라 빈자리를 찾는 것입니다. 다들 상위권과 소수정예를 외칠 때 아무도 안 서 있는 자리는 어디인가.', now()),
-  (1, 1, 3, '포지셔닝', '학원 소개 6문장 쓰기', '6:20', NULL, '타겟 선언, 진짜 문제, 우리의 방법, 증거, 차별점 한 방, 다음 행동 제안. 여섯 문장이 전부 주인공 정의에서 흘러나옵니다. 이 여섯 문장이 이후 블로그와 인스타와 상담 멘트의 기초가 됩니다.', now()),
-  (1, 2, 1, '검색 여정', '학부모는 어떤 경로로 학원을 찾는가', '4:15', 'https://customer-xxxx.cloudflarestream.com/1-2-1/iframe', '소개받은 학부모도 등록 전에 반드시 하는 행동이 있습니다. 검색입니다. 검색에서 플레이스 목록, 사진과 리뷰 훑기, 블로그 확인, 그리고 문의. 이 여정의 각 단계마다 학부모가 이탈합니다.', now()),
-  (1, 2, 2, '플레이스', '플레이스 전면 재세팅', '4:05', 'https://customer-xxxx.cloudflarestream.com/1-2-2/iframe', '상위노출을 결정하는 요소들. 소개글은 새로 쓰는 게 아니라 1주차 여섯 문장을 축약해서 붙이는 것입니다. 사진은 학부모가 확인하고 싶은 것 순서대로 공간, 수업, 아이들. 리뷰는 요청하는 법과 답글 다는 법.', now()),
-  (1, 3, 1, '키워드', '학부모는 블로그에서 무엇을 검색하는가', '4:20', 'https://customer-xxxx.cloudflarestream.com/1-3-1/iframe', '학부모는 학원 소식을 검색하지 않습니다. 1주차 주인공 학부모가 밤에 검색하는 말들이 곧 키워드입니다. 지역 키워드와 고민 키워드 두 갈래로 모읍니다.', now()),
-  (1, 3, 2, '블로그 3종 세트', '블로그 3종 세트 — 이것부터 쓰면 된다', '4:55', 'https://customer-xxxx.cloudflarestream.com/1-3-2/iframe', '소개하기는 1주차 여섯 문장을 글 한 편으로 풀어낸 것입니다. 학부모 질문 TOP 10은 상담 전화에서 실제로 받는 질문에 미리 답하기. 고객의 언어는 학부모가 차마 못 묻는 걱정을 먼저 꺼내서 답하기.', now()),
-  (1, 3, 3, '콘텐츠 분류', '콘텐츠 5기둥 — 올리는 모든 것의 분류함', '4:05', NULL, '전문가로 실력을 증명하고, 철학으로 왜 이렇게 가르치는지 말하고, 증거로 변화 사례와 후기를 쌓고, 신뢰로 일상과 사람 냄새를 내고, 상품으로 모집과 안내를 합니다. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다.', now()),
-  (1, 4, 1, '프로필', '학부모는 3초 안에 판단한다', '3:50', 'https://customer-xxxx.cloudflarestream.com/1-4-1/iframe', '학부모는 피드를 안 내립니다. 프로필 화면 하나 보고 나갈지 말지 정합니다. 프로필 첫 화면에서 보이는 것은 프로필 사진과 소개글과 하이라이트와 최근 게시물 아홉 개입니다.', now()),
-  (1, 4, 2, '계정 세팅', '소개글 4줄 공식', '4:40', NULL, '누구를 위한 학원인지, 뭐가 다른지, 믿을 근거는 무엇인지, 뭘 하면 되는지. 1주차 여섯 문장의 압축판입니다. 여기서도 새로 쓰는 게 아니라 있는 재료를 줄이는 것입니다. 검색되는 이름 짓기도 같이 합니다.', now()),
-  (1, 5, 1, '상담 준비', '상담은 예약 순간부터 시작된다', '4:10', 'https://customer-xxxx.cloudflarestream.com/1-5-1/iframe', '예약 응대의 톤, 확인 연락, 오시는 길 안내까지. 학부모는 학원에 도착하기 전에 이미 절반을 판단합니다.', now()),
-  (1, 5, 2, '도착 3분', '환영받은 기분 — 도착 후 3분의 설계', '5:30', 'https://customer-xxxx.cloudflarestream.com/1-5-2/iframe', '문 앞까지 나가 기다리기, 환영의 인사, 꽃 한 송이, 메뉴판. 이 학원은 우리를 기다렸구나를 만드는 장치들입니다. 비용은 거의 안 들고 효과는 즉시 나타납니다.', now()),
-  (1, 5, 3, '클로징', '등록하시겠어요 — CTA는 문구다', '3:45', NULL, '클로징을 화법이 아니라 준비된 한 문장으로 합니다. 어물어물 넘기다 연락드릴게요로 끝나는 상담과, 자연스럽게 등록을 묻는 상담의 차이입니다.', now()),
-  (1, 6, 1, '퇴원 징후', '갑자기 그만두는 학생은 없다', '4:25', 'https://customer-xxxx.cloudflarestream.com/1-6-1/iframe', '결석과 지각 패턴의 변화, 숙제 질 저하, 학부모 답장 톤의 변화, 요즘 애가 힘들어해서요라는 말. 퇴원은 갑자기 오지 않습니다. 신호를 놓쳤을 뿐입니다.', now()),
-  (1, 6, 2, '소통 체계', '학부모 리포트와 소개가 나오는 구조', '4:50', NULL, '신규 한 명 데려오는 비용보다 재원생 한 명 지키는 비용이 훨씬 쌉니다. 구멍 난 독에 물 붓기를 멈추는 것이 먼저입니다.', now()),
-  (1, 7, 1, '채널 성격', '채널 6종 성격표', '5:05', 'https://customer-xxxx.cloudflarestream.com/1-7-1/iframe', '유튜브 롱폼, 쓰레드, 맘카페, 당근, 파워링크, 전단지와 현수막. 각각 누가 보는가, 성과까지 걸리는 시간, 원장 시간 소요, 어떤 학원에 맞는가.', now()),
-  (1, 7, 2, '퍼널', '모든 길은 한 곳으로', '4:15', NULL, '채널을 늘리는 게 성장이 아닙니다. 어설픈 여섯 개보다 제대로 된 두 개입니다. 어느 문으로 들어와도 플레이스와 블로그를 거쳐 문의는 상담 시스템이 받습니다.', now()),
-  (1, 8, 1, '소통 체계', '정보가 원장을 거치지 않고도 원장에게 닿게', '5:40', 'https://customer-xxxx.cloudflarestream.com/1-8-1/iframe', '출결, 학생 특이사항, 학부모 컴플레인이 생기면 강사는 어디로 어떤 형식으로 보고하는가. 보고 체계를 일원화하고 양식화합니다. 그래서 원장만 모르는 일이 없게 만듭니다.', now()),
-  (1, 8, 2, '업무 매뉴얼', '학원의 결정은 원장이 아니라 원칙이 한다', '4:35', NULL, '매뉴얼은 두꺼운 문서가 아니라 우리 학원의 원칙 목록입니다. 결석 대응, 보강 규정, 컴플레인 1차 응대, 환불. 원장이 없어도 같은 결정이 나오게 합니다.', now());
-
--- 주차별 미션 양식. 글쓰기 창의 과제 폼이 이걸 읽는다.
-INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at) VALUES
-  (1, 1, '1주차 미션 · 우리 학원의 주인공 정하기', 1, '우리 학원의 주인공은 어떤 아이인가요?', '예: 머리가 나쁜 게 아니라 어느 순간 수학을 포기하는 게 편해진 아이', now()),
-  (1, 1, '1주차 미션 · 우리 학원의 주인공 정하기', 2, '반대로, 안 받을 학생을 한 줄로 적어보세요.', '예: 저는 전교 1등을 안 받습니다', now()),
-  (1, 1, '1주차 미션 · 우리 학원의 주인공 정하기', 3, '둘을 합쳐 우리 학원을 한 문장으로 쓰면?', '옆 학원이 가져다 써도 말이 되면 아직 우리 문장이 아닙니다', now()),
-  (1, 2, '2주차 미션 · 플레이스 다시 세팅하기', 1, '''○○동 수학학원''을 검색하면 우리는 몇 번째에 나오나요?', '예: 1페이지에 없습니다. 2페이지 중간쯤', now()),
-  (1, 2, '2주차 미션 · 플레이스 다시 세팅하기', 2, '학부모가 우리를 놓치는 단계는 어디인가요?', '검색 → 플레이스 목록 → 사진·리뷰 → 블로그 → 문의 중에서', now()),
-  (1, 2, '2주차 미션 · 플레이스 다시 세팅하기', 3, '1주차 여섯 문장을 줄여 플레이스 소개글을 적어보세요.', '새로 쓰는 게 아니라 있는 걸 줄이는 겁니다', now()),
-  (1, 3, '3주차 미션 · 학부모가 검색하는 말로 글 쓰기', 1, '주인공 학부모가 밤에 검색하는 말 세 개를 적으세요.', '지역 키워드(○○동 수학학원) + 고민 키워드(수포자 학원)', now()),
-  (1, 3, '3주차 미션 · 학부모가 검색하는 말로 글 쓰기', 2, '학부모가 상담에서 차마 못 묻는 걱정은 무엇인가요?', '예: 우리 애만 못 따라가면 어쩌죠', now()),
-  (1, 3, '3주차 미션 · 학부모가 검색하는 말로 글 쓰기', 3, '그 걱정에 먼저 답하는 글의 제목을 지어보세요.', '하고 싶은 말이 아니라 학부모가 검색하는 질문에 답하는 제목', now()),
-  (1, 4, '4주차 미션 · 프로필 4줄 다시 쓰기', 1, '지금 우리 계정 프로필 첫 화면에 무엇이 보이나요?', '프사 · 소개글 · 하이라이트 · 최근 게시물 아홉 개', now()),
-  (1, 4, '4주차 미션 · 프로필 4줄 다시 쓰기', 2, '소개글 4줄을 적어보세요.', '누구를 위한 / 뭐가 다른 / 믿을 근거 / 뭘 하면 되는지', now()),
-  (1, 4, '4주차 미션 · 프로필 4줄 다시 쓰기', 3, '검색되는 계정 이름으로 바꾼다면?', '예: ○○동수학 매쓰플랜', now()),
-  (1, 5, '5주차 미션 · 상담 3분 설계하기', 1, '지난달 문의 몇 건 중 몇 건이 등록으로 이어졌나요?', '학생 한 명이 연 120만 원입니다. 숫자로 마주하세요', now()),
-  (1, 5, '5주차 미션 · 상담 3분 설계하기', 2, '학부모가 도착한 뒤 3분 동안 무엇을 하시겠습니까?', '예: 문 앞까지 나가 기다리기 · 꽃 한 송이 · 메뉴판', now()),
-  (1, 5, '5주차 미션 · 상담 3분 설계하기', 3, '등록을 묻는 한 문장을 미리 적어두세요.', '화법이 아니라 준비된 문장입니다. 어물어물 넘기면 연락드릴게요로 끝납니다', now()),
-  (1, 6, '6주차 미션 · 퇴원 신호 찾아내기', 1, '최근 그만둔 학생에게 미리 어떤 신호가 있었나요?', '결석·지각 패턴, 숙제 질, 학부모 답장 톤', now()),
-  (1, 6, '6주차 미션 · 퇴원 신호 찾아내기', 2, '지금 그 신호가 보이는 학생은 누구인가요?', '퇴원은 갑자기 오지 않습니다. 놓쳤을 뿐입니다', now()),
-  (1, 6, '6주차 미션 · 퇴원 신호 찾아내기', 3, '그 학생에게 이번 주에 무엇을 하시겠습니까?', '예: 개별 면담 10분, 학부모에게 리포트 한 장', now()),
-  (1, 7, '7주차 미션 · 채널 두 개만 고르기', 1, '주인공 학부모가 실제로 있는 채널은 어디인가요?', '유튜브 · 쓰레드 · 맘카페 · 당근 · 파워링크 · 전단지 중에서', now()),
-  (1, 7, '7주차 미션 · 채널 두 개만 고르기', 2, '내가 지속할 수 있는 채널 두 개를 고르세요.', '어설픈 여섯 개보다 제대로 된 두 개', now()),
-  (1, 7, '7주차 미션 · 채널 두 개만 고르기', 3, '버리기로 한 채널과 그 이유는?', '버린 이유가 핵심입니다', now()),
-  (1, 8, '8주차 미션 · 원장 없이도 도는 원칙 만들기', 1, '오늘 하루 원장님을 거쳐 간 결정을 세 개 적어보세요.', '출결 확인, 학부모 답장, 강사 질문, 교재 주문', now()),
-  (1, 8, '8주차 미션 · 원장 없이도 도는 원칙 만들기', 2, '그중 다른 사람이 결정해도 되는 것은 무엇인가요?', '1차 판단은 중간 관리자가, 원장에게는 걸러진 것만', now()),
-  (1, 8, '8주차 미션 · 원장 없이도 도는 원칙 만들기', 3, '우리 학원 원칙 세 개를 적어보세요.', '결석 대응 · 보강 규정 · 컴플레인 1차 응대 · 환불 중에서', now());
+-- 레슨 = 영상 하나. 교안과 설명란이 통합 검색의 대상이 된다. 타임라인은 jsonb 로 그대로.
+INSERT INTO ext_lesson (id, course_id, section_id, seq, title, duration_sec, video_url, description, timeline, doc, synced_at) OVERRIDING SYSTEM VALUE VALUES
+  (1, 1, 1, 1, '우리 학원의 주인공은 누구인가', 310, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:43 고객 정의 · 3:26 정리', '[{"t":0,"label":"인트로"},{"t":103,"label":"고객 정의"},{"t":206,"label":"정리 · 다음 레슨 예고"}]', '여러분 학원의 주인공은 어떤 아이입니까. 그리고 뒤집어서, 안 받을 학생을 말할 수 있습니까. 학생을 정하면 학부모도 정해집니다. 그 학부모가 밤에 무엇을 검색하고, 상담 전화에서 무엇을 차마 못 묻는지까지 따라옵니다.', now()),
+  (2, 1, 1, 2, '옆 학원은 뭐라고 말하고 있는가', 270, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:30 경쟁사 분석 · 3:00 정리', '[{"t":0,"label":"인트로"},{"t":90,"label":"경쟁사 분석"},{"t":180,"label":"정리 · 다음 레슨 예고"}]', '우리 동네 학원 다섯 곳의 소개글을 나란히 놓으면 이름을 가려도 구분이 됩니까. 경쟁 분석의 목적은 이기는 게 아니라 빈자리를 찾는 것입니다. 다들 상위권과 소수정예를 외칠 때 아무도 안 서 있는 자리는 어디인가.', now()),
+  (3, 1, 1, 3, '학원 소개 6문장 쓰기', 380, NULL, NULL, '[]', '타겟 선언, 진짜 문제, 우리의 방법, 증거, 차별점 한 방, 다음 행동 제안. 여섯 문장이 전부 주인공 정의에서 흘러나옵니다. 이 여섯 문장이 이후 블로그와 인스타와 상담 멘트의 기초가 됩니다.', now()),
+  (4, 1, 2, 1, '학부모는 어떤 경로로 학원을 찾는가', 255, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:25 검색 여정 · 2:50 정리', '[{"t":0,"label":"인트로"},{"t":85,"label":"검색 여정"},{"t":170,"label":"정리 · 다음 레슨 예고"}]', '소개받은 학부모도 등록 전에 반드시 하는 행동이 있습니다. 검색입니다. 검색에서 플레이스 목록, 사진과 리뷰 훑기, 블로그 확인, 그리고 문의. 이 여정의 각 단계마다 학부모가 이탈합니다.', now()),
+  (5, 1, 2, 2, '플레이스 전면 재세팅', 245, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:21 플레이스 · 2:43 정리', '[{"t":0,"label":"인트로"},{"t":81,"label":"플레이스"},{"t":163,"label":"정리 · 다음 레슨 예고"}]', '상위노출을 결정하는 요소들. 소개글은 새로 쓰는 게 아니라 1주차 여섯 문장을 축약해서 붙이는 것입니다. 사진은 학부모가 확인하고 싶은 것 순서대로 공간, 수업, 아이들. 리뷰는 요청하는 법과 답글 다는 법.', now()),
+  (6, 1, 3, 1, '학부모는 블로그에서 무엇을 검색하는가', 260, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:26 키워드 · 2:53 정리', '[{"t":0,"label":"인트로"},{"t":86,"label":"키워드"},{"t":173,"label":"정리 · 다음 레슨 예고"}]', '학부모는 학원 소식을 검색하지 않습니다. 1주차 주인공 학부모가 밤에 검색하는 말들이 곧 키워드입니다. 지역 키워드와 고민 키워드 두 갈래로 모읍니다.', now()),
+  (7, 1, 3, 2, '블로그 3종 세트 — 이것부터 쓰면 된다', 295, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:38 블로그 3종 세트 · 3:16 정리', '[{"t":0,"label":"인트로"},{"t":98,"label":"블로그 3종 세트"},{"t":196,"label":"정리 · 다음 레슨 예고"}]', '소개하기는 1주차 여섯 문장을 글 한 편으로 풀어낸 것입니다. 학부모 질문 TOP 10은 상담 전화에서 실제로 받는 질문에 미리 답하기. 고객의 언어는 학부모가 차마 못 묻는 걱정을 먼저 꺼내서 답하기.', now()),
+  (8, 1, 3, 3, '콘텐츠 5기둥 — 올리는 모든 것의 분류함', 245, NULL, NULL, '[]', '전문가로 실력을 증명하고, 철학으로 왜 이렇게 가르치는지 말하고, 증거로 변화 사례와 후기를 쌓고, 신뢰로 일상과 사람 냄새를 내고, 상품으로 모집과 안내를 합니다. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다.', now()),
+  (9, 1, 4, 1, '학부모는 3초 안에 판단한다', 230, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:16 프로필 · 2:33 정리', '[{"t":0,"label":"인트로"},{"t":76,"label":"프로필"},{"t":153,"label":"정리 · 다음 레슨 예고"}]', '학부모는 피드를 안 내립니다. 프로필 화면 하나 보고 나갈지 말지 정합니다. 프로필 첫 화면에서 보이는 것은 프로필 사진과 소개글과 하이라이트와 최근 게시물 아홉 개입니다.', now()),
+  (10, 1, 4, 2, '소개글 4줄 공식', 280, NULL, NULL, '[]', '누구를 위한 학원인지, 뭐가 다른지, 믿을 근거는 무엇인지, 뭘 하면 되는지. 1주차 여섯 문장의 압축판입니다. 여기서도 새로 쓰는 게 아니라 있는 재료를 줄이는 것입니다. 검색되는 이름 짓기도 같이 합니다.', now()),
+  (11, 1, 5, 1, '상담은 예약 순간부터 시작된다', 250, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:23 상담 준비 · 2:46 정리', '[{"t":0,"label":"인트로"},{"t":83,"label":"상담 준비"},{"t":166,"label":"정리 · 다음 레슨 예고"}]', '예약 응대의 톤, 확인 연락, 오시는 길 안내까지. 학부모는 학원에 도착하기 전에 이미 절반을 판단합니다.', now()),
+  (12, 1, 5, 2, '환영받은 기분 — 도착 후 3분의 설계', 330, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:50 도착 3분 · 3:40 정리', '[{"t":0,"label":"인트로"},{"t":110,"label":"도착 3분"},{"t":220,"label":"정리 · 다음 레슨 예고"}]', '문 앞까지 나가 기다리기, 환영의 인사, 꽃 한 송이, 메뉴판. 이 학원은 우리를 기다렸구나를 만드는 장치들입니다. 비용은 거의 안 들고 효과는 즉시 나타납니다.', now()),
+  (13, 1, 5, 3, '등록하시겠어요 — CTA는 문구다', 225, NULL, NULL, '[]', '클로징을 화법이 아니라 준비된 한 문장으로 합니다. 어물어물 넘기다 연락드릴게요로 끝나는 상담과, 자연스럽게 등록을 묻는 상담의 차이입니다.', now()),
+  (14, 1, 6, 1, '갑자기 그만두는 학생은 없다', 265, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:28 퇴원 징후 · 2:56 정리', '[{"t":0,"label":"인트로"},{"t":88,"label":"퇴원 징후"},{"t":176,"label":"정리 · 다음 레슨 예고"}]', '결석과 지각 패턴의 변화, 숙제 질 저하, 학부모 답장 톤의 변화, 요즘 애가 힘들어해서요라는 말. 퇴원은 갑자기 오지 않습니다. 신호를 놓쳤을 뿐입니다.', now()),
+  (15, 1, 6, 2, '학부모 리포트와 소개가 나오는 구조', 290, NULL, NULL, '[]', '신규 한 명 데려오는 비용보다 재원생 한 명 지키는 비용이 훨씬 쌉니다. 구멍 난 독에 물 붓기를 멈추는 것이 먼저입니다.', now()),
+  (16, 1, 7, 1, '채널 6종 성격표', 305, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:41 채널 성격 · 3:23 정리', '[{"t":0,"label":"인트로"},{"t":101,"label":"채널 성격"},{"t":203,"label":"정리 · 다음 레슨 예고"}]', '유튜브 롱폼, 쓰레드, 맘카페, 당근, 파워링크, 전단지와 현수막. 각각 누가 보는가, 성과까지 걸리는 시간, 원장 시간 소요, 어떤 학원에 맞는가.', now()),
+  (17, 1, 7, 2, '모든 길은 한 곳으로', 255, NULL, NULL, '[]', '채널을 늘리는 게 성장이 아닙니다. 어설픈 여섯 개보다 제대로 된 두 개입니다. 어느 문으로 들어와도 플레이스와 블로그를 거쳐 문의는 상담 시스템이 받습니다.', now()),
+  (18, 1, 8, 1, '정보가 원장을 거치지 않고도 원장에게 닿게', 340, 'https://www.youtube.com/watch?v=d3RNpwbWaJU', '0:00 인트로 · 1:53 소통 체계 · 3:46 정리', '[{"t":0,"label":"인트로"},{"t":113,"label":"소통 체계"},{"t":226,"label":"정리 · 다음 레슨 예고"}]', '출결, 학생 특이사항, 학부모 컴플레인이 생기면 강사는 어디로 어떤 형식으로 보고하는가. 보고 체계를 일원화하고 양식화합니다. 그래서 원장만 모르는 일이 없게 만듭니다.', now()),
+  (19, 1, 8, 2, '학원의 결정은 원장이 아니라 원칙이 한다', 275, NULL, NULL, '[]', '매뉴얼은 두꺼운 문서가 아니라 우리 학원의 원칙 목록입니다. 결석 대응, 보강 규정, 컴플레인 1차 응대, 환불. 원장이 없어도 같은 결정이 나오게 합니다.', now());
 
 -- 구매. 기수와 만료일이 여기서 나온다.
 INSERT INTO ext_purchase (user_id, course_id, cohort, purchased_at, expires_at, synced_at) VALUES
@@ -145,131 +118,152 @@ INSERT INTO ext_purchase (user_id, course_id, cohort, purchased_at, expires_at, 
   (23, 1, 3, now() - interval '1 days', now() - interval '1 days' + interval '365 days', now()),
   (24, 1, 3, now() - interval '1 days', now() - interval '1 days' + interval '365 days', now());
 
--- 시청 기록. lounge_member.week 는 이 표에서 계산한 값의 캐시다.
--- 여기서는 '지난 주차의 강은 다 봤다'로 깔아 둔다.
-INSERT INTO ext_watch (user_id, lesson_id, watched_at, is_complete, synced_at) VALUES
-  (1, 1, now() - interval '16 days', true, now()),
-  (1, 2, now() - interval '16 days', true, now()),
-  (1, 3, now() - interval '16 days', true, now()),
-  (1, 4, now() - interval '13 days', true, now()),
-  (1, 5, now() - interval '13 days', true, now()),
-  (2, 1, now() - interval '16 days', true, now()),
-  (2, 2, now() - interval '16 days', true, now()),
-  (2, 3, now() - interval '16 days', true, now()),
-  (2, 4, now() - interval '13 days', true, now()),
-  (2, 5, now() - interval '13 days', true, now()),
-  (3, 1, now() - interval '30 days', true, now()),
-  (3, 2, now() - interval '30 days', true, now()),
-  (3, 3, now() - interval '30 days', true, now()),
-  (3, 4, now() - interval '27 days', true, now()),
-  (3, 5, now() - interval '27 days', true, now()),
-  (3, 6, now() - interval '24 days', true, now()),
-  (3, 7, now() - interval '24 days', true, now()),
-  (3, 8, now() - interval '24 days', true, now()),
-  (3, 9, now() - interval '21 days', true, now()),
-  (3, 10, now() - interval '21 days', true, now()),
-  (4, 1, now() - interval '15 days', true, now()),
-  (4, 2, now() - interval '15 days', true, now()),
-  (4, 3, now() - interval '15 days', true, now()),
-  (4, 4, now() - interval '12 days', true, now()),
-  (4, 5, now() - interval '12 days', true, now()),
-  (5, 1, now() - interval '25 days', true, now()),
-  (5, 2, now() - interval '25 days', true, now()),
-  (5, 3, now() - interval '25 days', true, now()),
-  (5, 4, now() - interval '22 days', true, now()),
-  (5, 5, now() - interval '22 days', true, now()),
-  (5, 6, now() - interval '19 days', true, now()),
-  (5, 7, now() - interval '19 days', true, now()),
-  (5, 8, now() - interval '19 days', true, now()),
-  (6, 1, now() - interval '10 days', true, now()),
-  (6, 2, now() - interval '10 days', true, now()),
-  (6, 3, now() - interval '10 days', true, now()),
-  (7, 1, now() - interval '16 days', true, now()),
-  (7, 2, now() - interval '16 days', true, now()),
-  (7, 3, now() - interval '16 days', true, now()),
-  (7, 4, now() - interval '13 days', true, now()),
-  (7, 5, now() - interval '13 days', true, now()),
-  (8, 1, now() - interval '15 days', true, now()),
-  (8, 2, now() - interval '15 days', true, now()),
-  (8, 3, now() - interval '15 days', true, now()),
-  (8, 4, now() - interval '12 days', true, now()),
-  (8, 5, now() - interval '12 days', true, now()),
-  (9, 1, now() - interval '9 days', true, now()),
-  (9, 2, now() - interval '9 days', true, now()),
-  (9, 3, now() - interval '9 days', true, now()),
-  (10, 1, now() - interval '31 days', true, now()),
-  (10, 2, now() - interval '31 days', true, now()),
-  (10, 3, now() - interval '31 days', true, now()),
-  (10, 4, now() - interval '28 days', true, now()),
-  (10, 5, now() - interval '28 days', true, now()),
-  (10, 6, now() - interval '25 days', true, now()),
-  (10, 7, now() - interval '25 days', true, now()),
-  (10, 8, now() - interval '25 days', true, now()),
-  (10, 9, now() - interval '22 days', true, now()),
-  (10, 10, now() - interval '22 days', true, now()),
-  (12, 1, now() - interval '24 days', true, now()),
-  (12, 2, now() - interval '24 days', true, now()),
-  (12, 3, now() - interval '24 days', true, now()),
-  (12, 4, now() - interval '21 days', true, now()),
-  (12, 5, now() - interval '21 days', true, now()),
-  (12, 6, now() - interval '18 days', true, now()),
-  (12, 7, now() - interval '18 days', true, now()),
-  (12, 8, now() - interval '18 days', true, now()),
-  (13, 1, now() - interval '15 days', true, now()),
-  (13, 2, now() - interval '15 days', true, now()),
-  (13, 3, now() - interval '15 days', true, now()),
-  (13, 4, now() - interval '12 days', true, now()),
-  (13, 5, now() - interval '12 days', true, now()),
-  (14, 1, now() - interval '10 days', true, now()),
-  (14, 2, now() - interval '10 days', true, now()),
-  (14, 3, now() - interval '10 days', true, now()),
-  (15, 1, now() - interval '37 days', true, now()),
-  (15, 2, now() - interval '37 days', true, now()),
-  (15, 3, now() - interval '37 days', true, now()),
-  (15, 4, now() - interval '34 days', true, now()),
-  (15, 5, now() - interval '34 days', true, now()),
-  (15, 6, now() - interval '31 days', true, now()),
-  (15, 7, now() - interval '31 days', true, now()),
-  (15, 8, now() - interval '31 days', true, now()),
-  (15, 9, now() - interval '28 days', true, now()),
-  (15, 10, now() - interval '28 days', true, now()),
-  (15, 11, now() - interval '25 days', true, now()),
-  (15, 12, now() - interval '25 days', true, now()),
-  (15, 13, now() - interval '25 days', true, now()),
-  (16, 1, now() - interval '16 days', true, now()),
-  (16, 2, now() - interval '16 days', true, now()),
-  (16, 3, now() - interval '16 days', true, now()),
-  (16, 4, now() - interval '13 days', true, now()),
-  (16, 5, now() - interval '13 days', true, now()),
-  (17, 1, now() - interval '11 days', true, now()),
-  (17, 2, now() - interval '11 days', true, now()),
-  (17, 3, now() - interval '11 days', true, now()),
-  (18, 1, now() - interval '26 days', true, now()),
-  (18, 2, now() - interval '26 days', true, now()),
-  (18, 3, now() - interval '26 days', true, now()),
-  (18, 4, now() - interval '23 days', true, now()),
-  (18, 5, now() - interval '23 days', true, now()),
-  (18, 6, now() - interval '20 days', true, now()),
-  (18, 7, now() - interval '20 days', true, now()),
-  (18, 8, now() - interval '20 days', true, now()),
-  (20, 1, now() - interval '15 days', true, now()),
-  (20, 2, now() - interval '15 days', true, now()),
-  (20, 3, now() - interval '15 days', true, now()),
-  (20, 4, now() - interval '12 days', true, now()),
-  (20, 5, now() - interval '12 days', true, now()),
-  (21, 1, now() - interval '30 days', true, now()),
-  (21, 2, now() - interval '30 days', true, now()),
-  (21, 3, now() - interval '30 days', true, now()),
-  (21, 4, now() - interval '27 days', true, now()),
-  (21, 5, now() - interval '27 days', true, now()),
-  (21, 6, now() - interval '24 days', true, now()),
-  (21, 7, now() - interval '24 days', true, now()),
-  (21, 8, now() - interval '24 days', true, now()),
-  (21, 9, now() - interval '21 days', true, now()),
-  (21, 10, now() - interval '21 days', true, now()),
-  (22, 1, now() - interval '9 days', true, now()),
-  (22, 2, now() - interval '9 days', true, now()),
-  (22, 3, now() - interval '9 days', true, now());
+-- 시청 기록. lounge_member.section_id 는 이 표에서 계산한 값의 캐시다.
+-- 앞 섹션의 레슨은 다 봤고(watched_sec = 길이), 지금 섹션의 첫 레슨을 40% 본 것으로 깔아 둔다 —
+-- 그래야 '이어보기' 가 가리킬 곳이 있다. 나(박현종)는 목업의 watch 를 그대로 쓴다.
+INSERT INTO ext_watch (user_id, lesson_id, watched_sec, watched_at, is_complete, synced_at) VALUES
+  (1, 1, 310, now() - interval '16 days', true, now()),
+  (1, 2, 270, now() - interval '16 days', true, now()),
+  (1, 3, 380, now() - interval '16 days', true, now()),
+  (1, 4, 255, now() - interval '13 days', true, now()),
+  (1, 5, 245, now() - interval '13 days', true, now()),
+  (1, 6, 104, now(), false, now()),
+  (2, 1, 310, now() - interval '16 days', true, now()),
+  (2, 2, 270, now() - interval '16 days', true, now()),
+  (2, 3, 380, now() - interval '16 days', true, now()),
+  (2, 4, 255, now() - interval '13 days', true, now()),
+  (2, 5, 245, now() - interval '13 days', true, now()),
+  (2, 6, 104, now(), false, now()),
+  (3, 1, 310, now() - interval '30 days', true, now()),
+  (3, 2, 270, now() - interval '30 days', true, now()),
+  (3, 3, 380, now() - interval '30 days', true, now()),
+  (3, 4, 255, now() - interval '27 days', true, now()),
+  (3, 5, 245, now() - interval '27 days', true, now()),
+  (3, 6, 260, now() - interval '24 days', true, now()),
+  (3, 7, 295, now() - interval '24 days', true, now()),
+  (3, 8, 245, now() - interval '24 days', true, now()),
+  (3, 9, 230, now() - interval '21 days', true, now()),
+  (3, 10, 280, now() - interval '21 days', true, now()),
+  (3, 11, 100, now() - interval '1 days', false, now()),
+  (4, 1, 310, now() - interval '15 days', true, now()),
+  (4, 2, 270, now() - interval '15 days', true, now()),
+  (4, 3, 380, now() - interval '15 days', true, now()),
+  (4, 4, 255, now() - interval '12 days', true, now()),
+  (4, 5, 245, now() - interval '12 days', true, now()),
+  (4, 6, 104, now(), false, now()),
+  (5, 1, 310, now() - interval '25 days', true, now()),
+  (5, 2, 270, now() - interval '25 days', true, now()),
+  (5, 3, 380, now() - interval '25 days', true, now()),
+  (5, 4, 255, now() - interval '22 days', true, now()),
+  (5, 5, 245, now() - interval '22 days', true, now()),
+  (5, 6, 260, now() - interval '19 days', true, now()),
+  (5, 7, 295, now() - interval '19 days', true, now()),
+  (5, 8, 245, now() - interval '19 days', true, now()),
+  (5, 9, 92, now() - interval '2 days', false, now()),
+  (6, 1, 310, now() - interval '10 days', true, now()),
+  (6, 2, 270, now() - interval '10 days', true, now()),
+  (6, 3, 380, now() - interval '10 days', true, now()),
+  (6, 4, 102, now() - interval '1 days', false, now()),
+  (7, 1, 310, now() - interval '6 days', true, now()),
+  (7, 2, 270, now() - interval '5 days', true, now()),
+  (7, 3, 380, now() - interval '4 days', true, now()),
+  (7, 4, 255, now() - interval '3 days', true, now()),
+  (7, 5, 245, now() - interval '2 days', true, now()),
+  (7, 6, 104, now() - interval '1 days', false, now()),
+  (8, 1, 310, now() - interval '15 days', true, now()),
+  (8, 2, 270, now() - interval '15 days', true, now()),
+  (8, 3, 380, now() - interval '15 days', true, now()),
+  (8, 4, 255, now() - interval '12 days', true, now()),
+  (8, 5, 245, now() - interval '12 days', true, now()),
+  (8, 6, 104, now() - interval '1 days', false, now()),
+  (9, 1, 310, now() - interval '9 days', true, now()),
+  (9, 2, 270, now() - interval '9 days', true, now()),
+  (9, 3, 380, now() - interval '9 days', true, now()),
+  (9, 4, 102, now() - interval '3 days', false, now()),
+  (10, 1, 310, now() - interval '31 days', true, now()),
+  (10, 2, 270, now() - interval '31 days', true, now()),
+  (10, 3, 380, now() - interval '31 days', true, now()),
+  (10, 4, 255, now() - interval '28 days', true, now()),
+  (10, 5, 245, now() - interval '28 days', true, now()),
+  (10, 6, 260, now() - interval '25 days', true, now()),
+  (10, 7, 295, now() - interval '25 days', true, now()),
+  (10, 8, 245, now() - interval '25 days', true, now()),
+  (10, 9, 230, now() - interval '22 days', true, now()),
+  (10, 10, 280, now() - interval '22 days', true, now()),
+  (10, 11, 100, now() - interval '2 days', false, now()),
+  (12, 1, 310, now() - interval '24 days', true, now()),
+  (12, 2, 270, now() - interval '24 days', true, now()),
+  (12, 3, 380, now() - interval '24 days', true, now()),
+  (12, 4, 255, now() - interval '21 days', true, now()),
+  (12, 5, 245, now() - interval '21 days', true, now()),
+  (12, 6, 260, now() - interval '18 days', true, now()),
+  (12, 7, 295, now() - interval '18 days', true, now()),
+  (12, 8, 245, now() - interval '18 days', true, now()),
+  (12, 9, 92, now() - interval '1 days', false, now()),
+  (13, 1, 310, now() - interval '15 days', true, now()),
+  (13, 2, 270, now() - interval '15 days', true, now()),
+  (13, 3, 380, now() - interval '15 days', true, now()),
+  (13, 4, 255, now() - interval '12 days', true, now()),
+  (13, 5, 245, now() - interval '12 days', true, now()),
+  (13, 6, 104, now(), false, now()),
+  (14, 1, 310, now() - interval '10 days', true, now()),
+  (14, 2, 270, now() - interval '10 days', true, now()),
+  (14, 3, 380, now() - interval '10 days', true, now()),
+  (14, 4, 102, now() - interval '4 days', false, now()),
+  (15, 1, 310, now() - interval '37 days', true, now()),
+  (15, 2, 270, now() - interval '37 days', true, now()),
+  (15, 3, 380, now() - interval '37 days', true, now()),
+  (15, 4, 255, now() - interval '34 days', true, now()),
+  (15, 5, 245, now() - interval '34 days', true, now()),
+  (15, 6, 260, now() - interval '31 days', true, now()),
+  (15, 7, 295, now() - interval '31 days', true, now()),
+  (15, 8, 245, now() - interval '31 days', true, now()),
+  (15, 9, 230, now() - interval '28 days', true, now()),
+  (15, 10, 280, now() - interval '28 days', true, now()),
+  (15, 11, 250, now() - interval '25 days', true, now()),
+  (15, 12, 330, now() - interval '25 days', true, now()),
+  (15, 13, 225, now() - interval '25 days', true, now()),
+  (15, 14, 106, now() - interval '1 days', false, now()),
+  (16, 1, 310, now() - interval '16 days', true, now()),
+  (16, 2, 270, now() - interval '16 days', true, now()),
+  (16, 3, 380, now() - interval '16 days', true, now()),
+  (16, 4, 255, now() - interval '13 days', true, now()),
+  (16, 5, 245, now() - interval '13 days', true, now()),
+  (16, 6, 104, now() - interval '2 days', false, now()),
+  (17, 1, 310, now() - interval '11 days', true, now()),
+  (17, 2, 270, now() - interval '11 days', true, now()),
+  (17, 3, 380, now() - interval '11 days', true, now()),
+  (17, 4, 102, now() - interval '11 days', false, now()),
+  (18, 1, 310, now() - interval '26 days', true, now()),
+  (18, 2, 270, now() - interval '26 days', true, now()),
+  (18, 3, 380, now() - interval '26 days', true, now()),
+  (18, 4, 255, now() - interval '23 days', true, now()),
+  (18, 5, 245, now() - interval '23 days', true, now()),
+  (18, 6, 260, now() - interval '20 days', true, now()),
+  (18, 7, 295, now() - interval '20 days', true, now()),
+  (18, 8, 245, now() - interval '20 days', true, now()),
+  (18, 9, 92, now() - interval '3 days', false, now()),
+  (20, 1, 310, now() - interval '15 days', true, now()),
+  (20, 2, 270, now() - interval '15 days', true, now()),
+  (20, 3, 380, now() - interval '15 days', true, now()),
+  (20, 4, 255, now() - interval '12 days', true, now()),
+  (20, 5, 245, now() - interval '12 days', true, now()),
+  (20, 6, 104, now() - interval '1 days', false, now()),
+  (21, 1, 310, now() - interval '30 days', true, now()),
+  (21, 2, 270, now() - interval '30 days', true, now()),
+  (21, 3, 380, now() - interval '30 days', true, now()),
+  (21, 4, 255, now() - interval '27 days', true, now()),
+  (21, 5, 245, now() - interval '27 days', true, now()),
+  (21, 6, 260, now() - interval '24 days', true, now()),
+  (21, 7, 295, now() - interval '24 days', true, now()),
+  (21, 8, 245, now() - interval '24 days', true, now()),
+  (21, 9, 230, now() - interval '21 days', true, now()),
+  (21, 10, 280, now() - interval '21 days', true, now()),
+  (21, 11, 100, now(), false, now()),
+  (22, 1, 310, now() - interval '9 days', true, now()),
+  (22, 2, 270, now() - interval '9 days', true, now()),
+  (22, 3, 380, now() - interval '9 days', true, now()),
+  (22, 4, 102, now() - interval '8 days', false, now());
 
 -- 피드백권 잔여. 소유는 프드프 소관이고 라운지는 읽기만 한다.
 INSERT INTO ext_feedback_pass (user_id, course_id, quota_per, period, period_start, used, synced_at) VALUES
@@ -300,7 +294,7 @@ INSERT INTO ext_feedback_pass (user_id, course_id, quota_per, period, period_sta
 
 -- 다음 라이브
 INSERT INTO ext_live (course_id, title, starts_at, synced_at) VALUES
-  (1, '4주차 라이브 · 인스타 프로필 첨삭', now() + interval '2 days', now());
+  (1, '4섹션 라이브 · 인스타 프로필 첨삭', now() + interval '2 days', now());
 
 -- =============================================================================
 -- 라운지
@@ -312,8 +306,8 @@ INSERT INTO lounge (id, course_id, name, intro) OVERRIDING SYSTEM VALUE VALUES
   (1, 1, '학원마케팅 올인원 강의', '강의를 듣기 전에 여기 먼저 들르는 곳입니다. 과제도, 피드백도, 등록 인증도 이 안에서 끝납니다. 잘 쓴 글보다 자주 들르는 게 중요합니다.'),
   (2, 2, '학원마케팅 올인원 강의 (샘플)', NULL);
 
--- 주차 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.
-INSERT INTO lounge_week (lounge_id, week, published) VALUES
+-- 섹션 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.
+INSERT INTO lounge_section (lounge_id, section_id, published) VALUES
   (1, 1, true),
   (1, 2, true),
   (1, 3, true),
@@ -324,7 +318,7 @@ INSERT INTO lounge_week (lounge_id, week, published) VALUES
   (1, 8, true);
 
 -- 멤버. 역할이 라운지 단위로 붙는다.
-INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_at, last_seen_at, week, week_synced_at) VALUES
+INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_at, last_seen_at, section_id, section_synced_at) VALUES
   (1, 1, 'student', 3, now() - interval '19 days', now() - interval '19 days' + interval '365 days', now(), 3, now()),
   (1, 2, 'student', 3, now() - interval '19 days', now() - interval '19 days' + interval '365 days', now(), 3, now()),
   (1, 3, 'student', 2, now() - interval '33 days', now() - interval '33 days' + interval '365 days', now() - interval '1 days', 5, now()),
@@ -351,8 +345,8 @@ INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_
   (1, 24, 'student', 3, now() - interval '1 days', now() - interval '1 days' + interval '365 days', now(), 1, now()),
   (1, 25, 'instructor', NULL, now() - interval '120 days', NULL, now(), 8, now()),
   (1, 26, 'admin', NULL, now() - interval '400 days', NULL, now(), 8, now());
-INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at, week) VALUES
-  (2, 26, 'admin', now() - interval '400 days', now(), 1);
+INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at) VALUES
+  (2, 26, 'admin', now() - interval '400 days', now());
 
 -- 카테고리. 전역 풀이다.
 INSERT INTO category (id, name, is_system, pass_required) OVERRIDING SYSTEM VALUE VALUES
@@ -379,18 +373,36 @@ INSERT INTO lounge_category (lounge_id, category_id, placement, sort, student_ca
   (2, 5, 'more', 1, true, true),
   (2, 6, 'more', 2, false, true);
 
+-- 레슨의 과제. 관리자가 붙인 것. 질문 양식은 통째로 jsonb. id 는 목업 순서와 같다.
+INSERT INTO lesson_task (id, lounge_id, lesson_id, seq, title, questions) OVERRIDING SYSTEM VALUE VALUES
+  (1, 1, 3, 1, '1주차 미션 · 우리 학원의 주인공 정하기', '[{"q":"우리 학원의 주인공은 어떤 아이인가요?","hint":"예: 머리가 나쁜 게 아니라 어느 순간 수학을 포기하는 게 편해진 아이"},{"q":"반대로, 안 받을 학생을 한 줄로 적어보세요.","hint":"예: 저는 전교 1등을 안 받습니다"},{"q":"둘을 합쳐 우리 학원을 한 문장으로 쓰면?","hint":"옆 학원이 가져다 써도 말이 되면 아직 우리 문장이 아닙니다"}]'),
+  (2, 1, 5, 1, '2주차 미션 · 플레이스 다시 세팅하기', '[{"q":"''○○동 수학학원''을 검색하면 우리는 몇 번째에 나오나요?","hint":"예: 1페이지에 없습니다. 2페이지 중간쯤"},{"q":"학부모가 우리를 놓치는 단계는 어디인가요?","hint":"검색 → 플레이스 목록 → 사진·리뷰 → 블로그 → 문의 중에서"},{"q":"1주차 여섯 문장을 줄여 플레이스 소개글을 적어보세요.","hint":"새로 쓰는 게 아니라 있는 걸 줄이는 겁니다"}]'),
+  (3, 1, 8, 1, '3주차 미션 · 학부모가 검색하는 말로 글 쓰기', '[{"q":"주인공 학부모가 밤에 검색하는 말 세 개를 적으세요.","hint":"지역 키워드(○○동 수학학원) + 고민 키워드(수포자 학원)"},{"q":"학부모가 상담에서 차마 못 묻는 걱정은 무엇인가요?","hint":"예: 우리 애만 못 따라가면 어쩌죠"},{"q":"그 걱정에 먼저 답하는 글의 제목을 지어보세요.","hint":"하고 싶은 말이 아니라 학부모가 검색하는 질문에 답하는 제목"}]'),
+  (4, 1, 10, 1, '4주차 미션 · 프로필 4줄 다시 쓰기', '[{"q":"지금 우리 계정 프로필 첫 화면에 무엇이 보이나요?","hint":"프사 · 소개글 · 하이라이트 · 최근 게시물 아홉 개"},{"q":"소개글 4줄을 적어보세요.","hint":"누구를 위한 / 뭐가 다른 / 믿을 근거 / 뭘 하면 되는지"},{"q":"검색되는 계정 이름으로 바꾼다면?","hint":"예: ○○동수학 매쓰플랜"}]'),
+  (5, 1, 13, 1, '5주차 미션 · 상담 3분 설계하기', '[{"q":"지난달 문의 몇 건 중 몇 건이 등록으로 이어졌나요?","hint":"학생 한 명이 연 120만 원입니다. 숫자로 마주하세요"},{"q":"학부모가 도착한 뒤 3분 동안 무엇을 하시겠습니까?","hint":"예: 문 앞까지 나가 기다리기 · 꽃 한 송이 · 메뉴판"},{"q":"등록을 묻는 한 문장을 미리 적어두세요.","hint":"화법이 아니라 준비된 문장입니다. 어물어물 넘기면 연락드릴게요로 끝납니다"}]'),
+  (6, 1, 15, 1, '6주차 미션 · 퇴원 신호 찾아내기', '[{"q":"최근 그만둔 학생에게 미리 어떤 신호가 있었나요?","hint":"결석·지각 패턴, 숙제 질, 학부모 답장 톤"},{"q":"지금 그 신호가 보이는 학생은 누구인가요?","hint":"퇴원은 갑자기 오지 않습니다. 놓쳤을 뿐입니다"},{"q":"그 학생에게 이번 주에 무엇을 하시겠습니까?","hint":"예: 개별 면담 10분, 학부모에게 리포트 한 장"}]'),
+  (7, 1, 17, 1, '7주차 미션 · 채널 두 개만 고르기', '[{"q":"주인공 학부모가 실제로 있는 채널은 어디인가요?","hint":"유튜브 · 쓰레드 · 맘카페 · 당근 · 파워링크 · 전단지 중에서"},{"q":"내가 지속할 수 있는 채널 두 개를 고르세요.","hint":"어설픈 여섯 개보다 제대로 된 두 개"},{"q":"버리기로 한 채널과 그 이유는?","hint":"버린 이유가 핵심입니다"}]'),
+  (8, 1, 19, 1, '8주차 미션 · 원장 없이도 도는 원칙 만들기', '[{"q":"오늘 하루 원장님을 거쳐 간 결정을 세 개 적어보세요.","hint":"출결 확인, 학부모 답장, 강사 질문, 교재 주문"},{"q":"그중 다른 사람이 결정해도 되는 것은 무엇인가요?","hint":"1차 판단은 중간 관리자가, 원장에게는 걸러진 것만"},{"q":"우리 학원 원칙 세 개를 적어보세요.","hint":"결석 대응 · 보강 규정 · 컴플레인 1차 응대 · 환불 중에서"}]');
+
+-- 레슨의 자료. 파일 또는 링크.
+INSERT INTO lesson_material (lounge_id, lesson_id, seq, kind, url, label) VALUES
+  (1, 3, 0, 'file', 'https://example.com/files/intro-6-sentences.pdf', '학원 소개 6문장 워크시트 (PDF)'),
+  (1, 5, 1, 'link', 'https://smartplace.naver.com/', '네이버 스마트플레이스 관리 페이지'),
+  (1, 6, 2, 'link', 'https://keywordtool.io/', '키워드 조사 도구'),
+  (1, 7, 3, 'file', 'https://example.com/files/blog-3-templates.pdf', '블로그 3종 세트 템플릿 (PDF)');
+
 -- 글. 글쓴이는 user_id 로 판정하고 author_name 으로 표시한다.
-INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body, week, is_pinned, reaction_count, comment_count, view_count, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES
+INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body, task_id, is_pinned, reaction_count, comment_count, view_count, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES
   (1, 1, 6, 26, '프드프 관리자', '이번 달 명예의 전당에 오른 결과물', '강사님이 고른 결과물을 이 글 하나에 계속 쌓습니다. 별도 메뉴 없이 최상단 고정.', NULL, true, 48, 0, 1204, now() - interval '30 days', now() - interval '30 days'),
   (2, 1, 1, 1, '김선주', '3주차 과제 올립니다. 학부모가 검색하는 말로 제목을 바꿔봤어요', NULL, 3, false, 11, 7, 61, now() - interval '2 hours', now() - interval '2 hours'),
-  (3, 1, 2, 2, '정해린', '블로그 글 제목이 아직 밋밋한 것 같은데 봐주세요', '고민 키워드를 넣긴 했는데 학부모가 클릭할 만한 제목인지 모르겠습니다.', 3, false, 3, 2, 44, now() - interval '4 hours', now() - interval '4 hours'),
+  (3, 1, 2, 2, '정해린', '블로그 글 제목이 아직 밋밋한 것 같은데 봐주세요', '고민 키워드를 넣긴 했는데 학부모가 클릭할 만한 제목인지 모르겠습니다.', NULL, false, 3, 2, 44, now() - interval '4 hours', now() - interval '4 hours'),
   (4, 1, 1, 7, '박현종', '3주차 과제 늦었지만 올립니다', NULL, 3, false, 5, 0, 38, now() - interval '6 hours', now() - interval '6 hours'),
   (5, 1, 6, 26, '프드프 관리자', '4주차는 수요일 10시에 열립니다', '이번 주차부터 교안이 강의 아래에 같이 올라갑니다. 검색으로 바로 찾을 수 있습니다.', NULL, false, 14, 0, 210, now() - interval '1 days', now() - interval '1 days'),
-  (6, 1, 4, 3, '오승민', '플레이스만 고쳤는데 이번 주 문의가 4건 들어왔습니다', '사진 순서를 공간·수업·아이들로 바꾸고 소개글을 1주차 여섯 문장에서 줄여 붙였습니다. 그게 전부입니다.', 2, false, 32, 2, 187, now() - interval '1 days', now() - interval '1 days'),
+  (6, 1, 4, 3, '오승민', '플레이스만 고쳤는데 이번 주 문의가 4건 들어왔습니다', '사진 순서를 공간·수업·아이들로 바꾸고 소개글을 1주차 여섯 문장에서 줄여 붙였습니다. 그게 전부입니다.', NULL, false, 32, 2, 187, now() - interval '1 days', now() - interval '1 days'),
   (7, 1, 3, 4, '한지수', '안 받을 학생을 적으니 소개글이 확 달라졌어요', '전교 1등을 안 받는다고 쓰는 게 무섭더니, 그 한 줄 덕에 나머지 다섯 문장이 저절로 나왔습니다.', NULL, false, 18, 0, 156, now() - interval '2 days', now() - interval '2 days'),
   (8, 1, 1, 7, '박현종', '2주차 과제, 플레이스 소개글 줄여봤습니다', NULL, 2, false, 7, 0, 55, now() - interval '3 days', now() - interval '3 days'),
-  (9, 1, 2, 13, '강예린', '제목은 고쳤는데 첫 문단이 아직 학원 소개입니다', '고민 키워드로 제목은 바꿨는데 본문 시작을 어떻게 열어야 할지 모르겠습니다. 봐주세요.', 3, false, 1, 0, 19, now() - interval '1 days', now() - interval '1 days'),
-  (10, 1, 2, 10, '임도현', '인스타 소개 두 줄인데 뭘 빼야 할지 모르겠습니다', '수업 과목이랑 지역이랑 경력을 다 넣었더니 읽히지가 않습니다.', 5, false, 2, 0, 27, now() - interval '2 days', now() - interval '2 days'),
+  (9, 1, 2, 13, '강예린', '제목은 고쳤는데 첫 문단이 아직 학원 소개입니다', '고민 키워드로 제목은 바꿨는데 본문 시작을 어떻게 열어야 할지 모르겠습니다. 봐주세요.', NULL, false, 1, 0, 19, now() - interval '1 days', now() - interval '1 days'),
+  (10, 1, 2, 10, '임도현', '인스타 소개 두 줄인데 뭘 빼야 할지 모르겠습니다', '수업 과목이랑 지역이랑 경력을 다 넣었더니 읽히지가 않습니다.', NULL, false, 2, 0, 27, now() - interval '2 days', now() - interval '2 days'),
   (11, 1, 1, 4, '한지수', '3주차 과제, 학부모가 밤에 검색하는 말 찾아봤습니다', NULL, 3, false, 6, 1, 43, now() - interval '1 days', now() - interval '1 days'),
   (12, 1, 1, 13, '강예린', '3주차 과제 올립니다', '고민 키워드를 찾는 게 지역 키워드보다 훨씬 어려웠습니다. 상담 메모를 다시 뒤져서 세 개 뽑았어요.', 3, false, 4, 0, 31, now() - interval '1 days', now() - interval '1 days'),
   (13, 1, 1, 3, '오승민', '5주차 과제, 인스타 프로필 고쳐봤습니다', '소개 첫 줄을 학원 이름에서 ''초등 영어가 늦었다고 생각하는 학부모님께''로 바꿨습니다. 팔로워보다 저장이 먼저 늘더라고요.', 5, false, 11, 1, 68, now() - interval '2 days', now() - interval '2 days'),
@@ -401,9 +413,9 @@ INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body,
   (18, 1, 1, 21, '황준서', '5주차 과제, 릴스 첫 3초 다시 찍었습니다', '학원 간판부터 보여주던 걸 아이가 문제 푸는 손으로 바꿨습니다. 끝까지 본 비율이 두 배가 됐어요.', 5, false, 7, 1, 45, now() - interval '5 days', now() - interval '5 days'),
   (19, 1, 1, 20, '서다인', '2주차 과제, 플레이스 사진부터 다 갈았습니다', '교실 사진이 한 장도 없었습니다. 수업 중 사진은 동의를 받아야 해서 빈 교실이랑 칠판 위주로 찍었어요.', 2, false, 3, 0, 26, now() - interval '5 days', now() - interval '5 days'),
   (20, 1, 1, 14, '홍수민', '2주차 과제 올립니다. 검색 순위 확인해봤어요', '''상계동 국어학원''으로 검색하니 2페이지에도 없었습니다. 플레이스 등록 자체가 안 돼 있었네요.', 2, false, 4, 0, 33, now() - interval '6 days', now() - interval '6 days'),
-  (21, 1, 2, 5, '최은영', '소개 여섯 문장 중 네 번째가 약한 것 같습니다', '증거 문장인데 숫자만 나열한 느낌이라 믿음이 안 갈까 걱정입니다.', 1, false, 2, 0, 40, now() - interval '5 days', now() - interval '5 days'),
+  (21, 1, 2, 5, '최은영', '소개 여섯 문장 중 네 번째가 약한 것 같습니다', '증거 문장인데 숫자만 나열한 느낌이라 믿음이 안 갈까 걱정입니다.', NULL, false, 2, 0, 40, now() - interval '5 days', now() - interval '5 days'),
   (22, 1, 5, 6, '박민경', '1주차 마치고 남기는 짧은 후기', '주인공을 정하라는 말이 제일 어려웠습니다. 정하고 나니 그다음이 다 쉬워졌어요.', NULL, false, 8, 0, 77, now() - interval '6 days', now() - interval '6 days'),
-  (23, 1, 3, 1, '김선주', '상담에서 들은 학부모 말을 그대로 적어두고 있습니다', '제가 만든 문장보다 학부모가 한 말이 훨씬 잘 걸립니다. 녹음 대신 상담 끝나고 바로 메모합니다.', 1, false, 16, 0, 134, now() - interval '7 days', now() - interval '7 days');
+  (23, 1, 3, 1, '김선주', '상담에서 들은 학부모 말을 그대로 적어두고 있습니다', '제가 만든 문장보다 학부모가 한 말이 훨씬 잘 걸립니다. 녹음 대신 상담 끝나고 바로 메모합니다.', NULL, false, 16, 0, 134, now() - interval '7 days', now() - interval '7 days');
 
 -- 과제 미션 답변. 질문 문구도 그때 것으로 같이 남긴다.
 INSERT INTO post_answer (post_id, seq, question, answer) VALUES
@@ -706,6 +718,9 @@ INSERT INTO feedback_pass_use (lounge_id, user_id, post_id, used_at) VALUES
 SELECT setval(pg_get_serial_sequence('lounge','id'),   (SELECT max(id) FROM lounge));
 SELECT setval(pg_get_serial_sequence('category','id'), (SELECT max(id) FROM category));
 SELECT setval(pg_get_serial_sequence('post','id'),     (SELECT max(id) FROM post));
+SELECT setval(pg_get_serial_sequence('lesson_task','id'), (SELECT max(id) FROM lesson_task));
+SELECT setval(pg_get_serial_sequence('ext_section','id'), (SELECT max(id) FROM ext_section));
+SELECT setval(pg_get_serial_sequence('ext_lesson','id'),  (SELECT max(id) FROM ext_lesson));
 SELECT setval(pg_get_serial_sequence('comment','id'),  (SELECT max(id) FROM comment));
 
 -- 파생 카운터를 실제 행 수로 맞춘다. 시드가 어긋나지 않았는지 확인하는 셈이기도 하다.

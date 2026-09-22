@@ -38,13 +38,36 @@ async function purchases(userId) {
        FROM ext_purchase WHERE user_id = $1`, [userId]);
 }
 
-/* 주차 계산의 출처. 원본은 언제나 프드프다 — 라운지는 쌓지 않는다. */
+/* 한 사람의 시청 기록. 진도(is_complete) · 이어보기(watched_at · watched_sec)의 출처.
+   원본은 언제나 프드프다 — 라운지는 쌓지 않는다. */
 async function watched(userId, courseId) {
   if (remote()) return call(`/api/lounge/watch?user_id=${userId}&course_id=${courseId}`);
   return rows(
-    `SELECT w.lesson_id, w.watched_at, w.is_complete, l.week
+    `SELECT w.lesson_id, w.watched_sec, w.watched_at, w.is_complete, l.section_id
        FROM ext_watch w JOIN ext_lesson l ON l.id = w.lesson_id
       WHERE w.user_id = $1 AND l.course_id = $2`, [userId, courseId]);
+}
+
+/* 모든 멤버의 시청 기록. 대시보드가 '지금 어느 섹션에 있나' 를 세는 데 쓴다(syncSections).
+   프드프 API ③ 은 사람 단위라, 원격에서는 전체를 한 번에 받는 ③b 가 있으면 그것을,
+   없으면 멤버마다 ③ 을 부른다(하루 한 번 200회 — 감당할 수 있다). */
+async function watchedAll(courseId, userIds) {
+  if (remote()) {
+    try {
+      return await call(`/api/lounge/watch?course_id=${courseId}`);
+    } catch (e) {
+      const all = [];
+      for (const u of userIds || []) {
+        const w = await call(`/api/lounge/watch?user_id=${u}&course_id=${courseId}`).catch(() => []);
+        w.forEach((x) => all.push({ ...x, user_id: u }));
+      }
+      return all;
+    }
+  }
+  return rows(
+    `SELECT w.user_id, w.lesson_id, w.watched_at, w.is_complete, l.section_id
+       FROM ext_watch w JOIN ext_lesson l ON l.id = w.lesson_id
+      WHERE l.course_id = $1`, [courseId]);
 }
 
 /* 피드백권 잔여. 소유는 프드프 소관이고 라운지는 읽기만 한다. */
@@ -55,18 +78,17 @@ async function passes(userId, courseId) {
        FROM ext_feedback_pass WHERE user_id = $1 AND course_id = $2`, [userId, courseId]);
 }
 
-/* 강의 구조 — 주차 · 강 · 영상 · 교안 · 미션 양식 */
+/* 강의 구조 — 섹션 · 레슨(영상 · 길이 · 설명란 · 타임라인 · 교안).
+   과제와 자료는 여기 없다 — 라운지가 소유한다(lesson_task · lesson_material). */
 async function course(courseId) {
   if (remote()) return call(`/api/lounge/course/${courseId}`);
-  const [meta, weeks, lessons, missions] = await Promise.all([
-    one("SELECT id, title, weeks FROM ext_course WHERE id = $1", [courseId]),
-    rows("SELECT week, title FROM ext_week WHERE course_id = $1 ORDER BY week", [courseId]),
-    rows(`SELECT id, week, seq, chapter, title, duration, video_url, doc
-            FROM ext_lesson WHERE course_id = $1 ORDER BY week, seq`, [courseId]),
-    rows(`SELECT week, title, seq, question, hint
-            FROM ext_mission WHERE course_id = $1 ORDER BY week, seq`, [courseId])
+  const [meta, sections, lessons] = await Promise.all([
+    one("SELECT id, title FROM ext_course WHERE id = $1", [courseId]),
+    rows("SELECT id, seq, title FROM ext_section WHERE course_id = $1 ORDER BY seq", [courseId]),
+    rows(`SELECT id, section_id, seq, title, duration_sec, video_url, description, timeline, doc
+            FROM ext_lesson WHERE course_id = $1 ORDER BY section_id, seq`, [courseId])
   ]);
-  return { ...meta, weekTitles: weeks, lessons, missions };
+  return { ...(meta || { id: courseId, title: "" }), sections, lessons };
 }
 
 async function live(courseId) {
@@ -76,35 +98,55 @@ async function live(courseId) {
       WHERE course_id = $1 AND starts_at >= now() ORDER BY starts_at LIMIT 1`, [courseId]);
 }
 
-/* 시청 기록에서 주차를 계산한다. 다 본 마지막 주차의 다음 주차에 서 있다고 본다.
-   lounge_member.week 는 이 값의 캐시일 뿐이므로 하루 한 번 맞춰 주면 된다. */
-async function syncWeeks(loungeId, courseId) {
-  const total = await rows(
-    "SELECT week, count(*)::int AS n FROM ext_lesson WHERE course_id = $1 GROUP BY week", [courseId]);
-  const need = new Map(total.map((r) => [r.week, r.n]));
-
-  const done = await rows(
-    `SELECT w.user_id, l.week, count(*)::int AS n
-       FROM ext_watch w JOIN ext_lesson l ON l.id = w.lesson_id
-      WHERE l.course_id = $1 AND w.is_complete
-      GROUP BY w.user_id, l.week`, [courseId]);
-
-  const by = new Map();
-  done.forEach((r) => {
-    if (!by.has(r.user_id)) by.set(r.user_id, new Set());
-    if (r.n >= (need.get(r.week) || Infinity)) by.get(r.user_id).add(r.week);
+/* 시청 기록에서 '지금 어느 섹션에 있나' 를 계산한다.
+   마지막으로 본 레슨의 섹션에 서 있다고 본다. 그 섹션의 레슨을 다 봤으면 다음 섹션.
+   본 것이 없으면 첫 섹션. lounge_member.section_id 는 이 값의 캐시일 뿐이므로
+   하루 한 번 맞춰 주면 된다. */
+async function syncSections(loungeId, courseId) {
+  const c = await course(courseId);
+  if (!c.sections.length) return 0;
+  const order = c.sections.map((s) => Number(s.id));
+  const lessonsOf = new Map();
+  c.lessons.forEach((l) => {
+    const k = Number(l.section_id);
+    if (!lessonsOf.has(k)) lessonsOf.set(k, []);
+    lessonsOf.get(k).push(Number(l.id));
   });
 
+  const members = await rows(
+    `SELECT user_id, section_id FROM lounge_member WHERE lounge_id = $1`, [loungeId]);
+  const watch = await watchedAll(courseId, members.map((m) => m.user_id));
+
+  const byUser = new Map();
+  watch.forEach((w) => {
+    const u = String(w.user_id);
+    if (!byUser.has(u)) byUser.set(u, { last: null, done: new Set() });
+    const rec = byUser.get(u);
+    if (w.is_complete) rec.done.add(Number(w.lesson_id));
+    if (!rec.last || new Date(w.watched_at) > new Date(rec.last.watched_at)) rec.last = w;
+  });
+
+  const sectionOfLesson = new Map();
+  c.lessons.forEach((l) => sectionOfLesson.set(Number(l.id), Number(l.section_id)));
+
   let touched = 0;
-  for (const [userId, weeks] of by) {
-    let w = 1;
-    while (weeks.has(w)) w++;
+  for (const m of members) {
+    const rec = byUser.get(String(m.user_id));
+    let cur = order[0];
+    if (rec && rec.last) {
+      cur = sectionOfLesson.get(Number(rec.last.lesson_id)) || order[0];
+      // 그 섹션을 다 봤으면 다음 섹션으로
+      let i = order.indexOf(cur);
+      while (i < order.length - 1 && (lessonsOf.get(order[i]) || []).every((id) => rec.done.has(id))) i++;
+      cur = order[i];
+    }
+    if (Number(m.section_id) === cur) continue;
     await rows(
-      `UPDATE lounge_member SET week = $1, week_synced_at = now()
-        WHERE lounge_id = $2 AND user_id = $3 AND week <> $1`, [w, loungeId, userId]);
+      `UPDATE lounge_member SET section_id = $1, section_synced_at = now()
+        WHERE lounge_id = $2 AND user_id = $3`, [cur, loungeId, m.user_id]);
     touched++;
   }
   return touched;
 }
 
-module.exports = { user, purchases, watched, passes, course, live, syncWeeks };
+module.exports = { user, purchases, watched, watchedAll, passes, course, live, syncSections };

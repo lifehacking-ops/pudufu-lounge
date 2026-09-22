@@ -18,6 +18,7 @@
 --       - 일반 인덱스 7개는 WHERE 만 뗐다. deleted_at 행이 섞여 조금 커지지만 이 규모에서는 무의미
 --       - uq_post_client_key · uq_comment_client_key 는 그냥 UNIQUE. MariaDB 도 NULL 은 여럿 허용
 --       - uq_category_live(살아 있는 이름만 유일)는 생성 컬럼 live_name 에 UNIQUE
+--       - uq_post_task_user(살아 있는 글에서 과제·사람 유일)도 같은 요령 — 생성 컬럼 live_task
 --   · pg_trgm GIN 인덱스 4개          → 없다. LIKE '%…%' 는 스캔한다. 글 수백 편이면 체감 없음.
 --                                      필요해지면 FULLTEXT(ngram 파서는 MySQL 전용이라 MariaDB 는 Mroonga)
 --   · COMMENT ON COLUMN               → 컬럼 뒤 COMMENT '…'
@@ -37,11 +38,11 @@ SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS post_report, lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
-  comment, attachment, post_answer, post, lounge_category, category,
+DROP TABLE IF EXISTS post_report, lounge_section, lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
+  comment, attachment, post_answer, post, lesson_material, lesson_task, lounge_category, category,
   lounge_member, lounge;
 DROP TABLE IF EXISTS ext_live, ext_feedback_pass, ext_watch, ext_purchase,
-  ext_mission, ext_lesson, ext_week, ext_course, ext_user;
+  ext_mission, ext_lesson, ext_section, ext_week, ext_course, ext_user;
 SET FOREIGN_KEY_CHECKS = 1;
 
 
@@ -81,10 +82,9 @@ CREATE TABLE lounge_member (
   expires_at     DATETIME(6) COMMENT 'NULL 이면 무기한(스태프)',
   last_seen_at   DATETIME(6),
 
-  -- 프드프 시청 기록에서 계산한 값의 캐시. 원본이 아니다.
-  -- 하루 한 번 동기화면 충분하다(대시보드가 오늘 아침 기준으로만 맞으면 된다).
-  week           SMALLINT    NOT NULL DEFAULT 1,
-  week_synced_at DATETIME(6),
+  -- 지금 어느 섹션에 있는가. 프드프 시청 기록에서 계산한 값의 캐시. 원본이 아니다.
+  section_id        BIGINT,
+  section_synced_at DATETIME(6),
 
   /* 돈을 낸 사람을 쫓아낼 수는 없다. 읽기는 두고 쓰기만 멈춘다.
      기한이 지나면 저절로 풀린다 — 영구 정지는 사실상 환불 문제가 된다. */
@@ -97,7 +97,7 @@ CREATE TABLE lounge_member (
   CONSTRAINT fk_member_lounge FOREIGN KEY (lounge_id) REFERENCES lounge (id),
   INDEX ix_member_role (lounge_id, role),
   INDEX ix_member_seen (lounge_id, last_seen_at),   -- 이탈 위험 명단
-  INDEX ix_member_week (lounge_id, week),           -- 주차별 이탈 퍼널
+  INDEX ix_member_section (lounge_id, section_id),  -- 섹션별 이탈 퍼널
   INDEX ix_member_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -150,6 +150,39 @@ CREATE TABLE lounge_category (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- 레슨의 과제 · 자료 -----------------------------------------------------------
+-- 어느 레슨에 무슨 과제와 자료를 붙일지는 라운지 관리자가 정한다. 과제 하나 = 라운지 글 한 편.
+-- 질문 양식(1~8개)은 통째로 고치고 통째로 저장하므로 JSON 한 컬럼.
+
+CREATE TABLE lesson_task (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  lounge_id  BIGINT       NOT NULL,
+  lesson_id  BIGINT       NOT NULL COMMENT '프드프 레슨 id. FK 없음 — 레슨 id 는 바뀌지 않아야 한다',
+  seq        SMALLINT     NOT NULL DEFAULT 1,
+  title      VARCHAR(200) NOT NULL,
+  questions  JSON         NOT NULL COMMENT '[{q, hint}] 1~8개',
+  created_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  deleted_at DATETIME(6),
+  CONSTRAINT fk_task_lounge FOREIGN KEY (lounge_id) REFERENCES lounge (id),
+  INDEX ix_task_lesson (lounge_id, lesson_id, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE lesson_material (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  lounge_id  BIGINT        NOT NULL,
+  lesson_id  BIGINT        NOT NULL,
+  seq        SMALLINT      NOT NULL DEFAULT 0,
+  kind       ENUM('file', 'link') NOT NULL COMMENT 'file = 올린 파일 · link = 바깥 주소',
+  url        VARCHAR(1000) NOT NULL,
+  label      VARCHAR(300),
+  created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  deleted_at DATETIME(6),
+  CONSTRAINT fk_material_lounge FOREIGN KEY (lounge_id) REFERENCES lounge (id),
+  INDEX ix_material_lesson (lounge_id, lesson_id, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- 글 -------------------------------------------------------------------------
 -- author_name 은 작성 시점 닉네임의 스냅샷이다. 닉네임을 바꿔도 과거 글의
 -- 이름은 그대로 남는다. 표시는 author_name, 판정과 집계는 전부 user_id 다.
@@ -166,7 +199,7 @@ CREATE TABLE post (
   author_name    VARCHAR(60)  NOT NULL COMMENT '작성 시점 닉네임 스냅샷',
   title          VARCHAR(200) NOT NULL,
   body           TEXT         COMMENT '평문. 리치 텍스트 아님',
-  week           SMALLINT     COMMENT '과제 글만. 그 외 NULL',
+  task_id        BIGINT       COMMENT '과제 글만 — 어느 레슨의 어느 과제에 낸 답인가. 그 외 NULL',
   is_pinned      BOOLEAN      NOT NULL DEFAULT FALSE,
   reaction_count INT          NOT NULL DEFAULT 0,
   comment_count  INT          NOT NULL DEFAULT 0,
@@ -187,7 +220,12 @@ CREATE TABLE post (
   INDEX ix_post_cat    (lounge_id, category_id, created_at),
   INDEX ix_post_hot    (lounge_id, reaction_count),
   INDEX ix_post_mine   (user_id, created_at),
-  INDEX ix_post_submit (lounge_id, category_id, week, user_id),   -- 과제 제출 여부 · 미제출 명단
+  -- 한 사람이 한 과제에 내는 글은 한 편. Postgres 의 부분 유니크(deleted_at IS NULL) 를
+  -- 생성 컬럼으로 흉내 낸다 — 지운 글은 NULL 이 되어 서로 부딪히지 않는다.
+  live_task      BIGINT AS (IF(deleted_at IS NULL, task_id, NULL)) VIRTUAL,
+  UNIQUE KEY uq_post_task_user (live_task, user_id),
+  CONSTRAINT fk_post_task FOREIGN KEY (task_id) REFERENCES lesson_task (id),
+  INDEX ix_post_task (lounge_id, task_id, user_id),
   INDEX ix_post_recent (lounge_id, created_at)                     -- 어제 올라온 글 집계
   -- 한글 부분 일치(pg_trgm)는 없다. LIKE '%…%' 는 스캔한다.
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -308,18 +346,16 @@ CREATE TABLE post_report (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- 주차 게시 여부 ---------------------------------------------------------------
--- 강의 내용은 프드프가 갖지만, 어느 주차를 라운지에서 열지는 라운지가 정한다.
--- 행이 없으면 공개로 본다.
+-- 섹션 게시 여부 ---------------------------------------------------------------
+-- 어느 섹션을 라운지에서 열지는 라운지가 정한다. 행이 없으면 공개. 순차 잠금 · 마감 없음.
 
-CREATE TABLE lounge_week (
+CREATE TABLE lounge_section (
   lounge_id  BIGINT      NOT NULL,
-  week       SMALLINT    NOT NULL,
+  section_id BIGINT      NOT NULL COMMENT '프드프 섹션 id. FK 없음',
   published  BOOLEAN     NOT NULL DEFAULT TRUE,
-  due_at     DATETIME(6) COMMENT '과제 마감. NULL 이면 마감 없음 — 카운트다운도 정시·지각 구분도 없다',
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (lounge_id, week),
-  CONSTRAINT fk_week_lounge FOREIGN KEY (lounge_id) REFERENCES lounge (id)
+  PRIMARY KEY (lounge_id, section_id),
+  CONSTRAINT fk_section_lounge FOREIGN KEY (lounge_id) REFERENCES lounge (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -361,47 +397,36 @@ CREATE TABLE ext_user (
 CREATE TABLE ext_course (
   id        BIGINT       PRIMARY KEY,
   title     VARCHAR(200) NOT NULL,
-  weeks     SMALLINT     NOT NULL DEFAULT 8,
   synced_at DATETIME(6)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- 주차 제목. 강의 목록의 카드 제목이 된다.
-CREATE TABLE ext_week (
+-- 섹션. 강의 목록의 카드 하나. remote 에서는 프드프 id 를 그대로 받는다.
+CREATE TABLE ext_section (
+  id        BIGINT       PRIMARY KEY,
   course_id BIGINT       NOT NULL,
-  week      SMALLINT     NOT NULL,
+  seq       SMALLINT     NOT NULL,
   title     VARCHAR(200) NOT NULL,
   synced_at DATETIME(6),
-  PRIMARY KEY (course_id, week)
+  UNIQUE KEY uq_section (course_id, seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- 레슨 = 영상 하나(2~30분). 진도는 끝까지 봤는지로 센다.
 CREATE TABLE ext_lesson (
-  id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-  course_id BIGINT       NOT NULL,
-  week      SMALLINT     NOT NULL,
-  seq       SMALLINT     NOT NULL,
-  chapter   VARCHAR(120) COMMENT '소속 챕터. 검색 결과에 뜬다',
-  title     VARCHAR(200) NOT NULL,
-  duration  VARCHAR(12),
-  video_url VARCHAR(500),
-  doc       TEXT         COMMENT '교안 본문. 검색 대상',
-  synced_at DATETIME(6),
-  UNIQUE KEY uq_lesson (course_id, week, seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- 프드프의 회차별 미션 양식. 글쓰기 창의 과제 폼이 이걸 읽는다.
-CREATE TABLE ext_mission (
-  id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-  course_id BIGINT       NOT NULL,
-  week      SMALLINT     NOT NULL,
-  title     VARCHAR(200) NOT NULL COMMENT '이번 주 과제 제목',
-  seq       SMALLINT     NOT NULL,
-  question  VARCHAR(300) NOT NULL,
-  hint      VARCHAR(300) COMMENT '입력칸 placeholder',
-  synced_at DATETIME(6),
-  UNIQUE KEY uq_mission (course_id, week, seq)
+  id           BIGINT       PRIMARY KEY,
+  course_id    BIGINT       NOT NULL,
+  section_id   BIGINT       NOT NULL,
+  seq          SMALLINT     NOT NULL,
+  title        VARCHAR(200) NOT NULL,
+  duration_sec INT          COMMENT '영상 길이(초). 없으면 완료 여부는 is_complete 만 믿는다',
+  video_url    VARCHAR(500),
+  description  TEXT         COMMENT '영상 아래 설명란. 12:30 같은 시각은 화면이 눌러서 이동하게 만든다',
+  timeline     JSON         COMMENT '[{t: 초, label}] 구간 목록',
+  doc          TEXT         COMMENT '교안 본문. 검색 대상',
+  synced_at    DATETIME(6),
+  UNIQUE KEY uq_lesson (section_id, seq),
+  INDEX ix_lesson_section (section_id, seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -419,11 +444,13 @@ CREATE TABLE ext_purchase (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- 시청 기록. 원본은 프드프다. lounge_member.week 는 이 표에서 계산한 값의 캐시일 뿐이다.
+-- 시청 기록. 원본은 프드프다. lounge_member.section_id 는 이 표에서 계산한 값의 캐시일 뿐이다.
+-- 완료의 진실은 is_complete. watched_sec 은 '어디까지 봤나' — 이어보기와 레슨 안 막대에 쓴다.
 CREATE TABLE ext_watch (
   user_id     BIGINT      NOT NULL,
   lesson_id   BIGINT      NOT NULL,
-  watched_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  watched_sec INT         NOT NULL DEFAULT 0,
+  watched_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '마지막으로 본 시각',
   is_complete BOOLEAN     NOT NULL DEFAULT FALSE,
   synced_at   DATETIME(6),
   PRIMARY KEY (user_id, lesson_id),

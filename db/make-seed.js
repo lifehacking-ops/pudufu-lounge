@@ -15,11 +15,13 @@ const D = global.window.LOUNGE_DATA;
 
 const MEMBERS    = D.members;
 const POSTS      = D.posts;
-const LESSONS    = D.lessons;
-const WEEKS      = D.weeks;
+const SECTIONS   = D.sections;      // build() 가 조립한 모양: sections[].lessons[].tasks/materials
+const LESSONS    = SECTIONS.reduce((a, s) => a.concat(s.lessons), []);
+const TASKS      = D.tasks;         // 납작한 원본. lessonId 는 build() 가 채웠다
+const MATERIALS  = D.materials;
+const WATCH      = D.watch;
 const CATEGORIES = D.categories;
 const LOUNGES    = D.lounges;
-const MISSIONS   = D.missions;
 const LIVE       = D.live;
 
 /* ---- 도우미 ---- */
@@ -90,11 +92,11 @@ SET TIME ZONE 'UTC';
 
 BEGIN;
 
-TRUNCATE lounge_week, lounge_digest, feedback_pass_use, post_view, reaction, comment,
-  attachment, post_answer, post, lounge_category, category, lounge_member,
-  lounge RESTART IDENTITY CASCADE;
-TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase, ext_mission,
-  ext_lesson, ext_week, ext_course, ext_user RESTART IDENTITY CASCADE;
+TRUNCATE lounge_section, lounge_digest, feedback_pass_use, post_view, reaction, comment,
+  attachment, post_answer, post, lesson_material, lesson_task, lounge_category, category,
+  lounge_member, lounge RESTART IDENTITY CASCADE;
+TRUNCATE ext_live, ext_feedback_pass, ext_watch, ext_purchase,
+  ext_lesson, ext_section, ext_course, ext_user RESTART IDENTITY CASCADE;
 `);
 
 /* ---- 2부 · 프드프에서 받아 온 것 ---- */
@@ -111,35 +113,20 @@ say(MEMBERS.map((m, i) =>
 
 say(`
 -- 강의`);
-say("INSERT INTO ext_course (id, title, weeks, synced_at) VALUES");
-say(`  (${COURSE}, ${q("학원마케팅 올인원 강의")}, ${WEEKS.length}, now());`);
+say("INSERT INTO ext_course (id, title, synced_at) VALUES");
+say(`  (${COURSE}, ${q("학원마케팅 올인원 강의")}, now());`);
 
 say(`
--- 주차 제목. 강의 목록의 카드 제목이 된다.`);
-say("INSERT INTO ext_week (course_id, week, title, synced_at) VALUES");
-say(WEEKS.map((t, i) => `  (${COURSE}, ${i + 1}, ${q(t)}, now())`).join(",\n") + ";");
+-- 섹션. 강의 목록의 카드 하나. id 는 목업 순서와 같다.`);
+say("INSERT INTO ext_section (id, course_id, seq, title, synced_at) OVERRIDING SYSTEM VALUE VALUES");
+say(SECTIONS.map((sec) => `  (${sec.id}, ${COURSE}, ${sec.seq}, ${q(sec.title)}, now())`).join(",\n") + ";");
 
 say(`
--- 주차별 강. 교안 본문이 통합 검색의 대상이 된다.`);
-const seqOf = {};
-say("INSERT INTO ext_lesson (course_id, week, seq, chapter, title, duration, video_url, doc, synced_at) VALUES");
-say(LESSONS.map((l) => {
-  seqOf[l.wk] = (seqOf[l.wk] || 0) + 1;
-  const url = l.video ? `https://customer-xxxx.cloudflarestream.com/${COURSE}-${l.wk}-${seqOf[l.wk]}/iframe` : null;
-  return `  (${COURSE}, ${l.wk}, ${seqOf[l.wk]}, ${q(l.chap)}, ${q(l.t)}, ${q(l.d)}, ${q(url)}, ${q(l.doc)}, now())`;
-}).join(",\n") + ";");
-
-say(`
--- 주차별 미션 양식. 글쓰기 창의 과제 폼이 이걸 읽는다.`);
-const mrows = [];
-Object.keys(MISSIONS).map(Number).sort((a, b) => a - b).forEach((wk) => {
-  const m = MISSIONS[wk];
-  m.qs.forEach((x, i) => {
-    mrows.push(`  (${COURSE}, ${wk}, ${q(m.title)}, ${i + 1}, ${q(x.q)}, ${q(x.hint)}, now())`);
-  });
-});
-say("INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at) VALUES");
-say(mrows.join(",\n") + ";");
+-- 레슨 = 영상 하나. 교안과 설명란이 통합 검색의 대상이 된다. 타임라인은 jsonb 로 그대로.`);
+say("INSERT INTO ext_lesson (id, course_id, section_id, seq, title, duration_sec, video_url, description, timeline, doc, synced_at) OVERRIDING SYSTEM VALUE VALUES");
+say(LESSONS.map((l) =>
+  `  (${l.id}, ${COURSE}, ${l.section}, ${l.seq}, ${q(l.title)}, ${n(l.durationSec)}, ${q(l.videoUrl)}, ${q(l.description)}, ${q(JSON.stringify(l.timeline || []))}, ${q(l.doc)}, now())`
+).join(",\n") + ";");
 
 say(`
 -- 구매. 기수와 만료일이 여기서 나온다.`);
@@ -150,19 +137,31 @@ say(students.map((m) =>
 ).join(",\n") + ";");
 
 say(`
--- 시청 기록. lounge_member.week 는 이 표에서 계산한 값의 캐시다.
--- 여기서는 '지난 주차의 강은 다 봤다'로 깔아 둔다.`);
-const lessonId = {};
-let lid = 0;
-const bywk = {};
-LESSONS.forEach((l) => { lid++; (bywk[l.wk] = bywk[l.wk] || []).push(lid); });
+-- 시청 기록. lounge_member.section_id 는 이 표에서 계산한 값의 캐시다.
+-- 앞 섹션의 레슨은 다 봤고(watched_sec = 길이), 지금 섹션의 첫 레슨을 40% 본 것으로 깔아 둔다 —
+-- 그래야 '이어보기' 가 가리킬 곳이 있다. 나(박현종)는 목업의 watch 를 그대로 쓴다.`);
+const bySec = {};
+LESSONS.forEach((l) => { (bySec[l.section] = bySec[l.section] || []).push(l); });
+const me = MEMBERS.find((m) => m.name === "박현종");
 const wrows = [];
 students.forEach((m) => {
-  for (let w = 1; w < m.wk; w++) (bywk[w] || []).forEach((id) => {
-    wrows.push(`  (${uid[m.name]}, ${id}, ${days(m.joined - w * 3 > 0 ? m.joined - w * 3 : 0)}, true, now())`);
+  const u = uid[m.name];
+  if (m === me) {
+    WATCH.forEach((w, i) => {
+      const l = LESSONS[w.lesson - 1];
+      wrows.push(`  (${u}, ${l.id}, ${w.sec}, ${back(WATCH.length - i, "days")}, ${!!w.done}, now())`);
+    });
+    return;
+  }
+  for (let sIdx = 1; sIdx < m.section; sIdx++) (bySec[sIdx] || []).forEach((l) => {
+    wrows.push(`  (${u}, ${l.id}, ${n(l.durationSec || 0)}, ${days(m.joined - sIdx * 3 > 0 ? m.joined - sIdx * 3 : 0)}, true, now())`);
   });
+  const first = (bySec[m.section] || [])[0];
+  if (first && m.section > 1) {
+    wrows.push(`  (${u}, ${first.id}, ${Math.round((first.durationSec || 0) * 0.4)}, ${days(m.lastDays)}, false, now())`);
+  }
 });
-say("INSERT INTO ext_watch (user_id, lesson_id, watched_at, is_complete, synced_at) VALUES");
+say("INSERT INTO ext_watch (user_id, lesson_id, watched_sec, watched_at, is_complete, synced_at) VALUES");
 say(wrows.join(",\n") + ";");
 
 say(`
@@ -192,26 +191,26 @@ say(LOUNGES.map((l, i) =>
 ).join(",\n") + ";");
 
 say(`
--- 주차 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.`);
-say("INSERT INTO lounge_week (lounge_id, week, published) VALUES");
-say(WEEKS.map((t, i) => `  (1, ${i + 1}, true)`).join(",\n") + ";");
+-- 섹션 게시 여부. 강의 내용은 프드프 것이고 여는 시점은 라운지 것이다.`);
+say("INSERT INTO lounge_section (lounge_id, section_id, published) VALUES");
+say(SECTIONS.map((sec) => `  (1, ${sec.id}, true)`).join(",\n") + ";");
 
 say(`
 -- 멤버. 역할이 라운지 단위로 붙는다.`);
-say("INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_at, last_seen_at, week, week_synced_at) VALUES");
+say("INSERT INTO lounge_member (lounge_id, user_id, role, cohort, joined_at, expires_at, last_seen_at, section_id, section_synced_at) VALUES");
 say(MEMBERS.map((m) => {
   const staff = m.role !== "student";
   const exp = staff ? "NULL" : `${days(m.joined)} + interval '365 days'`;
-  return `  (1, ${uid[m.name]}, ${q(m.role)}, ${n(m.cohort || null)}, ${days(m.joined)}, ${exp}, ${days(m.lastDays)}, ${m.wk}, now())`;
+  return `  (1, ${uid[m.name]}, ${q(m.role)}, ${n(m.cohort || null)}, ${days(m.joined)}, ${exp}, ${days(m.lastDays)}, ${m.section}, now())`;
 }).join(",\n") + ";");
 
 // 관리자는 모든 라운지를 맡는다. 첫 라운지는 위에서 이미 들어갔다.
 // 라운지 수를 여기 다시 적지 않는다 — 라운지를 줄였을 때 없는 라운지에 넣으려다 깨진 적이 있다.
 const admin = MEMBERS.find((m) => m.role === "admin");
 if (LOUNGES.length > 1) {
-  say("INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at, week) VALUES");
+  say("INSERT INTO lounge_member (lounge_id, user_id, role, joined_at, last_seen_at) VALUES");
   say(LOUNGES.slice(1).map((_, i) =>
-    `  (${i + 2}, ${uid[admin.name]}, 'admin', ${days(400)}, now(), 1)`).join(",\n") + ";");
+    `  (${i + 2}, ${uid[admin.name]}, 'admin', ${days(400)}, now())`).join(",\n") + ";");
 }
 
 say(`
@@ -239,6 +238,16 @@ LOUNGES.forEach((L, li) => {
 say("INSERT INTO lounge_category (lounge_id, category_id, placement, sort, student_can_write, instructor_can_write) VALUES");
 say(lcrows.join(",\n") + ";");
 
+say(`
+-- 레슨의 과제. 관리자가 붙인 것. 질문 양식은 통째로 jsonb. id 는 목업 순서와 같다.`);
+say("INSERT INTO lesson_task (id, lounge_id, lesson_id, seq, title, questions) OVERRIDING SYSTEM VALUE VALUES");
+say(TASKS.map((t, i) => `  (${i + 1}, 1, ${t.lessonId}, 1, ${q(t.title)}, ${q(JSON.stringify(t.qs))})`).join(",\n") + ";");
+
+say(`
+-- 레슨의 자료. 파일 또는 링크.`);
+say("INSERT INTO lesson_material (lounge_id, lesson_id, seq, kind, url, label) VALUES");
+say(MATERIALS.map((m, i) => `  (1, ${m.lesson}, ${i}, ${q(m.kind)}, ${q(m.url)}, ${q(m.label)})`).join(",\n") + ";");
+
 /* ---- 글 ---- */
 
 const cmtCount = (p) => (p.thread || []).reduce((a, c) => a + 1 + (c.replies || []).length, 0);
@@ -252,7 +261,7 @@ POSTS.forEach((p) => {
   pid++;
   const at = ago(p.when);
   const rc = (p.likes || 0) + reactTotal(p);
-  postRows.push(`  (${pid}, 1, ${cid[p.cat]}, ${uid[p.author]}, ${q(p.author)}, ${q(p.title)}, ${q(p.body || null)}, ${n(p.wk || null)}, ${!!p.pinned}, ${rc}, ${cmtCount(p)}, ${n(p.views || 0)}, ${at}, ${at})`);
+  postRows.push(`  (${pid}, 1, ${cid[p.cat]}, ${uid[p.author]}, ${q(p.author)}, ${q(p.title)}, ${q(p.body || null)}, ${n(p.task || null)}, ${!!p.pinned}, ${rc}, ${cmtCount(p)}, ${n(p.views || 0)}, ${at}, ${at})`);
 
   (p.mission || []).forEach((a, i) => {
     answerRows.push(`  (${pid}, ${i + 1}, ${q(a.q)}, ${q(a.a)})`);
@@ -306,7 +315,7 @@ POSTS.forEach((p) => {
 
 say(`
 -- 글. 글쓴이는 user_id 로 판정하고 author_name 으로 표시한다.`);
-say("INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body, week, is_pinned, reaction_count, comment_count, view_count, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES");
+say("INSERT INTO post (id, lounge_id, category_id, user_id, author_name, title, body, task_id, is_pinned, reaction_count, comment_count, view_count, created_at, updated_at) OVERRIDING SYSTEM VALUE VALUES");
 say(postRows.join(",\n") + ";");
 
 say(`
@@ -339,6 +348,9 @@ say(`
 SELECT setval(pg_get_serial_sequence('lounge','id'),   (SELECT max(id) FROM lounge));
 SELECT setval(pg_get_serial_sequence('category','id'), (SELECT max(id) FROM category));
 SELECT setval(pg_get_serial_sequence('post','id'),     (SELECT max(id) FROM post));
+SELECT setval(pg_get_serial_sequence('lesson_task','id'), (SELECT max(id) FROM lesson_task));
+SELECT setval(pg_get_serial_sequence('ext_section','id'), (SELECT max(id) FROM ext_section));
+SELECT setval(pg_get_serial_sequence('ext_lesson','id'),  (SELECT max(id) FROM ext_lesson));
 SELECT setval(pg_get_serial_sequence('comment','id'),  (SELECT max(id) FROM comment));
 
 -- 파생 카운터를 실제 행 수로 맞춘다. 시드가 어긋나지 않았는지 확인하는 셈이기도 하다.
@@ -380,4 +392,4 @@ const MARIA = process.argv.includes("--mariadb");
 console.log(MARIA ? toMaria(out.join("\n")) : out.join("\n"));
 
 if (capped.length) console.error(`사람 수보다 많아 잘린 반응 ${capped.length}건: ${capped.slice(0,3).join(" · ")}${capped.length>3?" …":""}`);
-console.error(`사람 ${MEMBERS.length} · 글 ${pid} · 댓글 ${cmid} · 반응 ${reactRows.length} · 강 ${LESSONS.length} · 미션 ${mrows.length} · 시청 ${wrows.length}`);
+console.error(`사람 ${MEMBERS.length} · 글 ${pid} · 댓글 ${cmid} · 반응 ${reactRows.length} · 섹션 ${SECTIONS.length} · 레슨 ${LESSONS.length} · 과제 ${TASKS.length} · 자료 ${MATERIALS.length} · 시청 ${wrows.length}`);

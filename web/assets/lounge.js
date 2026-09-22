@@ -242,20 +242,60 @@
      주 3회 · 총 무제한 · 365일 · 관리자 지급. 쓰면 1회 차감된다. */
   var PASSES = D.passes;
 
-  /* 지금 내가 진행 중인 주차. 실제로는 마지막으로 본 강의에서 나오는 값이고,
-     이미 시스템이 아는 값이라 글쓰기에서 다시 물어보지 않는다. */
-  var CURRENT_WK = D.currentWk || 3;
-  var WEEK_DUE = D.weekDue || {};   // 주차별 마감. 라운지가 정한다. 없으면 없다.
+  /* 강의 구조 : 섹션 → 레슨 → 과제 · 자료.
+     서버(present.js)와 목업(data-mock.js 의 build())이 같은 나무를 준다.
+       섹션  강의 탭의 카드. 게시 여부는 라운지가 정한다
+       레슨  영상 하나(2~30분). 끝까지 보면 done. watchedSec 은 어디까지 봤나
+       과제  레슨에 붙는다. 과제 하나 = 라운지 글 한 편. id 로 가리킨다
+       자료  레슨에 붙는다. 파일 또는 링크
+     진도는 시청 시간에서 나온다 — 여기서는 계산하지 않고 서버가 준 done 을 믿는다. */
+  var SECTIONS = D.sections || [];
+  var RESUME = D.resume || null;              // 마지막으로 본 레슨. 없으면 null
+  var TASK_PROGRESS = D.taskProgress || { done: 0, total: 0 };
+  var MY_TASKS = D.myTasks || {};             // taskId → 내가 낸 글 { postId, when, at, mission, attach }
 
-  /* 주차별 미션 양식. 강사는 질문과 예시만 갈아끼우면 된다.
-     hint 는 칸의 placeholder 로만 쓰이고 저장되지 않는다 — 비계는 남기되 결과물에는 안 남는다. */
-  var MISSIONS = D.missions;
+  function allLessons() {
+    var a = [];
+    SECTIONS.forEach(function (sc) { sc.lessons.forEach(function (l) { a.push(l); }); });
+    return a;
+  }
+  function allTasks() {
+    var a = [];
+    allLessons().forEach(function (l) { (l.tasks || []).forEach(function (t) { a.push(t); }); });
+    return a;
+  }
+  function sectionById(id) { return SECTIONS.filter(function (sc) { return String(sc.id) === String(id); })[0] || null; }
+  function lessonById(id) { return allLessons().filter(function (l) { return String(l.id) === String(id); })[0] || null; }
+  function taskOf(id) { return allTasks().filter(function (t) { return String(t.id) === String(id); })[0] || null; }
+  function sectionOfLesson(lesson) {
+    return SECTIONS.filter(function (sc) { return sc.lessons.indexOf(lesson) > -1; })[0] || null;
+  }
+  function lessonOfTask(task) {
+    return allLessons().filter(function (l) { return (l.tasks || []).indexOf(task) > -1; })[0] || null;
+  }
+  function sectionLabel(id) {
+    var sc = sectionById(id);
+    return sc ? "섹션 " + sc.seq : "—";
+  }
+  /* 8:05 처럼. 한 시간을 넘으면 1:02:05 */
+  function mmss(sec) {
+    sec = Math.max(0, Math.round(sec || 0));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+    var p2 = function (n) { return String(n).padStart(2, "0"); };
+    return (h ? h + ":" + p2(m) : String(m)) + ":" + p2(x);
+  }
+  /* 총 1시간 20분 · 12분 */
+  function durLabel(sec) {
+    var m = Math.round((sec || 0) / 60);
+    if (m < 60) return m + "분";
+    return Math.floor(m / 60) + "시간" + (m % 60 ? " " + (m % 60) + "분" : "");
+  }
 
   /* 미션 양식 위젯. 라운지 글쓰기 창과 강의실이 같은 모듈을 쓴다.
      강의를 보다가 그 자리에서 과제를 써야 뷰어와 게시판을 왕복하지 않는다. */
-  function buildMissionForm(wk, opts) {
-    var def = MISSIONS[wk];
-    if (!def) return null;
+  function buildMissionForm(task, opts) {
+    var def = task;
+    if (!def || !def.qs) return null;
     opts = opts || {};
 
     var box = el("div", "mission");
@@ -277,7 +317,7 @@
 
       var input = document.createElement("textarea");
       input.className = "ta";
-      input.placeholder = item.hint;
+      input.placeholder = item.hint || "";
       input.addEventListener("input", function () { autoGrow(input); sync(); });
       wrap.appendChild(input);
       list.appendChild(wrap);
@@ -296,7 +336,7 @@
     }
 
     return {
-      wk: wk,
+      taskId: task.id,
       el: box,
       sync: sync,
       complete: complete,
@@ -316,22 +356,44 @@
     };
   }
 
-  /* 라운지에 미션 글을 올리는 한 곳. 글쓰기 창과 강의실이 같이 부른다. */
-  /* 내가 그 주차에 이미 올린 과제 글 */
   /* 내가 낸 과제는 피드 묶음 밖에 있을 수 있다 — 150편이 쌓이면 첫 묶음에 없다.
-     서버가 내 것만 따로 보내 주므로 화면에 실린 글보다 그쪽을 먼저 믿는다. */
-  var MY_MISSIONS = (D.myMissions || []).map(function (m) {
-    return { id: m.id, cat: "과제", wk: m.wk, title: m.title, when: m.when,
-             mine: true, mission: m.mission, attach: m.attach && m.attach.length ? m.attach : undefined,
-             reactions: {}, myReact: null, thread: [], views: 0, body: "" };
-  });
-
-  function myMissionPost(wk) {
+     서버가 내 것만 따로 보내 주므로(myTasks) 화면에 실린 글보다 그쪽을 먼저 믿는다. */
+  function myTaskPost(taskId) {
     var inFeed = POSTS.filter(function (p) {
-      return p.mine && p.cat === "과제" && p.wk === wk && p.mission;
+      return p.mine && p.cat === "과제" && String(p.taskId) === String(taskId);
     })[0];
     if (inFeed) return inFeed;
-    return MY_MISSIONS.filter(function (p) { return p.wk === wk; })[0];
+    var m = MY_TASKS[taskId];
+    if (!m) return null;
+    var task = taskOf(taskId);
+    return { id: m.postId, cat: "과제", taskId: taskId, title: task ? task.title : "과제", when: m.when, at: m.at,
+             mine: true, mission: m.mission, attach: m.attach && m.attach.length ? m.attach : undefined,
+             reactions: {}, myReact: null, thread: [], views: 0, body: "" };
+  }
+
+  /* 과제 진행률. 낸 뒤에는 서버를 다시 묻지 않고 여기서 센다. */
+  function countTasks() {
+    var total = 0, done = 0;
+    SECTIONS.filter(function (sc) { return sc.published; }).forEach(function (sc) {
+      sc.lessons.forEach(function (l) { (l.tasks || []).forEach(function (t) { total++; if (t.submittedPostId) done++; }); });
+    });
+    TASK_PROGRESS = { done: done, total: total };
+    return TASK_PROGRESS;
+  }
+
+  /* 과제 글은 어느 레슨의 과제인지가 카테고리 옆에 선다. 누르면 그 레슨으로 간다. */
+  function taskMeta(meta, p) {
+    if (p.cat !== "과제" || !p.taskId) return;
+    var task = taskOf(p.taskId);
+    var lesson = task ? lessonOfTask(task) : (p.lessonId ? lessonById(p.lessonId) : null);
+    if (!lesson) return;
+    var sc = sectionOfLesson(lesson);
+    meta.appendChild(el("span", "sep", "·"));
+    var b = el("button", "cat cat-link", lesson.title);
+    b.type = "button";
+    b.title = (sc ? sc.title + " · " : "") + "레슨 " + lesson.seq;
+    b.addEventListener("click", function (e) { e.stopPropagation(); closePost(); openLesson(sc && sc.id, lesson.id, task ? task.id : null); });
+    meta.appendChild(b);
   }
 
   /* 글에 적힌 주소를 카드로 편다. 글 저장과 다른 요청이다 — 남의 서버가 느려도
@@ -346,42 +408,48 @@
     }).catch(function () { /* 카드는 있으면 좋은 것이다. 없어도 글은 읽힌다 */ });
   }
 
-  /* overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 */
-  function publishMission(wk, answers, title, overwrite, attach, key) {
-    var exist = myMissionPost(wk);
-    var name = title || wk + "주차 과제 올립니다";
+  /* 과제 글을 올리는 한 곳. 글쓰기 창과 강의실이 같이 부른다.
+     overwrite 면 새 글을 쌓지 않고 이미 올린 글을 고쳐 쓴다 — 과제 하나에 한 편이다. */
+  function publishTask(task, answers, title, overwrite, attach, key) {
+    var exist = myTaskPost(task.id);
+    var name = title || task.title;
 
-    // 과제는 주차마다 한 편이다. 덮어쓰기는 앞의 것을 지우고 새로 쓴다.
     return send("POST", "/posts", {
-      cat: "과제", wk: wk, title: name, body: "", mission: answers,
+      cat: "과제", taskId: task.id, title: name, body: "", mission: answers,
       attach: attach || [], overwrite: !!(overwrite && exist), key: key || newKey()
     }).then(function (r) {
       if (r && r.duplicate && !(overwrite && exist)) return;   // 두 번 누른 것. 이미 올라가 있다
+      var lesson = lessonOfTask(task);
+      var post;
       if (overwrite && exist) {
         exist.mission = answers;
         exist.when = "방금 수정함";
         exist.title = name;
         if (attach && attach.length) exist.attach = attach;
         if (r) exist.id = r.id;
+        post = exist;
       } else {
-        var fresh = {
-          id: r ? r.id : undefined,
-          cat: "과제", wk: wk,
+        post = {
+          id: r ? r.id : "m-task-" + task.id,
+          cat: "과제", taskId: task.id, lessonId: lesson ? lesson.id : null, taskTitle: task.title,
           author: ME.name, when: "방금", state: "live",
           views: 1, mine: true,
           reactions: {}, myReact: null, thread: [],
           title: name, body: "", mission: answers,
           attach: attach && attach.length ? attach : undefined
         };
-        POSTS.unshift(fresh);
-        MY_MISSIONS.push(fresh);
+        POSTS.unshift(post);
       }
-      if (r && r.card) fetchCard(overwrite && exist ? exist : POSTS[0], r.card);
+      task.submittedPostId = post.id;
+      MY_TASKS[task.id] = { postId: post.id, when: post.when, at: new Date().toISOString(), mission: answers, attach: attach || [] };
+      if (r && r.card) fetchCard(post, r.card);
+      countTasks();
       render();
-      markMissionQuest(wk);
 
-      // 강의실 과제 칸도 같이 고쳐 그린다. 안 그러면 낸 뒤에도 빈 양식이 남는다.
-      mountClassMission();
+      // 강의실 과제 칸 · 왼쪽 목록 · 레일도 같이 고쳐 그린다. 안 그러면 낸 뒤에도 빈 양식이 남는다.
+      if (viewTask === task) mountTask(task);
+      renderCurric();
+      renderCourseList();
       paintRail();
     }).catch(failed);
   }
@@ -461,10 +529,6 @@
     return out;
   })();
 
-  /* 강의는 카드가 아니라 '강' 단위로 찾는다.
-     어느 주차 · 어느 섹션에 속한 강인지와, 교안에서 검색어가 걸린 대목을 같이 보여준다. */
-  var LESSONS = D.lessons;
-
   /* 수강생 명부. 강사 화면이 필요로 하는 값을 담는다.
      wk = 지금 서 있는 주차 · lastDays = 마지막 활동 이후 지난 날 */
   /* 프드프 계정에서 오는 값과 라운지가 만드는 값이 섞여 있다.
@@ -479,96 +543,17 @@
   /* 다음 라이브 특강 */
   var LIVE = D.live;
 
-  /* 주차 하나가 강의 하나다. 목록에 여덟 장이 깔리고, 한 장을 열면 그 주차의 강이 나온다. */
-  var WEEKS = D.weeks;
-
-  /* 강 하나를 커리큘럼 항목으로 바꾼다.
-     검색도 LESSONS 가 아니라 이 항목을 보므로 주차·챕터를 같이 들고 있는다. */
-  /* 시청 기록의 원본은 프드프다. 라운지는 남기기만 하고 쌓지 않는다. */
-  function saveWatched(item) {
-    if (!item.id) return;
-    send("PUT", "/lessons/" + item.id + "/done", { done: !!item.done })
-      .catch(function (err) { item.done = !item.done; renderCurric(); updateProgress(); failed(err); });
-  }
-
-  function lessonItemOf(l, done) {
-    return { id: l.id, wk: l.wk, chap: l.chap, t: l.t, d: l.video ? l.d : "교안",
-             doc: l.doc, video: l.video,
-             /* 서버가 내 시청 기록을 주면 그것을 쓴다. 프로토타입에는 없으므로
-                지난 주차는 다 본 것으로 깔아 둔다. */
-             done: l.done != null ? !!l.done : !!done };
-  }
-
-  function makeCourse(wk, title, published) {
-    var past = wk < CURRENT_WK;
-
-    var lessons = LESSONS.filter(function (l) { return l.wk === wk; })
-      .map(function (l) { return lessonItemOf(l, past); });
-
-    // 진행 중인 주차는 첫 강만 듣고 멈춰 있는 상태로 둔다
-    if (wk === CURRENT_WK && lessons.length) {
-      if (lessons[0].done == null) lessons[0].done = true;
-      lessons[0].cur = true;
-      lessons[0].rich = true;
-    } else if (lessons.length) {
-      lessons[0].cur = true;
-    }
-
-    return {
-      wk: wk,
-      title: title,
-      published: published,
-      sections: [
-        { name: "강의 · 4~5분 단위", open: true, items: lessons },
-        { name: "과제 & 자료", open: true, items: [
-          { t: wk + "주차 과제 올리기", d: "과제", mission: true, done: past },
-          { t: "남의 글 3개 보고 반응 1개", d: "퀘스트", done: past }
-        ] }
-      ]
-    };
-  }
-
-  /* 게시 여부는 라운지가 정한다. 서버가 주면 그것을 쓰고, 프로토타입에서는
-     전부 공개로 시작한다. */
-  var COURSES = WEEKS.map(function (title, i) {
-    return makeCourse(i + 1, title, D.weekPublished ? D.weekPublished[i] !== false : true);
-  });
-
-  /* 게시 전 주차는 수강생 화면 어디에도 나오지 않는다 — 목록·검색·주차 선택기 전부.
+  /* 게시 전 섹션은 수강생 화면 어디에도 나오지 않는다 — 목록 · 검색 · 과제 고르기 전부.
      관리자에게만 보여서 게시하기 전에 열어보고 확인할 수 있다. */
-  function courseOf(wk) { return COURSES.filter(function (c) { return c.wk === wk; })[0]; }
-  function liveCourses() { return COURSES.filter(function (c) { return c.published; }); }
-  function shownCourses() { return can("manage") ? COURSES : liveCourses(); }
+  function liveSections() { return SECTIONS.filter(function (sc) { return sc.published; }); }
+  function shownSections() { return can("manage") ? SECTIONS : liveSections(); }
 
-  var viewWk = CURRENT_WK;
-  function course() { return courseOf(viewWk); }
-
-  function flatOf(c) {
-    var a = [];
-    c.sections.forEach(function (sec) { sec.items.forEach(function (it) { a.push(it); }); });
-    return a;
-  }
-
-  /* ================= 카운트다운 ================= */
-
-  /* 마감은 라운지가 정한다. 없으면 세지 않는다 — 예전에는 '지금 + 54시간' 이라는
-     가짜 시각을 항상 세고 있었다. 프로토타입에서만 예시로 하나 만든다. */
-  var target = WEEK_DUE[CURRENT_WK] ? Date.parse(WEEK_DUE[CURRENT_WK])
-    : (D.api ? null : Date.now() + (2 * 24 + 6) * 3600e3 + 12 * 60e3 + 5e3);
-
-  /* 과제 카드는 다시 그려지므로 표시 대상을 그때그때 찾는다 */
-  function tick() {
-    if (target == null) return;
-    var s = Math.floor(Math.max(0, target - Date.now()) / 1000);
-    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
-    var p = function (n) { return String(n).padStart(2, "0"); };
-    var txt = p(h) + ":" + p(m) + ":" + p(ss);
-
-    var nodes = [$("countdown")].concat(Array.prototype.slice.call(document.querySelectorAll(".cd")));
-    nodes.forEach(function (n) { if (n) n.textContent = txt; });
-  }
-  tick();
-  setInterval(tick, 1000);
+  /* 지금 강의실이 보고 있는 섹션 · 레슨 · (열려 있으면) 과제.
+     처음에는 이어보기 자리 — 마지막으로 본 레슨. 본 게 없으면 첫 섹션 첫 레슨. */
+  var viewSection = (RESUME && sectionById(RESUME.sectionId)) || liveSections()[0] || SECTIONS[0] || null;
+  var viewLesson = (RESUME && lessonById(RESUME.lessonId)) || (viewSection && viewSection.lessons[0]) || null;
+  var viewTask = null;
+  function section() { return viewSection; }
 
   /* ================= 라운지 전환 (P1-7) ================= */
 
@@ -625,7 +610,7 @@
     renderCourseList();  // 게시 전 주차는 수강생에게 안 보인다
 
     // 게시 전 주차를 열어둔 채로 권한을 잃으면 강의 목록으로 되돌린다
-    if (screenNow === "lesson" && !course().published && !can("manage")) show("courses");
+    if (screenNow === "lesson" && section() && !section().published && !can("manage")) show("courses");
   }
 
   if (hasSwitcher) roleBtn.addEventListener("click", function (e) {
@@ -679,7 +664,7 @@
   function postHits(tk) {
     return POSTS.filter(function (p) {
       var answers = (p.mission || []).map(function (a) { return a.q + " " + a.a; }).join(" ");
-      return hitAll([p.title, p.cat, p.author, p.wk ? p.wk + "주차" : "", p.body || "", answers].join(" "), tk);
+      return hitAll([p.title, p.cat, p.author, p.taskTitle || "", p.body || "", answers].join(" "), tk);
     });
   }
 
@@ -700,9 +685,9 @@
 
   function lessonHits(tk) {
     var out = [];
-    liveCourses().forEach(function (c) {
-      c.sections[0].items.forEach(function (l) {
-        if (hitAll([l.t, l.doc || "", l.chap, l.wk + "주차"].join(" "), tk)) out.push(l);
+    liveSections().forEach(function (sc) {
+      sc.lessons.forEach(function (l) {
+        if (hitAll([l.title, l.doc || "", l.description || "", sc.title].join(" "), tk)) out.push(l);
       });
     });
     return out;
@@ -745,7 +730,7 @@
     row.addEventListener("click", function () { closeSearchResults(); openById(p.id, null); });
 
     var main = el("div", "sr-main");
-    main.appendChild(el("span", "sr-where", p.cat + (p.wk ? " · " + p.wk + "주차" : "") + " · " + p.author));
+    main.appendChild(el("span", "sr-where", p.cat + (p.taskTitle ? " · " + p.taskTitle : "") + " · " + p.author));
 
     var h = el("h3", "sr-t");
     h.appendChild(mark(p.title, tk));
@@ -802,26 +787,27 @@
   function lessonItem(l, tk) {
     var row = el("button", "sr-item");
     row.type = "button";
-    row.addEventListener("click", function () { closeSearchResults(); show("lesson"); });
+    var sc = sectionOfLesson(l);
+    row.addEventListener("click", function () { closeSearchResults(); openLesson(sc && sc.id, l.id); });
 
     var main = el("div", "sr-main");
-    main.appendChild(el("span", "sr-where", l.wk + "주차 · " + l.chap));
+    main.appendChild(el("span", "sr-where", (sc ? sc.title : "") + " · 레슨 " + l.seq));
 
     var h = el("h3", "sr-t");
-    h.appendChild(mark(l.t, tk));
+    h.appendChild(mark(l.title, tk));
     main.appendChild(h);
 
     var x = el("p", "sr-x");
-    x.appendChild(mark(excerpt(l.doc, tk), tk));
+    x.appendChild(mark(excerpt(l.doc || l.description || "", tk), tk));
     main.appendChild(x);
 
     var foot = el("div", "sr-foot");
-    foot.appendChild(el("span", null, l.video ? "영상 " + l.d : "교안"));
+    foot.appendChild(el("span", null, l.videoUrl ? "영상 " + mmss(l.durationSec) : "교안"));
     main.appendChild(foot);
 
     row.appendChild(main);
 
-    if (l.video) {
+    if (l.videoUrl) {
       var th = el("div", "sr-thumb");
       th.appendChild(playMark());
       row.appendChild(th);
@@ -841,7 +827,7 @@
     main.appendChild(h);
 
     var where = [m.cohort ? m.cohort + "기" : roleLabel(m.role)];
-    if (m.role === "student") where.push(m.wk + "주차");
+    if (m.role === "student" && m.section) where.push(sectionLabel(m.section));
     main.appendChild(el("span", "sr-where", where.join(" · ")));
 
     row.appendChild(main);
@@ -985,7 +971,7 @@
   var TODO_FALLBACK = [
     "다른 사람 글 3개 읽기",
     "마음에 드는 글에 반응 하나",
-    "이번 주차 과제 올리기"
+    "이번 레슨 과제 올리기"
   ];
 
   function todoList() {
@@ -1046,7 +1032,7 @@
     set("railBanner", "라운지 배너 자리 · " + D.lounge.name);
     set("whoLounge", full);
     set("whoName", ME.name);
-    set("classMeta", full + " · " + WEEKS.length + "주 과정");
+    set("classMeta", full + " · 섹션 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개");
 
     // 라운지 전환 목록에서 '지금' 은 진짜 지금 보는 것에 붙어야 한다
     var menu = $("loungeMenu");
@@ -1203,7 +1189,7 @@
     composerAtt.clear();
     composerLinks.reset();
     draft.cat = DEFAULT_CAT;
-    draft.wk = CURRENT_WK;
+    draft.task = (defaultTask() || {}).id || null;
     syncComposer();
     updatePostBtn();
     setComposer(false);
@@ -1506,7 +1492,19 @@
     return open[0] || writableCats()[0] || DEFAULT_CAT;
   }
 
-  var draft = { cat: DEFAULT_CAT, wk: CURRENT_WK, attach: [] };
+  /* 기본 과제 : 이어보기 레슨의 미제출 과제 → 첫 미제출 과제 → 첫 과제. 없으면 null */
+  function defaultTask() {
+    var lesson = RESUME && lessonById(RESUME.lessonId);
+    var first = null;
+    var pick = null;
+    liveSections().forEach(function (sc) { sc.lessons.forEach(function (l) { (l.tasks || []).forEach(function (t) {
+      if (!first) first = t;
+      if (!pick && !t.submittedPostId && (!lesson || l === lesson)) pick = t;
+    }); }); });
+    if (!pick) allTasks().some(function (t) { if (!t.submittedPostId) { pick = t; return true; } return false; });
+    return pick || first;
+  }
+  var draft = { cat: DEFAULT_CAT, task: (defaultTask() || {}).id || null, attach: [] };
 
   /* 글쓰기 창의 첨부. 툴바의 클립 단추와 숨은 파일 입력을 그대로 쓰고,
      미리보기 줄은 본문 아래 · 툴바 위에 선다. 카드 전체가 끌어다 놓기 자리다. */
@@ -1528,23 +1526,7 @@
     return parts.join("\n");
   }, composerAtt, draft.attach);
 
-  function syncComposer() { paintCat(); syncWkLine(); syncGate(); syncMission(); }
-
-  /* ISO 시각 → datetime-local 입력값(현지 시각). 비면 빈 문자열. */
-  function toLocalInput(iso) {
-    if (!iso) return "";
-    var d = new Date(iso);
-    var p = function (n) { return String(n).padStart(2, "0"); };
-    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
-      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
-  }
-
-  function dueLabel(iso) {
-    var d = new Date(iso);
-    var days = ["일", "월", "화", "수", "목", "금", "토"];
-    var p = function (n) { return String(n).padStart(2, "0"); };
-    return days[d.getDay()] + " " + p(d.getHours()) + ":" + p(d.getMinutes());
-  }
+  function syncComposer() { paintCat(); syncTaskLine(); syncGate(); syncMission(); }
 
   /* ----- 우측 레일 -----
      예전에는 멤버 24 · 온라인 7 · 기수 3 · 3주차 · 상위 12% 가 전부 마크업에 박혀
@@ -1564,90 +1546,57 @@
       }
     }
 
-    /* 이번 주 과제 카드. 이 주차에 과제가 없으면 카드를 통째로 뺀다. */
+    /* 이어보기 카드. 마지막으로 본 레슨으로 바로 간다. 본 게 없으면 첫 레슨부터. */
     var card = $("railMission");
-    var def = MISSIONS[CURRENT_WK];
     if (card) {
-      if (!def) { card.hidden = true; }
+      var lesson = (RESUME && lessonById(RESUME.lessonId)) || (liveSections()[0] && liveSections()[0].lessons[0]) || null;
+      if (!lesson || watchLocked()) { card.hidden = true; }
       else {
         card.hidden = false;
-        set("railWk", CURRENT_WK);
-        set("railMissionT", String(def.title || "").replace(/^\d+주차 미션 · /, ""));
-        var done = !!myMissionPost(CURRENT_WK);
-        var badge = $("railDone");
-        if (badge) {
-          badge.textContent = done ? "제출함" : "미제출";
-          badge.className = "badge " + (done ? "b-ontime" : "b-none");
-        }
-        var due = WEEK_DUE[CURRENT_WK];
-        var lab = $("railDueLabel"), cd = $("countdown");
-        if (due) {
-          target = Date.parse(due);
-          if (lab) { lab.hidden = false; lab.textContent = "정시 마감까지 · " + dueLabel(due); }
-          if (cd) cd.hidden = false;
-          tick();
-        } else if (D.api) {
-          if (lab) { lab.hidden = false; lab.textContent = "마감 없음"; }
-          if (cd) cd.hidden = true;
-        }
+        var sc = sectionOfLesson(lesson);
+        var sec = RESUME && String(RESUME.lessonId) === String(lesson.id) ? RESUME.watchedSec : 0;
+        set("railKicker", RESUME ? "이어보기" : "처음부터 보기");
+        set("railMissionT", lesson.title);
+        set("railSub", (sc ? sc.title : "") + (lesson.durationSec ? " · " + mmss(sec) + " / " + mmss(lesson.durationSec) : ""));
+        var fill = $("wkFill");
+        if (fill) fill.style.width = (lesson.durationSec ? Math.min(100, sec / lesson.durationSec * 100) : 0) + "%";
+        var btn = $("toCourseBtn");
+        if (btn) btn.textContent = RESUME ? "이어보기" : "처음부터 보기";
       }
     }
 
     paintRibbon();
   }
 
-  /* 완주 리본. 낸 주차는 정시·지각으로, 안 낸 주차는 지났는지 남았는지로 가른다.
-     마감이 없는 주차는 제출이면 그냥 정시로 본다 — 늦었다고 말할 기준이 없다. */
+  /* 과제 진행률 리본. 과제 하나가 칸 하나 — 낸 것은 채워지고 안 낸 것은 비어 있다.
+     과제가 열두 개를 넘으면 칸 대신 막대 하나로 보여 준다. */
   function paintRibbon() {
     var rib = $("ribbon");
-    if (!rib || !D.api) return;   // 프로토타입은 마크업의 예시 그대로
+    if (!rib) return;
     rib.textContent = "";
+    var tp = countTasks();
+    var tasks = [];
+    liveSections().forEach(function (sc) { sc.lessons.forEach(function (l) { (l.tasks || []).forEach(function (t) { tasks.push({ t: t, l: l }); }); }); });
 
-    var total = WEEKS.length, ontime = 0, late = 0, left = 0;
-    for (var wk = 1; wk <= total; wk++) {
-      var mine = myMissionPost(wk);
-      var cell = el("div", "rcell");
-      if (mine) {
-        var due = WEEK_DUE[wk];
-        var isLate = due && mine.at && Date.parse(mine.at) > Date.parse(due);
-        cell.className += isLate ? " r-late hatch" : " r-ontime";
-        cell.title = wk + "주차 · " + (isLate ? "지각 제출" : "정시 제출");
-        if (isLate) late++; else ontime++;
-      } else if (wk < CURRENT_WK) {
-        cell.className += " r-none";
-        cell.title = wk + "주차 · 미제출";
-      } else {
-        cell.className += wk === CURRENT_WK ? " r-none" : " r-future";
-        cell.title = wk + "주차 · " + (wk === CURRENT_WK ? "이번 주" : "예정");
-        left++;
-      }
-      rib.appendChild(cell);
+    if (tasks.length <= 12) {
+      tasks.forEach(function (x) {
+        var cell = el("div", "rcell " + (x.t.submittedPostId ? "r-ontime" : "r-none"));
+        cell.title = x.l.title + " · " + x.t.title + " · " + (x.t.submittedPostId ? "제출" : "미제출");
+        rib.appendChild(cell);
+      });
+    } else {
+      var track = el("div", "track");
+      var fill = el("div", "fill");
+      fill.style.width = (tp.total ? tp.done / tp.total * 100 : 0) + "%";
+      track.appendChild(fill);
+      rib.appendChild(track);
     }
     var set = function (id, v) { var e = $(id); if (e) e.textContent = v; };
-    set("ribbonHead", total + "주 완주 현황");
-    set("ribbonN", (ontime + late) + "/" + total);
-    set("ribbonSum", "정시 " + ontime + " · 지각 " + late + " · 남은 주차 " + left);
+    set("ribbonHead", "과제 진행률");
+    set("ribbonN", tp.done + " / " + tp.total);
+    set("ribbonSum", tp.total ? (tp.total - tp.done ? "남은 과제 " + (tp.total - tp.done) + "개" : "모든 과제를 냈습니다") : "아직 과제가 없습니다");
     var sec = rib.closest("section");
-    if (sec) sec.hidden = total === 0;
-  }
-
-  /* 우측 레일의 이번 주 제출 현황. 관리 화면 대시보드와 같은 함수로 세어
-     두 화면의 숫자가 어긋나지 않게 한다. */
-  function paintWkSubmit() {
-    var all, done;
-    if (D.stats) {
-      all = D.stats.students;
-      done = D.stats.submitted;
-    } else {
-      all = students().length;
-      done = all - notSubmitted().length;
-    }
-    $("wkFill").style.width = (all ? (done / all) * 100 : 0) + "%";
-    $("wkSubmit").textContent = "";
-    $("wkSubmit").appendChild(el("span", "tnum", String(all)));
-    $("wkSubmit").appendChild(document.createTextNode("명 중 "));
-    $("wkSubmit").appendChild(el("span", "tnum", String(done)));
-    $("wkSubmit").appendChild(document.createTextNode("명 제출"));
+    if (sec) sec.hidden = tp.total === 0;
   }
 
   /* ----- 카테고리 : 알약 나열이 아니라 토글 하나 ----- */
@@ -1696,58 +1645,57 @@
     if (!catMenu.hidden && !catMenu.contains(e.target) && e.target !== catBtn) closeCatMenu();
   });
 
-  /* ----- 과제 주차 : 고르게 하지 않는다 -----
-     기본값은 내가 지금 진행 중인 주차다. 시스템이 이미 아는 값이라 물어볼 필요가 없다.
-     예외(늦은 과제 · 앞선 주차)만 '변경'으로 연다. 주차가 50개여도 UI 는 그대로다. */
+  /* ----- 과제 : 고르는 것이 아니라 확정된 한 줄 -----
+     기본값은 내가 보던 레슨의 미제출 과제다. 시스템이 이미 아는 값이라 물어볼 필요가 없다.
+     다른 과제를 내려는 예외만 '변경' 으로 연다. 과제가 50개여도 UI 는 그대로다. */
 
   var wkLine = $("wkLine"), wkPick = $("wkPick");
 
-  function shortTitle(wk) { return MISSIONS[wk].title.replace(/^\d+주차 미션 · /, ""); }
-
-  function syncWkLine() {
+  function syncTaskLine() {
     wkPick.textContent = "";
-    var cur = currentMission();
+    var cur = currentTask();
     if (!cur) { wkLine.hidden = true; return; }
+    var lesson = lessonOfTask(cur);
 
     wkLine.textContent = "";
-    wkLine.appendChild(el("b", null, cur.wk + "주차 미션"));
-    wkLine.appendChild(el("span", null, shortTitle(cur.wk)));
+    wkLine.appendChild(el("b", null, "과제"));
+    wkLine.appendChild(el("span", null, (lesson ? lesson.title + " · " : "") + cur.title));
 
     var chg = el("button", "chg", "변경");
     chg.type = "button";
-    chg.addEventListener("click", toggleWkPick);
+    chg.addEventListener("click", toggleTaskPick);
     wkLine.appendChild(chg);
     wkLine.hidden = false;
   }
 
-  function toggleWkPick() {
+  function toggleTaskPick() {
     if (wkPick.firstChild) { wkPick.textContent = ""; return; }
 
     var box = el("div", "wkpick");
     var input = document.createElement("input");
     input.type = "text";
-    input.placeholder = "주차 번호나 제목으로 찾기";
+    input.placeholder = "섹션 · 레슨 · 과제 제목으로 찾기";
     var list = el("div", "list");
 
     function paint(q) {
       list.textContent = "";
-      var keys = Object.keys(MISSIONS).map(Number)
-        .filter(function (k) { var c = courseOf(k); return !!c && c.published; })
-        .sort(function (a, b) { return a - b; });
-      var hit = keys.filter(function (k) {
+      var rows = [];
+      liveSections().forEach(function (sc) { sc.lessons.forEach(function (l) { (l.tasks || []).forEach(function (t) {
+        rows.push({ sc: sc, l: l, t: t });
+      }); }); });
+      var hit = rows.filter(function (r) {
         if (!q) return true;
-        return String(k).indexOf(q) >= 0 || MISSIONS[k].title.indexOf(q) >= 0;
+        return [r.sc.title, r.l.title, r.t.title].join(" ").indexOf(q) >= 0;
       });
+      if (!hit.length) { list.appendChild(el("div", "none", "그런 과제가 없습니다")); return; }
 
-      if (!hit.length) { list.appendChild(el("div", "none", "그런 주차가 없습니다")); return; }
-
-      hit.forEach(function (k) {
+      hit.forEach(function (r) {
         var b = el("button");
         b.type = "button";
-        b.appendChild(el("b", null, k + "주차"));
-        b.appendChild(document.createTextNode(shortTitle(k)));
+        b.appendChild(el("b", null, r.t.submittedPostId ? "제출함" : "미제출"));
+        b.appendChild(document.createTextNode(r.l.title + " · " + r.t.title));
         b.addEventListener("click", function () {
-          draft.wk = k;
+          draft.task = r.t.id;
           wkPick.textContent = "";
           syncComposer();
           updatePostBtn();
@@ -1794,10 +1742,14 @@
   var missionBox = $("missionBox");
   var missionForm = null;
 
-  function currentMission() {
-    if (draft.cat !== "과제" || !MISSIONS[draft.wk]) return null;
-    return { wk: draft.wk, def: MISSIONS[draft.wk] };
+  /* 글쓰기 창이 지금 향하는 과제. '과제' 카테고리가 아니면 없다. */
+  function currentTask() {
+    if (draft.cat !== "과제") return null;
+    var t = taskOf(draft.task);
+    if (!t) { draft.task = (defaultTask() || {}).id || null; t = taskOf(draft.task); }
+    return t;
   }
+  var currentMission = currentTask;
 
   function syncMission() {
     var cur = currentMission();
@@ -1811,8 +1763,8 @@
       return;
     }
 
-    if (!missionForm || missionForm.wk !== cur.wk) {
-      missionForm = buildMissionForm(cur.wk, { onChange: function () { updatePostBtn(); composerLinks.poke(); }, headless: true });
+    if (!missionForm || String(missionForm.taskId) !== String(cur.id)) {
+      missionForm = buildMissionForm(cur, { onChange: function () { updatePostBtn(); composerLinks.poke(); }, headless: true });
       missionBox.textContent = "";
       missionBox.appendChild(missionForm.el);
     }
@@ -1849,16 +1801,17 @@
       return;
     }
 
+    var lesson = cur ? lessonOfTask(cur) : null;
     var post = {
       cat: draft.cat,
-      wk: cur ? cur.wk : 0,
+      taskId: cur ? cur.id : null, lessonId: lesson ? lesson.id : null, taskTitle: cur ? cur.title : null,
       author: ME.name,
       when: "방금",
       state: "live",
       comments: 0, views: 1,
       mine: true,
       reactions: {}, myReact: null, thread: [],
-      title: title || (cur ? cur.wk + "주차 과제 올립니다" : body.split("\n")[0].slice(0, 70)),
+      title: title || (cur ? cur.title : body.split("\n")[0].slice(0, 70)),
 
       /* 제목을 안 적었으면 첫 줄이 제목이 되고 나머지가 본문이다.
          예전에는 여기서 줄바꿈을 공백으로 바꾸고 160자에서 잘랐다 — 미리보기
@@ -1874,17 +1827,23 @@
 
     if (postBtn.disabled) return;   // 이미 보내는 중이다
     busy(postBtn, "게시 중…", send("POST", "/posts", {
-      cat: post.cat, wk: post.wk || null, title: post.title,
+      cat: post.cat, taskId: post.taskId, title: post.title,
       body: post.body, mission: answers, attach: ready, key: draft.key || newKey()
     })).then(function (r) {
       draft.key = null;   // 이 글은 끝났다. 다음 글은 새 열쇠다.
       // 서버가 같은 글로 봤으면 화면에 두 번 세우지 않는다
       if (r && r.duplicate) { setComposer(false); return; }
-      if (r) post.id = r.id;
+      if (r) post.id = r.id; else if (cur) post.id = "m-task-" + cur.id;
       if (r && r.attach && r.attach.length) post.attach = r.attach;
       POSTS.unshift(post);
       // 본문에 적은 주소는 글이 선 뒤에 카드로 편다. 게시가 남의 서버를 기다리지 않는다.
       if (r && r.card) fetchCard(post, r.card);
+      // 과제를 냈으면 강의실 · 레일이 그것을 알아야 한다
+      if (cur) {
+        cur.submittedPostId = post.id;
+        MY_TASKS[cur.id] = { postId: post.id, when: "방금", at: new Date().toISOString(), mission: answers, attach: ready };
+        countTasks();
+      }
 
       // 피드백권이 필요한 카테고리면 여기서 1회 차감된다
       if (pass) pass.left -= 1;
@@ -1896,15 +1855,13 @@
       composerLinks.reset();
       if (missionForm) missionForm.clear();
       draft.cat = DEFAULT_CAT; // 다음 글도 빈 종이에서 시작한다
-      draft.wk = CURRENT_WK;   // 주차는 다시 진행 중인 주차부터
+      draft.task = (defaultTask() || {}).id || null;   // 과제는 다시 미제출 과제부터
       setComposer(false);
       render();
       syncComposer();
       updatePostBtn();
+      if (cur) { renderCurric(); renderCourseList(); paintRail(); if (viewTask === cur) mountTask(cur); }
     }).catch(failed);
-
-    // 미션을 올리면 그 주차 과제 퀘스트가 체크되고 진도율이 오른다
-    if (cur) markMissionQuest(cur.wk);
   });
 
   syncComposer();
@@ -2448,7 +2405,6 @@
     var total = whole && D.stats ? D.stats.posts
       : whole && INDEX ? INDEX.length : rows.length;
     resultCount.textContent = String(total);
-    paintWkSubmit();
 
     feed.textContent = "";
 
@@ -2464,6 +2420,7 @@
       // 카테고리 · 주차 · 시각이 먼저 오고, 그 아래에 쓴 사람이 온다
       var meta = el("div", "post-meta");
       meta.appendChild(el("span", "cat", p.cat));
+      taskMeta(meta, p);
       meta.appendChild(el("span", "sep", "·"));
       meta.appendChild(el("span", null, p.when));
       meta.appendChild(el("span", "grow"));
@@ -2577,6 +2534,7 @@
 
     var meta = el("div", "post-meta");
     meta.appendChild(el("span", "cat", p.cat));
+    taskMeta(meta, p);
     meta.appendChild(el("span", "sep", "·"));
     meta.appendChild(el("span", null, p.when));
     meta.appendChild(el("span", "grow"));
@@ -2747,8 +2705,9 @@
 
     var form = null, body = null;
 
-    if (p.mission && MISSIONS[p.wk]) {
-      form = buildMissionForm(p.wk, { headless: true, onChange: function (ok) { save.disabled = !ok; } });
+    var task = p.taskId ? taskOf(p.taskId) : null;
+    if (p.mission && task) {
+      form = buildMissionForm(task, { headless: true, onChange: function (ok) { save.disabled = !ok; } });
       form.fill(p.mission.map(function (a) { return a.a; }));
       detailBody.appendChild(form.el);
     } else {
@@ -2775,7 +2734,7 @@
 
     if (!movable) {
       detailBody.appendChild(el("p", "sec-note",
-        p.cat === "과제" ? "과제는 주차 양식에 묶여 있어 카테고리를 옮길 수 없습니다"
+        p.cat === "과제" ? "과제는 레슨의 양식에 묶여 있어 카테고리를 옮길 수 없습니다"
                          : "피드백권을 쓴 글은 카테고리를 옮길 수 없습니다"));
     }
 
@@ -2793,7 +2752,7 @@
 
       render();
       openPost(p);
-      if (form) mountClassMission();
+      if (form && task) { MY_TASKS[task.id] = Object.assign(MY_TASKS[task.id] || {}, { mission: p.mission }); if (viewTask === task) mountTask(task); }
     });
 
     if (form) form.sync();
@@ -3112,52 +3071,49 @@
   // 강의 목록에서 코스를 고르면 상세로
   $("crumbCourses").addEventListener("click", function () { show("courses"); });
 
-  // 우측 레일 '강의 이어보기' 는 목록을 건너뛰고 보던 레슨으로 바로 (P1-6)
+  // 우측 레일 '이어보기' 는 목록을 건너뛰고 마지막으로 본 레슨으로 바로 (P1-6)
   $("toCourseBtn").addEventListener("click", function () {
-    show(watchLocked() ? "courses" : "lesson");   // 만료면 안내가 있는 목록으로
+    if (watchLocked()) { show("courses"); return; }   // 만료면 안내가 있는 목록으로
+    var l = (RESUME && lessonById(RESUME.lessonId)) || (liveSections()[0] && liveSections()[0].lessons[0]);
+    var sc = l && sectionOfLesson(l);
+    if (sc) openLesson(sc.id, l.id); else show("courses");
   });
 
-  /* ================= 강의 목록 · 상세 ================= */
+  /* ================= 강의 목록 · 상세 =================
+     섹션 카드 → 강의실. 강의실은 왼쪽에 이 섹션의 레슨 목록, 오른쪽에 영상 · 타임라인 · 교안.
+     레슨을 누르면 그 아래로 과제 · 자료가 내려온다. 진도는 시청에서 나온다 — 체크하는 것이 없다. */
 
   var curric = $("curric"), courseList = $("courseList");
   var pctPill = $("pctPill"), pctFill = $("pctFill"), qDone = $("qDone"), qAll = $("qAll");
-  var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle"), lessonDone = $("lessonDone");
+  var lessonKicker = $("lessonKicker"), lessonTitle = $("lessonTitle");
   var crumbCur = $("crumbCur"), weekKicker = $("weekKicker"), weekTitle = $("weekTitle");
-  var proseEl = $("lessonProse"), videoCap = $("videoCap"), videoBox = $("lessonVideo");
-  var classMission = $("classMission"), nextLesson = $("nextLesson");
-  var richHTML = proseEl.innerHTML;   // 3주차 1강용 구조화 교안. 한 번만 보관해 둔다
+  var videoBox = $("lessonVideo"), tlBox = $("lessonTimeline"), descBox = $("lessonDesc");
+  var docBox = $("lessonDoc"), proseEl = $("lessonProse");
+  var classMission = $("classMission"), nextLesson = $("nextLesson"), prevLesson = $("prevLesson");
 
-  function flat() { return flatOf(course()); }
-  function curItem() { return flat().filter(function (it) { return it.cur; })[0] || flat()[0]; }
-
-  function checkIcon() {
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", "11");
-    svg.setAttribute("height", "11");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "3.5");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    svg.setAttribute("aria-hidden", "true");
-    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", "M20 6 9 17l-5-5");
-    svg.appendChild(path);
-    return svg;
+  function pctOf(sc) {
+    var all = sc.lessons.length;
+    var done = sc.lessons.filter(function (l) { return l.done; }).length;
+    return { done: done, all: all, value: all ? Math.round((done / all) * 100) : 0 };
   }
-
-  function pctOf(c) {
-    var items = flatOf(c);
-    var done = items.filter(function (it) { return it.done; }).length;
-    return { done: done, all: items.length, value: Math.round((done / items.length) * 100) };
-  }
-
-  /* ----- 강의 목록 : 주차 한 장씩 ----- */
+  function totalDur(sc) { return sc.lessons.reduce(function (a, l) { return a + (l.durationSec || 0); }, 0); }
 
   /* 수강이 끝나면 강의 시청은 막고 라운지는 그대로 둔다 — 함께 정한 규칙이다.
      스태프는 만료가 없다. */
   function watchLocked() { return !!(ME.expired && !isStaff()); }
+
+  function loungeName() { return (D.lounge && D.lounge.name) || "학원마케팅 올인원 강의"; }
+
+  /* ----- 강의 목록 : 섹션 한 장씩. 카드 아래 '목차' 를 펴면 레슨 줄이 카드 안에 내려온다 ----- */
+
+  var openTOC = {};   // sectionId → 목차 펼침. 화면을 오가도 그대로
+
+  function stateIcon(l) {
+    var w = el("span", "lstate " + (l.done ? "is-done" : (l.watchedSec > 0 ? "is-part" : "")));
+    w.setAttribute("aria-hidden", "true");
+    if (l.done) w.appendChild(icon("check", 11));
+    return w;
+  }
 
   function renderCourseList() {
     if (!courseList) return;
@@ -3171,39 +3127,45 @@
       courseList.appendChild(note);
     }
 
-    if (!shownCourses().length) {
+    var meta = $("classMeta");
+    if (meta) meta.textContent = loungeName() + " · 섹션 " + SECTIONS.length + "개 · 레슨 " + allLessons().length + "개";
+
+    if (!shownSections().length) {
       courseList.appendChild(el("p", "empty",
-        can("manage") ? "아직 등록된 강의가 없습니다. 관리 › 강의 게시에서 주차를 만드세요."
+        can("manage") ? "아직 등록된 강의가 없습니다. 관리 › 강의 · 과제에서 섹션을 만드세요."
                       : "아직 열린 강의가 없습니다."));
       return;
     }
 
-    shownCourses().forEach(function (c) {
-      var p = pctOf(c);
-      var state = !c.published ? "draft"
-        : p.value === 100 ? "done" : c.wk === CURRENT_WK ? "live" : p.done ? "live" : "soon";
+    shownSections().forEach(function (sc) {
+      var p = pctOf(sc);
+      var live = RESUME && String(RESUME.sectionId) === String(sc.id);
+      var state = !sc.published ? "draft"
+        : p.value === 100 ? "done" : (live || p.done > 0) ? "live" : "soon";
 
-      var card = el("button", "card course");
-      card.type = "button";
+      var card = el("div", "card course");
       card.setAttribute("data-open", "true");
-      card.addEventListener("click", function () { openWeek(c.wk); });
 
-      var box = el("div", "course-in");
+      var main = el("button", "course-in");
+      main.type = "button";
+      main.addEventListener("click", function () { openLesson(sc.id); });
+
       var head = el("div");
-      head.appendChild(el("span", "kicker", c.wk + "주차"));
-      head.appendChild(el("h2", "course-t", c.title));
-      box.appendChild(head);
+      // 제목이 '3주차 …' 처럼 자기 순서를 말하면 kicker 는 접는다
+      if (!/^\d+\s*주차/.test(sc.title)) head.appendChild(el("span", "kicker", "섹션 " + sc.seq));
+      head.appendChild(el("h2", "course-t", sc.title));
+      main.appendChild(head);
 
       var track = el("div", "track");
       var fill = el("div", "fill");
       fill.style.width = p.value + "%";
       track.appendChild(fill);
-      box.appendChild(track);
+      main.appendChild(track);
 
       var foot = el("div", "course-foot");
       var left = el("span");
       left.appendChild(el("span", "course-pct", p.value + "%"));
-      left.appendChild(document.createTextNode(" · 레슨 " + p.all + "개"));
+      left.appendChild(document.createTextNode(" · 레슨 " + p.all + "개" + (totalDur(sc) ? " · " + durLabel(totalDur(sc)) : "")));
       foot.appendChild(left);
 
       var badge = el("span", "badge " + (state === "done" ? "b-ontime" : state === "live" ? "b-live" : "b-none"));
@@ -3211,42 +3173,79 @@
       badge.appendChild(document.createTextNode(
         state === "done" ? "완료" : state === "live" ? "진행중" : state === "draft" ? "비공개" : "예정"));
       foot.appendChild(badge);
+      main.appendChild(foot);
+      card.appendChild(main);
 
-      box.appendChild(foot);
-      card.appendChild(box);
+      /* 목차. 카드 클릭(섹션 열기)과 분리된 단추다. 펼치면 레슨 줄이 카드 안에 서고,
+         줄을 누르면 그 레슨으로 바로 들어간다. */
+      if (sc.lessons.length) {
+        var toc = el("button", "toc-btn");
+        toc.type = "button";
+        toc.setAttribute("aria-expanded", String(!!openTOC[sc.id]));
+        toc.appendChild(el("span", null, "목차 " + sc.lessons.length + "개"));
+        toc.appendChild(icon("chevron-down", 14));
+        toc.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openTOC[sc.id] = !openTOC[sc.id];
+          renderCourseList();
+        });
+        card.appendChild(toc);
+
+        if (openTOC[sc.id]) {
+          var ul = el("ul", "toc");
+          sc.lessons.forEach(function (l) {
+            var li = el("li", "toc-row");
+            li.setAttribute("data-done", String(!!l.done));
+            var b = el("button", "toc-t");
+            b.type = "button";
+            b.appendChild(stateIcon(l));
+            b.appendChild(el("span", "t", l.title));
+            b.appendChild(el("span", "d", l.durationSec ? mmss(l.durationSec) : "교안"));
+            b.addEventListener("click", function (e) { e.stopPropagation(); openLesson(sc.id, l.id); });
+            li.appendChild(b);
+            ul.appendChild(li);
+          });
+          card.appendChild(ul);
+        }
+      }
+
       courseList.appendChild(card);
     });
   }
 
-  function openWeek(wk) {
-    var c = courseOf(wk);
-    if (!c || (!c.published && !can("manage"))) return;
+  /* 강의실을 연다. 섹션 · 레슨 · (있으면) 과제까지 한 번에 — 주소 · 검색 · 카드 · 레일이 다 이걸로 온다. */
+  function openLesson(sectionId, lessonId, taskId) {
+    var sc = sectionById(sectionId) || viewSection;
+    if (!sc) return;
+    if (!sc.published && !can("manage")) return;
     if (watchLocked()) return;   // 수강이 끝나면 강의는 다시 볼 수 없다
 
-    viewWk = wk;
+    viewSection = sc;
+    var l = lessonId ? lessonById(lessonId) : null;
+    if (!l || sectionOfLesson(l) !== sc) l = sc.lessons[0] || null;
+    viewLesson = l;
+    var task = taskId && l ? (l.tasks || []).filter(function (t) { return String(t.id) === String(taskId); })[0] : null;
+
     show("lesson");
-    paintWeekHead();
-    renderCurric();
+    paintSectionHead();
     updateProgress();
-    selectLesson(curItem());
+    if (task) mountTask(task); else if (l) selectLesson(l); else renderCurric();
   }
 
-  function paintWeekHead() {
-    var c = course();
-    if (!c) return;   // 아직 강의가 없는 라운지. 강의실은 빈 화면으로 둔다.
-
-    crumbCur.textContent = c.wk + "주차 · " + c.title;
+  function paintSectionHead() {
+    var sc = section();
+    if (!sc) return;   // 아직 강의가 없는 라운지. 강의실은 빈 화면으로 둔다.
+    crumbCur.textContent = sc.title;
     weekKicker.textContent = "";
-    weekKicker.appendChild(document.createTextNode(loungeName() + " · "));
-    weekKicker.appendChild(el("span", "disp", String(c.wk)));
-    weekKicker.appendChild(document.createTextNode("주차"));
-    weekTitle.textContent = c.title;
+    weekKicker.appendChild(document.createTextNode(loungeName() + " · 섹션 "));
+    weekKicker.appendChild(el("span", "disp", String(sc.seq)));
+    weekTitle.textContent = sc.title;
   }
-
-  function loungeName() { return (D.lounge && D.lounge.name) || "학원마케팅 올인원 강의"; }
 
   function updateProgress() {
-    var p = pctOf(course());
+    var sc = section();
+    if (!sc) return;
+    var p = pctOf(sc);
     pctPill.textContent = p.value + "%";
     pctFill.style.width = p.value + "%";
     qDone.textContent = String(p.done);
@@ -3254,176 +3253,322 @@
     renderCourseList();
   }
 
-  /* ----- 과제 퀘스트 ----- */
+  /* ----- 왼쪽 목록 : 레슨 줄, 고른 레슨 아래로 과제 · 자료가 내려온다 ----- */
 
-  function questItem(wk) {
-    var c = courseOf(wk);
-    return c && flatOf(c).filter(function (it) { return it.mission; })[0];
-  }
+  function renderCurric() {
+    var sc = section();
+    curric.textContent = "";
+    if (!sc) return;
 
-  function missionQuestDone(wk) {
-    var hit = questItem(wk);
-    return !!(hit && hit.done);
-  }
-
-  function markMissionQuest(wk) {
-    var hit = questItem(wk);
-    if (hit) hit.done = true;
-    if (wk === viewWk) {
-      renderCurric();
-      updateProgress();
-      if (curItem() === hit) mountClassMission();
+    if (!sc.lessons.length) {
+      curric.appendChild(el("p", "empty", "이 섹션에는 아직 레슨이 없습니다."));
+      return;
     }
-    else renderCourseList();
+
+    var ul = el("ul", "lessons");
+    sc.lessons.forEach(function (l) {
+      var li = document.createElement("li");
+      li.className = "lesson";
+      var cur = l === viewLesson;
+      li.setAttribute("data-cur", String(cur && !viewTask));
+      li.setAttribute("data-open", String(cur));
+      li.setAttribute("data-done", String(!!l.done));
+
+      var head = el("div", "lesson-row");
+      head.appendChild(stateIcon(l));
+      var t = el("button", "t", l.title);
+      t.type = "button";
+      t.addEventListener("click", function () { selectLesson(l); });
+      head.appendChild(t);
+      head.appendChild(el("span", "d", l.durationSec ? mmss(l.durationSec) : "교안"));
+      li.appendChild(head);
+
+      // 고른 레슨의 과제 · 자료. 다른 레슨을 고르면 접힌다(아코디언).
+      var tasks = l.tasks || [], mats = l.materials || [];
+      if (cur && (tasks.length || mats.length)) {
+        var sub = el("ul", "lesson-sub");
+        tasks.forEach(function (tk) {
+          var row = el("li", "sub-row" + (viewTask === tk ? " is-cur" : ""));
+          var b = el("button", "sub-t");
+          b.type = "button";
+          b.appendChild(el("span", "sub-k", "과제"));
+          b.appendChild(el("span", "t", tk.title));
+          b.appendChild(el("span", "badge " + (tk.submittedPostId ? "b-ontime" : "b-none"), tk.submittedPostId ? "제출함" : "미제출"));
+          b.addEventListener("click", function () { mountTask(tk); });
+          row.appendChild(b);
+          sub.appendChild(row);
+        });
+        mats.forEach(function (m) {
+          var row = el("li", "sub-row");
+          var a = document.createElement("a");
+          a.className = "sub-t";
+          a.href = m.url; a.target = "_blank"; a.rel = "noopener";
+          a.appendChild(el("span", "sub-k", "자료"));
+          a.appendChild(el("span", "t", m.label || pretty(m.url)));
+          a.appendChild(el("span", "d", m.kind === "file" ? (m.url.split(".").pop().toUpperCase().slice(0, 4) || "파일") : "링크"));
+          row.appendChild(a);
+          sub.appendChild(row);
+        });
+        li.appendChild(sub);
+      }
+      ul.appendChild(li);
+    });
+    curric.appendChild(ul);
+  }
+
+  /* ----- 플레이어 -----
+     Cloudflare Stream 이면 SDK 로, 유튜브면 IFrame API 로 시각 이동과 재생 시간을 받는다.
+     시청 위치는 15초마다 · 멈출 때 · 끝날 때 서버에 보고한다(원격이면 프드프로 간다). */
+
+  var player = null;   // { seek(sec), destroy() }
+
+  function reportWatch(l, sec, complete) {
+    sec = Math.max(0, Math.round(sec || 0));
+    if (l.durationSec && sec >= l.durationSec - 1) complete = true;
+    l.watchedSec = Math.max(l.watchedSec || 0, sec);
+    var wasDone = l.done;
+    if (complete) l.done = true;
+    RESUME = { lessonId: l.id, sectionId: (sectionOfLesson(l) || {}).id, watchedSec: l.watchedSec, at: new Date().toISOString() };
+    if (API) send("PUT", "/lessons/" + l.id + "/watch", { seconds: sec, complete: !!complete }).catch(function () { /* 다음 보고가 있다 */ });
+    if (!wasDone && l.done) { updateProgress(); renderCurric(); }
+    paintRail();
+  }
+
+  function streamSdk() {
+    if (window.Stream) return Promise.resolve(window.Stream);
+    if (!streamSdk.p) {
+      streamSdk.p = new Promise(function (ok, no) {
+        var sc = document.createElement("script");
+        sc.src = "https://embed.cloudflarestream.com/embed/sdk.latest.js";
+        sc.onload = function () { ok(window.Stream); };
+        sc.onerror = function () { no(new Error("Stream SDK")); };
+        document.head.appendChild(sc);
+      });
+    }
+    return streamSdk.p;
+  }
+
+  function mountPlayer(l) {
+    if (player) { player.destroy(); player = null; }
+    videoBox.textContent = "";
+    videoBox.className = "video";
+
+    if (!l.videoUrl) {
+      videoBox.appendChild(el("span", null, "이 레슨은 교안으로만 제공됩니다"));
+      return;
+    }
+    if (location.protocol === "file:") {
+      // file:// 로 열면 출처가 null 이라 임베드가 재생을 거부한다. 링크로 내보낸다.
+      var a = document.createElement("a");
+      a.href = l.videoUrl; a.target = "_blank"; a.rel = "noopener"; a.textContent = "새 창에서 영상 열기";
+      videoBox.appendChild(a);
+      return;
+    }
+
+    videoBox.classList.add("has-player");
+    var frame = document.createElement("iframe");
+    frame.allow = "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen";
+    frame.allowFullscreen = true;
+    frame.title = l.title;
+
+    var last = 0, lastSent = 0, ended = false;
+    var MIN_SEC = 5;   // 이만큼은 봐야 '봤다' 다. 재생기가 준비되며 보내는 0초는 시청이 아니다
+    function tickSec(sec) {
+      last = sec;
+      if (sec >= MIN_SEC && sec - lastSent >= 15) { lastSent = sec; reportWatch(l, sec, false); }
+    }
+
+    var isYT = /youtube\.com|youtu\.be/.test(l.videoUrl);
+    var isStream = /cloudflarestream\.com/.test(l.videoUrl);
+
+    if (isYT) {
+      frame.src = ytEmbed(l.videoUrl) + "?enablejsapi=1&rel=0&origin=" + encodeURIComponent(location.origin);
+      videoBox.appendChild(frame);
+      var post = function (func, args) {
+        frame.contentWindow && frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*");
+      };
+      var onMsg = function (e) {
+        if (e.source !== frame.contentWindow) return;
+        var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+        if (!d || !d.info) return;
+        if (typeof d.info.currentTime === "number") tickSec(d.info.currentTime);
+        if (d.info.playerState === 0 && !ended) { ended = true; reportWatch(l, l.durationSec || last, true); }
+        if (d.info.playerState === 2 && last >= MIN_SEC) reportWatch(l, last, false);   // 멈춤
+      };
+      window.addEventListener("message", onMsg);
+      frame.addEventListener("load", function () {
+        frame.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "lounge" }), "*");
+      });
+      player = {
+        seek: function (sec) { post("seekTo", [sec, true]); post("playVideo"); },
+        destroy: function () { window.removeEventListener("message", onMsg); if (last >= MIN_SEC && !ended) reportWatch(l, last, false); }
+      };
+    } else if (isStream) {
+      frame.src = l.videoUrl;
+      videoBox.appendChild(frame);
+      var sp = null;
+      streamSdk().then(function (Stream) {
+        sp = Stream(frame);
+        sp.addEventListener("timeupdate", function () { tickSec(sp.currentTime || 0); });
+        sp.addEventListener("pause", function () { if ((sp.currentTime || last) >= MIN_SEC) reportWatch(l, sp.currentTime || last, false); });
+        sp.addEventListener("ended", function () { if (!ended) { ended = true; reportWatch(l, l.durationSec || sp.currentTime || last, true); } });
+      }).catch(function () { /* SDK 를 못 실어도 영상은 돈다. 시각 이동만 안 된다 */ });
+      player = {
+        seek: function (sec) { if (sp) { sp.currentTime = sec; sp.play && sp.play(); } },
+        destroy: function () { if (last >= MIN_SEC && !ended) reportWatch(l, last, false); }
+      };
+    } else {
+      frame.src = l.videoUrl;
+      videoBox.appendChild(frame);
+      player = { seek: function () {}, destroy: function () {} };
+    }
+  }
+
+  function seekTo(sec) {
+    if (player) player.seek(sec);
+    videoBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /* '12:30' 이나 '1:02:05' 를 초로 */
+  function parseStamp(txt) {
+    var m = txt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    return m[3] != null ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
+  }
+
+  /* 설명란. mm:ss 토큰은 눌러서 그 시각으로 가는 단추가 된다. */
+  function renderDesc(l) {
+    descBox.textContent = "";
+    var text = l.description || "";
+    if (!text.trim()) { descBox.hidden = true; return; }
+    descBox.hidden = false;
+    var re = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g, at = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > at) descBox.appendChild(document.createTextNode(text.slice(at, m.index)));
+      var sec = parseStamp(m[0]);
+      if (sec == null || !l.videoUrl) { descBox.appendChild(document.createTextNode(m[0])); }
+      else {
+        var b = el("button", "tl-tok", m[0]);
+        b.type = "button";
+        b.addEventListener("click", (function (x) { return function () { seekTo(x); }; })(sec));
+        descBox.appendChild(b);
+      }
+      at = m.index + m[0].length;
+    }
+    if (at < text.length) descBox.appendChild(document.createTextNode(text.slice(at)));
+  }
+
+  /* 타임라인 토글. 기본은 접힘. 구간이 없으면 토글 자체가 없다. */
+  function renderTimeline(l) {
+    tlBox.textContent = "";
+    var tl = (l.timeline || []).filter(function (x) { return x && x.label; });
+    if (!tl.length || !l.videoUrl) { tlBox.hidden = true; return; }
+    tlBox.hidden = false;
+    var sum = el("summary", "tog-head");
+    sum.appendChild(el("span", null, "타임라인 " + tl.length + "개"));
+    sum.appendChild(icon("chevron-down", 14));
+    tlBox.appendChild(sum);
+    var ul = el("ul", "tl-list");
+    tl.forEach(function (x) {
+      var li = el("li");
+      var b = el("button", "tl-row");
+      b.type = "button";
+      b.appendChild(el("span", "tl-t tnum", mmss(x.t)));
+      b.appendChild(el("span", "tl-l", x.label));
+      b.addEventListener("click", function () { seekTo(x.t); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+    tlBox.appendChild(ul);
+    tlBox.open = false;
+  }
+
+  /* 교안 토글. 기본은 접힘. */
+  function renderDoc(l) {
+    proseEl.textContent = "";
+    if (!l.doc) { docBox.hidden = true; return; }
+    docBox.hidden = false;
+    String(l.doc).split(/\n{2,}/).forEach(function (para) { proseEl.appendChild(el("p", null, para)); });
+    docBox.open = false;
   }
 
   /* ----- 강의 본문 ----- */
 
-  function selectLesson(item) {
-    var items = flat();
-    items.forEach(function (it) { it.cur = it === item; });
+  function selectLesson(l) {
+    var sc = section();
+    if (!sc || !l) return;
+    viewLesson = l;
+    viewTask = null;
 
-    var idx = items.indexOf(item);
     lessonKicker.textContent = "";
+    lessonKicker.appendChild(document.createTextNode("레슨 · "));
+    lessonKicker.appendChild(el("span", "disp", String(l.seq).padStart(2, "0")));
+    lessonTitle.textContent = l.title;
 
-    lessonDone.setAttribute("aria-pressed", String(!!item.done));
-    lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
+    videoBox.hidden = false;
+    classMission.hidden = true;
+    mountPlayer(l);
+    renderTimeline(l);
+    renderDesc(l);
+    renderDoc(l);
 
-    // 과제 항목은 빈 교안을 띄우지 않고 그 자리에 제출 양식을 열어준다
-    var isMission = !!item.mission && !!MISSIONS[viewWk];
-    videoBox.hidden = isMission;
-    proseEl.hidden = isMission;
-    classMission.hidden = !isMission;
-
-    if (isMission) {
-      lessonKicker.appendChild(document.createTextNode("과제"));
-      lessonTitle.textContent = MISSIONS[viewWk].title;
-      mountClassMission();
-    } else {
-      lessonKicker.appendChild(document.createTextNode("강의 · "));
-      lessonKicker.appendChild(el("span", "disp", String(idx + 1).padStart(2, "0")));
-      lessonTitle.textContent = item.t;
-      videoCap.textContent = item.video ? item.t : "이 강은 교안으로만 제공됩니다";
-
-      // 구조화 교안은 3주차 1강에만 있다. 나머지는 교안 본문을 그대로 보여준다.
-      if (item.rich) {
-        proseEl.innerHTML = richHTML;
-      } else {
-        proseEl.textContent = "";
-        proseEl.appendChild(el("p", null, item.doc || "교안 준비 중입니다."));
-      }
-    }
-
-    // 마지막 강을 다 들으면 다음 칸이 과제다. 버튼이 그걸 미리 말해준다.
-    var nx = items[idx + 1];
-    nextLesson.textContent = nx && nx.mission ? "과제 쓰러 가기" : "다음 강의";
+    var i = sc.lessons.indexOf(l);
+    prevLesson.disabled = i <= 0;
+    var nx = sc.lessons[i + 1];
+    var nextSec = !nx && nextSection(sc);
+    nextLesson.textContent = nx ? "다음 레슨" : nextSec ? "다음 섹션으로" : "마지막 레슨";
+    nextLesson.disabled = !nx && !nextSec;
 
     renderCurric();
+    remember();
   }
 
-  function chevron() {
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    ["width", "12", "height", "12"].forEach(function (v, i, a) { if (i % 2 === 0) svg.setAttribute(v, a[i + 1]); });
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "2.5");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    svg.setAttribute("aria-hidden", "true");
-    var cp = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    cp.setAttribute("d", "m6 9 6 6 6-6");
-    svg.appendChild(cp);
-    return svg;
+  function nextSection(sc) {
+    var list = shownSections();
+    var i = list.indexOf(sc);
+    return i > -1 && list[i + 1] && list[i + 1].lessons.length ? list[i + 1] : null;
   }
 
-  function renderCurric() {
-    curric.textContent = "";
-
-    course().sections.forEach(function (sec) {
-      var block = el("div", "secblock");
-
-      var head = el("button", "sechead");
-      head.type = "button";
-      head.setAttribute("aria-expanded", String(sec.open));
-      head.appendChild(el("span", "grow", sec.name));
-      head.appendChild(el("span", "n", sec.items.filter(function (i) { return i.done; }).length + "/" + sec.items.length));
-      head.appendChild(chevron());
-      head.addEventListener("click", function () { sec.open = !sec.open; renderCurric(); });
-      block.appendChild(head);
-
-      if (sec.open) {
-        var ul = el("ul", "lessons");
-
-        sec.items.forEach(function (item) {
-          var li = document.createElement("li");
-          li.className = "lesson";
-          li.setAttribute("data-cur", String(!!item.cur));
-          li.setAttribute("data-done", String(!!item.done));
-
-          var chk = el("button", "check");
-          chk.type = "button";
-          chk.setAttribute("aria-pressed", String(!!item.done));
-          chk.setAttribute("aria-label", item.t + " 완료 표시");
-          chk.appendChild(checkIcon());
-          chk.addEventListener("click", function (e) {
-            e.stopPropagation();
-            item.done = !item.done;
-            saveWatched(item);
-            if (item.cur) {
-              lessonDone.setAttribute("aria-pressed", String(item.done));
-              lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
-            }
-            updateProgress();
-            renderCurric();
-          });
-          li.appendChild(chk);
-
-          var t = el("button", "t", item.t);
-          t.type = "button";
-          t.addEventListener("click", function () { selectLesson(item); });
-          li.appendChild(t);
-
-          li.appendChild(el("span", "d", item.d));
-          ul.appendChild(li);
-        });
-
-        block.appendChild(ul);
-      }
-
-      curric.appendChild(block);
-    });
-  }
-
-  lessonDone.addEventListener("click", function () {
-    var item = curItem();
-    item.done = !item.done;
-    saveWatched(item);
-    lessonDone.setAttribute("aria-pressed", String(item.done));
-    lessonDone.textContent = item.done ? "완료됨" : "완료로 표시";
-    updateProgress();
-    renderCurric();
-  });
-
-  $("prevLesson").addEventListener("click", function () {
-    var items = flat(), i = items.indexOf(curItem());
-    if (i > 0) selectLesson(items[i - 1]);
+  prevLesson.addEventListener("click", function () {
+    var sc = section(); if (!sc) return;
+    var i = sc.lessons.indexOf(viewLesson);
+    if (viewTask) { selectLesson(viewLesson); return; }   // 과제에서 이전 = 그 레슨 본문으로
+    if (i > 0) selectLesson(sc.lessons[i - 1]);
   });
 
   nextLesson.addEventListener("click", function () {
-    var items = flat(), i = items.indexOf(curItem());
-    if (i < items.length - 1) selectLesson(items[i + 1]);
+    var sc = section(); if (!sc) return;
+    var i = sc.lessons.indexOf(viewLesson);
+    if (sc.lessons[i + 1]) { selectLesson(sc.lessons[i + 1]); return; }
+    var ns = nextSection(sc);
+    if (ns) openLesson(ns.id, ns.lessons[0].id);
   });
 
-  /* ----- 강의 아래 과제 카드 -----
+  /* ----- 과제 모듈 -----
+     레슨 아래 과제를 고르면 영상 · 교안 자리에 제출 양식이 선다.
      이미 제출했으면 제출한 답변을 보여주고, 다시 올리려 하면 덮어쓸지 먼저 묻는다. */
 
-  function mountClassMission() {
-    classMission.textContent = "";
+  function mountTask(task) {
+    var l = lessonOfTask(task);
+    if (!l) return;
+    viewLesson = l;
+    viewTask = task;
+    if (player) { player.destroy(); player = null; }
 
-    var wk = viewWk;
-    var def = MISSIONS[wk];
-    if (!def) return;
+    lessonKicker.textContent = "";
+    lessonKicker.appendChild(document.createTextNode("과제 · " + l.title));
+    lessonTitle.textContent = task.title;
+    videoBox.hidden = true;
+    tlBox.hidden = true;
+    descBox.hidden = true;
+    docBox.hidden = true;
+    classMission.hidden = false;
+    classMission.textContent = "";
+    prevLesson.disabled = false;
+    nextLesson.textContent = "레슨으로 돌아가기";
+    nextLesson.disabled = false;
+    renderCurric();
+    remember();
 
     if (watchLocked()) {
       var over = el("div", "gate");
@@ -3433,42 +3578,38 @@
       return;
     }
 
-    var posted = myMissionPost(wk);
+    var posted = myTaskPost(task.id);
     var card = el("div", "classmission");
 
     var head = el("div", "cm-head");
-
     if (posted) {
       var ok = el("p", "cm-state");
       ok.appendChild(el("span", "mbox", "✓"));
       ok.appendChild(document.createTextNode(" 제출 완료 · " + posted.when + " 라운지에 올림"));
       head.appendChild(ok);
     } else {
-      head.appendChild(el("p", "meta", "별도 제출 양식이 없습니다. 아래 세 칸을 채우면 그게 제출입니다."));
+      head.appendChild(el("p", "meta", "별도 제출 양식이 없습니다. 아래 칸을 채우면 그게 제출입니다."));
     }
-
     card.appendChild(head);
 
-    var send = el("button", "btn-primary sm", posted ? "다시 올리기" : "라운지에 올리기");
-    send.type = "button";
-    send.disabled = true;
+    var sendBtn = el("button", "btn-primary sm", posted ? "다시 올리기" : "라운지에 올리기");
+    sendBtn.type = "button";
+    sendBtn.disabled = true;
 
-    var form = buildMissionForm(wk, {
+    var cmLinks = null;
+    var form = buildMissionForm(task, {
       headless: true,
-      // cmLinks 는 아래에서 만든다. 그 전에 fill() 이 한 번 부르므로 있을 때만
-      onChange: function (done) { send.disabled = !done; if (cmLinks) cmLinks.poke(); }
+      onChange: function (done) { sendBtn.disabled = !done; if (cmLinks) cmLinks.poke(); }
     });
+    if (!form) return;
 
-    // 이미 제출했다면 그때 쓴 답변을 그대로 불러온다
-    if (posted) form.fill(posted.mission.map(function (a) { return a.a; }));
+    if (posted) form.fill((posted.mission || []).map(function (a) { return a.a; }));
 
-    /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많고,
-       전후 비교처럼 두 장이 있어야 말이 되는 것도 있다. 이미 낸 과제의 파일은
-       그대로 이어 받는다. */
+    /* 과제에도 파일을 붙인다. 캡처 한 장이 답변 세 줄보다 나을 때가 많다.
+       이미 낸 과제의 파일은 그대로 이어 받는다. */
     var cmList = posted && posted.attach ? posted.attach.slice() : [];
     var cmAtt = attachRow(cmList, { onRemove: function (a) { cmLinks.removed(a); } });
-    // 답변에 적은 주소도 글쓰기 창과 똑같이 카드가 된다
-    var cmLinks = linkWatch(function () {
+    cmLinks = linkWatch(function () {
       return form.answers().map(function (a) { return a.a; }).join("\n");
     }, cmAtt, cmList);
 
@@ -3477,13 +3618,13 @@
 
     var cmKey = newKey();   // 이 폼에서 나가는 과제는 한 편이다
     function doSend(overwrite) {
-      if (send.disabled) return;
+      if (sendBtn.disabled) return;
       confirmBox.hidden = true;
-      busy(send, "올리는 중…", publishMission(wk, form.answers(), null, overwrite, cmAtt.value(), cmKey)
+      busy(sendBtn, "올리는 중…", publishTask(task, form.answers(), null, overwrite, cmAtt.value(), cmKey)
         .then(function () { cmKey = newKey(); }));
     }
 
-    send.addEventListener("click", function () {
+    sendBtn.addEventListener("click", function () {
       if (!posted) { doSend(false); return; }
       confirmBox.hidden = false;
     });
@@ -3491,31 +3632,25 @@
     confirmBox.appendChild(el("b", null, "이미 제출한 과제가 있습니다."));
     confirmBox.appendChild(document.createTextNode(" 덮어쓰면 이전 답변은 사라집니다."));
     confirmBox.appendChild(el("span", "grow"));
-
     var cancel = el("button", "btn-ghost", "취소");
     cancel.type = "button";
     cancel.addEventListener("click", function () { confirmBox.hidden = true; });
     confirmBox.appendChild(cancel);
-
-    var over = el("button", "btn-primary sm", "덮어쓰기");
-    over.type = "button";
-    over.addEventListener("click", function () { doSend(true); });
-    confirmBox.appendChild(over);
+    var over2 = el("button", "btn-primary sm", "덮어쓰기");
+    over2.type = "button";
+    over2.addEventListener("click", function () { doSend(true); });
+    confirmBox.appendChild(over2);
 
     var row = el("div", "row");
-    var dl = el("span", "meta-m");
-    dl.appendChild(document.createTextNode("마감까지 "));
-    dl.appendChild(el("span", "tnum cd", "--:--:--"));
-    row.appendChild(dl);
+    row.appendChild(el("span", "meta-m", "마감 없음 · 낸 글은 커뮤니티 '과제' 에 올라갑니다"));
     row.appendChild(el("span", "grow"));
-
     if (posted) {
       var go = el("button", "btn-sec", "라운지에서 보기");
       go.type = "button";
       go.addEventListener("click", function () { show("community"); openPost(posted); });
       row.appendChild(go);
     }
-    row.appendChild(send);
+    row.appendChild(sendBtn);
 
     card.appendChild(form.el);
     card.appendChild(cmAtt.el);
@@ -3523,11 +3658,8 @@
     card.appendChild(row);
     card.appendChild(confirmBox);   // 확인은 누른 버튼 바로 아래에 뜬다
     classMission.appendChild(card);
-
     form.sync();
-    tick();
   }
-
 
   /* ================= 관리 · 강사 화면 =================
      한 화면 안에 탭을 둔다. 강사는 대시보드만 보고, 나머지 세 탭은 관리자만 본다.
@@ -3535,7 +3667,7 @@
 
   var ADM_TABS = [
     { key: "dash",    label: "대시보드",   need: "dashboard" },
-    { key: "course",  label: "강의 게시",   need: "manage" },
+    { key: "course",  label: "강의 · 과제", need: "manage" },
     { key: "roles",   label: "수강생 관리",   need: "manage" },
     { key: "filters", label: "필터 관리",   need: "manage" },
     { key: "posts",   label: "게시물 관리", need: "manage" }
@@ -3645,57 +3777,6 @@
     return { el: box, say: say, foot: foot };
   }
 
-  /* 주차 하나에 강을 붙인다. 길이를 비우면 영상 없는 교안 전용 강이 된다. */
-  function lessonForm(cr) {
-    var f = cForm(cr.wk + "주차에 강 추가");
-
-    var chap = cField("챕터", "예: 후기 수집");
-    var title = cField("강 제목", "예: 학부모 후기를 어떻게 받아내는가");
-    var pair = el("div", "cadd-2");
-    pair.appendChild(chap.el);
-    pair.appendChild(title.el);
-    f.el.appendChild(pair);
-
-    var len = cField("영상 길이", "예: 4:30 · 비우면 교안 전용");
-    f.el.appendChild(len.el);
-
-    var doc = cField("교안 본문", "강의실 본문에 그대로 실립니다", true);
-    f.el.appendChild(doc.el);
-
-    function reset() {
-      [chap, title, len, doc].forEach(function (x) { x.input.value = ""; });
-      f.say("");
-      f.el.hidden = true;
-    }
-
-    f.foot("이 주차에 게시", function () {
-      if (!chap.val() || !title.val()) { f.say("챕터와 강 제목은 있어야 합니다."); return; }
-
-      var made = { wk: cr.wk, chap: chap.val(), t: title.val(),
-                   d: len.val(), video: !!len.val(), doc: doc.val() };
-
-      function put() {
-        LESSONS.push(made);
-        cr.sections[0].items.push(lessonItemOf(made, false));
-        reset();
-        renderCourseList();
-        if (viewWk === cr.wk) { renderCurric(); updateProgress(); }
-        renderAdmin();
-      }
-
-      if (!API) return put();
-
-      send("POST", "/admin/lessons", {
-        week: cr.wk, chapter: made.chap, title: made.t,
-        duration: made.d, doc: made.doc
-      }).then(put).catch(function (err) { f.say(err.message); });
-    }, reset);
-
-    f.reset = reset;
-    f.focus = function () { chap.input.focus(); };
-    return f;
-  }
-
   /* 질문 칸. 주차마다 물을 것이 다르므로 개수를 고정하지 않는다.
      세 개로 박아 두면 '주소 하나만 받는 주차' 도 빈 칸 두 개를 끌고 간다. */
   var QS_MAX = 8;
@@ -3763,213 +3844,360 @@
     };
   }
 
-  /* 이미 연 주차의 과제 양식을 고친다.
-     이미 낸 과제는 그때의 질문을 스냅샷으로 갖고 있어서 안 바뀐다. */
-  function missionForm2(cr) {
-    var cur = MISSIONS[cr.wk] || { title: "", qs: [] };
-    var f = cForm(cr.wk + "주차 과제 양식");
+  /* ----- 과제 양식 : 레슨에 붙인다. 만들기와 고치기가 같은 폼 -----
+     이미 낸 과제는 그때의 질문을 스냅샷으로 갖고 있어서 양식을 고쳐도 안 바뀐다. */
+  function taskForm(lesson, task) {
+    var f = cForm(task ? "과제 고치기 · " + lesson.title : "과제 추가 · " + lesson.title);
 
-    var mis = cField("과제 미션 한 줄", "예: 후기 세 개 받아오기");
-    mis.input.value = (cur.title || "").replace(/^\d+주차 미션 · /, "");
-    f.el.appendChild(mis.el);
+    var tt = cField("과제 제목", "예: 후기 세 개 받아오기");
+    tt.input.value = task ? task.title : "";
+    f.el.appendChild(tt.el);
 
-    var readQs = questionList(f.el, cur.qs || []);
+    var readQs = questionList(f.el, task ? task.qs : []);
 
     function close() { f.say(""); f.el.hidden = true; }
 
-    f.foot("양식 저장", function () {
-      if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
+    f.foot(task ? "양식 저장" : "과제 추가", function () {
+      if (!tt.val()) { f.say("과제 제목은 있어야 합니다. 이게 과제 칸과 제출 글의 제목이 됩니다."); return; }
       var list = readQs();
       if (!list.length) { f.say("질문이 하나는 있어야 합니다."); return; }
 
-      function put(title) {
-        MISSIONS[cr.wk] = { title: title, qs: list };
+      function put(r) {
+        if (task) { task.title = r.title || tt.val(); task.qs = r.qs || list; }
+        else {
+          lesson.tasks = lesson.tasks || [];
+          lesson.tasks.push({ id: r.id, seq: r.seq || lesson.tasks.length + 1, title: r.title || tt.val(), qs: r.qs || list, submittedPostId: null });
+        }
         close();
-        if (viewWk === cr.wk) mountClassMission();
-        syncComposer();
+        countTasks();
+        if (viewTask === task) mountTask(task);
+        renderCurric(); renderCourseList(); paintRail(); syncComposer();
         renderAdmin();
       }
 
-      var title = cr.wk + "주차 미션 · " + mis.val();
-      if (!API) return put(title);
+      if (!API) return put({ id: "m-new-" + Date.now(), title: tt.val(), qs: list });
 
-      send("PUT", "/admin/weeks/" + cr.wk + "/mission", { mission: mis.val(), qs: list })
-        .then(function (r) {
-          put(r.title);
-          if (r.alreadySubmitted) {
-            failed(new Error("이미 제출된 과제 " + r.alreadySubmitted + "건은 그대로 둡니다. 낼 때의 질문이 함께 저장돼 있습니다."));
-          }
-        })
-        .catch(function (err) { f.say(err.message); });
+      var req = task
+        ? send("PATCH", "/admin/tasks/" + task.id, { title: tt.val(), qs: list })
+        : send("POST", "/admin/lessons/" + lesson.id + "/tasks", { title: tt.val(), qs: list });
+      req.then(function (r) {
+        put(r);
+        if (r && r.alreadySubmitted) {
+          failed(new Error("이미 제출된 과제 " + r.alreadySubmitted + "건은 그대로 둡니다. 낼 때의 질문이 함께 저장돼 있습니다."));
+        }
+      }).catch(function (err) { f.say(err.message); });
     }, close);
 
     f.reset = close;
-    f.focus = function () { mis.input.focus(); };
+    f.focus = function () { tt.input.focus(); };
     return f;
   }
 
-  /* 새 주차는 과제 양식까지 같이 받는다. 양식 없이 열면 그 주차 과제 칸이 빈 채로 남는다. */
-  function weekForm() {
-    var wrap = el("div", "fadd");
+  /* ----- 자료 : 링크 또는 올린 파일 ----- */
+  function materialForm(lesson) {
+    var f = cForm("자료 추가 · " + lesson.title);
+    var kind = "link";
 
-    var open = el("button", "fadd-btn", "+ 새 주차 만들기");
+    var seg = el("div", "seg seg-s");
+    [["link", "링크"], ["file", "파일"]].forEach(function (k) {
+      var b = el("button", null, k[1]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(kind === k[0]));
+      b.addEventListener("click", function () {
+        kind = k[0];
+        [].forEach.call(seg.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        urlF.el.hidden = kind !== "link";
+        fileBox.hidden = kind !== "file";
+      });
+      seg.appendChild(b);
+    });
+    f.el.appendChild(seg);
+
+    var label = cField("이름", "예: 학원 소개 6문장 워크시트");
+    f.el.appendChild(label.el);
+    var urlF = cField("주소", "https:// 없이 적어도 됩니다");
+    f.el.appendChild(urlF.el);
+
+    var fileBox = el("div", "cfield");
+    fileBox.hidden = true;
+    fileBox.appendChild(el("span", "cfield-l", "파일 (PDF · 사진 · 영상)"));
+    var files = [];
+    var att = attachRow(files, {});
+    fileBox.appendChild(att.el);
+    f.el.appendChild(fileBox);
+
+    function close() { f.say(""); f.el.hidden = true; }
+
+    f.foot("자료 추가", function () {
+      var body = { kind: kind, label: label.val() };
+      if (kind === "link") {
+        if (!urlF.val()) { f.say("주소를 적어 주세요."); return; }
+        body.url = urlF.val();
+      } else {
+        var up = att.value()[0];
+        if (!up) { f.say("파일을 먼저 올려 주세요."); return; }
+        body.url = up.url;
+        if (!body.label) body.label = up.name || up.label || "";
+      }
+
+      function put(r) {
+        lesson.materials = lesson.materials || [];
+        lesson.materials.push({ id: r.id, kind: r.kind || kind, url: r.url || body.url, label: r.label || body.label || null });
+        close();
+        renderCurric();
+        renderAdmin();
+      }
+      if (!API) return put({ id: "m-mat-" + Date.now() });
+      send("POST", "/admin/lessons/" + lesson.id + "/materials", body)
+        .then(put).catch(function (err) { f.say(err.message); });
+    }, close);
+
+    f.reset = close;
+    f.focus = function () { label.input.focus(); };
+    return f;
+  }
+
+  /* ----- 레슨 · 섹션 : 로컬 개발용. 운영에서는 프드프에서 온다 ----- */
+  function lessonForm(sc) {
+    var f = cForm("레슨 추가 · " + sc.title);
+
+    var title = cField("레슨 제목", "예: 학부모 후기를 어떻게 받아내는가");
+    var len = cField("영상 길이", "예: 12:30 · 비우면 교안 전용");
+    var pair = el("div", "cadd-2");
+    pair.appendChild(title.el);
+    pair.appendChild(len.el);
+    f.el.appendChild(pair);
+
+    var url = cField("영상 주소", "Cloudflare Stream iframe 주소 또는 유튜브 주소");
+    f.el.appendChild(url.el);
+    var desc = cField("설명란", "영상 아래 글. 0:00 처럼 시각을 적으면 눌러서 이동합니다", true);
+    f.el.appendChild(desc.el);
+    var tl = cField("타임라인", "한 줄에 하나 · 예: 2:15 주인공 정의", true);
+    f.el.appendChild(tl.el);
+    var doc = cField("교안 본문", "강의실 교안 토글에 그대로 실립니다", true);
+    f.el.appendChild(doc.el);
+
+    function reset() {
+      [title, len, url, desc, tl, doc].forEach(function (x) { x.input.value = ""; });
+      f.say("");
+      f.el.hidden = true;
+    }
+
+    f.foot("이 섹션에 레슨 추가", function () {
+      if (!title.val()) { f.say("레슨 제목은 있어야 합니다."); return; }
+      var timeline = tl.val().split("\n").map(function (line) {
+        var m = line.trim().match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
+        return m ? { t: parseStamp(m[1]), label: m[2] } : null;
+      }).filter(Boolean);
+      var body = { sectionId: sc.id, title: title.val(), duration: len.val(), videoUrl: url.val(),
+                   description: desc.val(), timeline: timeline, doc: doc.val() };
+
+      function put(r) {
+        sc.lessons.push({ id: r.id, seq: r.seq || sc.lessons.length + 1, title: body.title,
+                          durationSec: parseStamp(body.duration) || (Number(body.duration) || null),
+                          videoUrl: body.videoUrl || null, description: body.description || null,
+                          timeline: timeline, doc: body.doc || null, watchedSec: 0, done: false, tasks: [], materials: [] });
+        reset();
+        renderCourseList();
+        if (viewSection === sc) { renderCurric(); updateProgress(); }
+        renderAdmin();
+      }
+      if (!API) return put({ id: "m-les-" + Date.now() });
+      send("POST", "/admin/lessons", body).then(put).catch(function (err) { f.say(err.message); });
+    }, reset);
+
+    f.reset = reset;
+    f.focus = function () { title.input.focus(); };
+    return f;
+  }
+
+  function sectionForm() {
+    var wrap = el("div", "fadd");
+    var open = el("button", "fadd-btn", "+ 새 섹션 만들기");
     open.type = "button";
     wrap.appendChild(open);
 
-    var nextWk = COURSES.reduce(function (a, c) { return Math.max(a, c.wk); }, 0) + 1;
-    var f = cForm(nextWk + "주차 만들기");
+    var f = cForm("섹션 만들기");
     f.el.hidden = true;
-
-    var title = cField("강의 제목", "예: 학부모 후기를 자산으로 만들기");
+    var title = cField("섹션 제목", "예: 9주차 · 학부모 후기를 자산으로 만들기");
     f.el.appendChild(title.el);
 
-    var mis = cField("과제 미션 한 줄", "예: 후기 세 개 받아오기");
-    f.el.appendChild(mis.el);
-
-    var readQs = questionList(f.el, []);
-
-    function close() {
-      f.say("");
-      f.el.hidden = true;
-      open.hidden = false;
-    }
+    function close() { f.say(""); f.el.hidden = true; open.hidden = false; }
 
     f.foot("만들고 비공개로 두기", function () {
-      if (!title.val()) { f.say("강의 제목은 있어야 합니다."); return; }
-      if (!mis.val()) { f.say("과제 미션 한 줄은 있어야 합니다. 이게 그 주차 과제 칸의 제목이 됩니다."); return; }
-      var picked = readQs();
-      if (!picked.length) { f.say("질문이 하나는 있어야 합니다."); return; }
-
-      var body = { title: title.val(), mission: mis.val(), qs: picked };
-
-      function put(wk) {
-        MISSIONS[wk] = {
-          title: wk + "주차 미션 · " + body.mission,
-          qs: body.qs
-        };
-        WEEKS[wk - 1] = body.title;
-        COURSES.push(makeCourse(wk, body.title, false));
+      if (!title.val()) { f.say("섹션 제목은 있어야 합니다."); return; }
+      function put(r) {
+        SECTIONS.push({ id: r.id, seq: r.seq || SECTIONS.length + 1, title: title.val(), published: false, lessons: [] });
         close();
         renderCourseList();
         renderAdmin();
       }
-
-      if (!API) return put(nextWk);
-
-      send("POST", "/admin/weeks", body)
-        .then(function (r) { put(r.week); })
-        .catch(function (err) { f.say(err.message); });
+      if (!API) return put({ id: "m-sec-" + Date.now() });
+      send("POST", "/admin/sections", { title: title.val() }).then(put).catch(function (err) { f.say(err.message); });
     }, close);
 
-    open.addEventListener("click", function () {
-      open.hidden = true;
-      f.el.hidden = false;
-      title.input.focus();
-    });
-
+    open.addEventListener("click", function () { open.hidden = true; f.el.hidden = false; title.input.focus(); });
     wrap.appendChild(f.el);
     return wrap;
   }
 
+  /* 펼쳐 둔 섹션. renderAdmin 을 거쳐도 그대로 */
+  var admOpenSection = null;
+
   function paintCourseTab(host) {
-    var c = admCard("강의 게시", "공개 " + liveCourses().length + " / 전체 " + COURSES.length + "주차");
+    var nLes = allLessons().length, nTask = allTasks().length;
+    var c = admCard("강의 · 과제", "공개 " + liveSections().length + " / 전체 " + SECTIONS.length + "섹션 · 레슨 " + nLes + " · 과제 " + nTask);
 
-    var t = admTable(["주차", "제목", "강", "마감", "상태", ""]);
+    var t = admTable(["섹션", "레슨", "과제", "자료", "상태", ""]);
     var forms = [];
+    var below = el("div");
 
-    COURSES.forEach(function (cr) {
+    function toggleForm(which) {
+      var opening = which.el.hidden;
+      forms.forEach(function (x) { x.el.hidden = true; });
+      which.el.hidden = !opening;
+      if (opening) which.focus();
+    }
+
+    SECTIONS.forEach(function (sc) {
       var tr = el("tr");
-      tr.appendChild(el("td", null, String(cr.wk)));
-      tr.appendChild(el("td", null, cr.title));
-      tr.appendChild(el("td", null, cr.sections[0].items.length + "개"));
+      var nt = 0, nm = 0;
+      sc.lessons.forEach(function (l) { nt += (l.tasks || []).length; nm += (l.materials || []).length; });
 
-      /* 마감. 비우면 마감 없음이다 — 그 주차 카드에서 카운트다운이 사라지고
-         완주 리본도 정시·지각을 가르지 않는다. */
-      var dueTd = el("td");
-      var due = document.createElement("input");
-      due.type = "datetime-local";
-      due.className = "adm-find adm-due";
-      due.value = toLocalInput(WEEK_DUE[cr.wk]);
-      due.setAttribute("aria-label", cr.wk + "주차 마감");
-      due.addEventListener("change", function () {
-        var was = WEEK_DUE[cr.wk];
-        var iso = due.value ? new Date(due.value).toISOString() : null;
-        if (iso) WEEK_DUE[cr.wk] = iso; else delete WEEK_DUE[cr.wk];
-        paintRail();
-        send("PUT", "/admin/weeks/" + cr.wk + "/due", { dueAt: iso })
-          .catch(function (err) {
-            if (was) WEEK_DUE[cr.wk] = was; else delete WEEK_DUE[cr.wk];
-            due.value = toLocalInput(was);
-            paintRail();
-            failed(err);
-          });
+      var tt = el("td", "nm");
+      var openBtn = el("button", "qrow-t", sc.title);
+      openBtn.type = "button";
+      openBtn.addEventListener("click", function () {
+        admOpenSection = admOpenSection === sc.id ? null : sc.id;
+        renderAdmin();
       });
-      dueTd.appendChild(due);
-      tr.appendChild(dueTd);
+      tt.appendChild(openBtn);
+      tr.appendChild(tt);
+      tr.appendChild(el("td", "num", sc.lessons.length + "개"));
+      tr.appendChild(el("td", "num", nt + "개"));
+      tr.appendChild(el("td", "num", nm + "개"));
 
       var st = el("td");
-      st.appendChild(el("span", "badge " + (cr.published ? "b-ontime" : "b-none"),
-        cr.published ? "공개" : "비공개"));
+      st.appendChild(el("span", "badge " + (sc.published ? "b-ontime" : "b-none"), sc.published ? "공개" : "비공개"));
       tr.appendChild(st);
 
       var ops = el("td");
       var row = el("div", "crow");
+      var see = el("button", "fadd-btn", admOpenSection === sc.id ? "레슨 접기" : "레슨 보기");
+      see.type = "button";
+      see.addEventListener("click", function () { admOpenSection = admOpenSection === sc.id ? null : sc.id; renderAdmin(); });
+      row.appendChild(see);
 
-      var add = el("button", "fadd-btn", "강 추가");
-      add.type = "button";
-      row.appendChild(add);
-
-      var mis = el("button", "fadd-btn", "과제 양식");
-      mis.type = "button";
-      row.appendChild(mis);
-
-      var pub = el("button", cr.published ? "del" : "fadd-btn", cr.published ? "비공개로" : "게시하기");
+      var pub = el("button", sc.published ? "del" : "fadd-btn", sc.published ? "비공개로" : "게시하기");
       pub.type = "button";
       pub.addEventListener("click", function () {
-        cr.published = !cr.published;
-        renderCourseList();
-        renderAdmin();
-
-        send("PUT", "/admin/weeks/" + cr.wk + "/published", { published: cr.published })
+        sc.published = !sc.published;
+        countTasks(); renderCourseList(); paintRail(); syncComposer(); renderAdmin();
+        send("PUT", "/admin/sections/" + sc.id + "/published", { published: sc.published })
           .catch(function (err) {
-            cr.published = !cr.published;
-            renderCourseList(); renderAdmin();
+            sc.published = !sc.published;
+            countTasks(); renderCourseList(); paintRail(); renderAdmin();
             failed(err);
           });
       });
       row.appendChild(pub);
-
       ops.appendChild(row);
       tr.appendChild(ops);
       t.body.appendChild(tr);
 
-      // 폼은 표 안이 아니라 표 아래에 둔다. 칸 너비 규칙이 입력창을 눌러버린다.
-      var f = lessonForm(cr);
-      f.el.hidden = true;
-      forms.push(f);
+      /* 펼친 섹션의 레슨 목록. 레슨마다 과제 · 자료가 붙어 있고, 여기서 더한다. */
+      if (admOpenSection === sc.id) {
+        var box = el("div", "adm-lessons");
+        box.appendChild(el("div", "sechead-s"));
+        box.appendChild(el("span", "sec-n", sc.title));
 
-      var mf = missionForm2(cr);
-      mf.el.hidden = true;
-      forms.push(mf);
+        if (!sc.lessons.length) box.appendChild(el("p", "adm-empty", "레슨이 없습니다."));
 
-      function toggle(which) {
-        var opening = which.el.hidden;
-        forms.forEach(function (x) { x.el.hidden = true; });
-        which.el.hidden = !opening;
-        if (opening) which.focus();
+        sc.lessons.forEach(function (l) {
+          var lrow = el("div", "adm-lesson");
+          var head = el("div", "qrow");
+          head.appendChild(el("span", "qrow-t", "레슨 " + l.seq + " · " + l.title));
+          head.appendChild(el("span", "qrow-m", (l.durationSec ? mmss(l.durationSec) : "교안") + " · 과제 " + (l.tasks || []).length + " · 자료 " + (l.materials || []).length));
+          var addT = el("button", "fadd-btn", "+ 과제");
+          addT.type = "button";
+          var addM = el("button", "fadd-btn", "+ 자료");
+          addM.type = "button";
+          head.appendChild(addT);
+          head.appendChild(addM);
+          lrow.appendChild(head);
+
+          var tf = taskForm(l, null); tf.el.hidden = true; forms.push(tf);
+          var mf = materialForm(l); mf.el.hidden = true; forms.push(mf);
+          addT.addEventListener("click", function () { toggleForm(tf); });
+          addM.addEventListener("click", function () { toggleForm(mf); });
+
+          (l.tasks || []).forEach(function (tk) {
+            var r = el("div", "qrow adm-sub");
+            r.appendChild(el("span", "sub-k", "과제"));
+            r.appendChild(el("span", "qrow-t", tk.title));
+            r.appendChild(el("span", "qrow-m", "질문 " + (tk.qs || []).length + (tk.submitted != null ? " · 제출 " + tk.submitted : "")));
+            var ed = el("button", "fadd-btn", "수정");
+            ed.type = "button";
+            var ef = taskForm(l, tk); ef.el.hidden = true; forms.push(ef);
+            ed.addEventListener("click", function () { toggleForm(ef); });
+            r.appendChild(ed);
+            var dl = el("button", "del", "삭제");
+            dl.type = "button";
+            dl.addEventListener("click", function () {
+              if (tk.submitted) { failed(new Error("제출한 글이 " + tk.submitted + "편 있어 지울 수 없습니다.")); return; }
+              function gone() { l.tasks.splice(l.tasks.indexOf(tk), 1); countTasks(); renderCurric(); renderCourseList(); paintRail(); syncComposer(); renderAdmin(); }
+              if (!API) return gone();
+              send("DELETE", "/admin/tasks/" + tk.id).then(gone).catch(failed);
+            });
+            r.appendChild(dl);
+            lrow.appendChild(r);
+            lrow.appendChild(ef.el);
+          });
+
+          (l.materials || []).forEach(function (m) {
+            var r = el("div", "qrow adm-sub");
+            r.appendChild(el("span", "sub-k", "자료"));
+            var a = document.createElement("a");
+            a.className = "qrow-t"; a.href = m.url; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = m.label || pretty(m.url);
+            r.appendChild(a);
+            r.appendChild(el("span", "qrow-m", m.kind === "file" ? "파일" : "링크"));
+            var dl = el("button", "del", "삭제");
+            dl.type = "button";
+            dl.addEventListener("click", function () {
+              function gone() { l.materials.splice(l.materials.indexOf(m), 1); renderCurric(); renderAdmin(); }
+              if (!API) return gone();
+              send("DELETE", "/admin/materials/" + m.id).then(gone).catch(failed);
+            });
+            r.appendChild(dl);
+            lrow.appendChild(r);
+          });
+
+          lrow.appendChild(tf.el);
+          lrow.appendChild(mf.el);
+          box.appendChild(lrow);
+        });
+
+        if (D.editableCourse) {
+          var lf = lessonForm(sc); lf.el.hidden = true; forms.push(lf);
+          var addL = el("button", "fadd-btn", "+ 레슨 추가 (로컬 개발용)");
+          addL.type = "button";
+          addL.addEventListener("click", function () { toggleForm(lf); });
+          box.appendChild(addL);
+          box.appendChild(lf.el);
+        }
+        below.appendChild(box);
       }
-
-      add.addEventListener("click", function () { toggle(f); });
-      mis.addEventListener("click", function () { toggle(mf); });
     });
 
     c.appendChild(t.el);
-    forms.forEach(function (f) { c.appendChild(f.el); });
+    c.appendChild(below);
 
     c.appendChild(el("p", "sec-note",
-      "비공개로 내리면 수강생의 강의 목록 · 통합 검색 · 과제 주차 선택기에서 즉시 사라집니다. 관리자에게는 계속 보이므로 게시 전에 열어보고 확인할 수 있습니다."));
+      "섹션 · 레슨 · 영상 · 타임라인 · 교안은 프드프에서 옵니다. 여기서는 어느 섹션을 열지, 레슨에 무슨 과제와 자료를 붙일지를 정합니다. " +
+      "비공개로 내리면 수강생의 강의 목록 · 검색 · 과제 고르기에서 즉시 사라지고, 그 섹션의 과제는 진행률에서도 빠집니다."));
 
-    c.appendChild(weekForm());
+    if (D.editableCourse) c.appendChild(sectionForm());
     host.appendChild(c);
   }
 
@@ -4020,7 +4248,7 @@
 
       var who = el("div", "rank-who");
       who.appendChild(el("span", "rank-name", r.name));
-      who.appendChild(el("span", "rank-sub", (r.cohort ? r.cohort + "기 · " : "") + r.wk + "주차"));
+      who.appendChild(el("span", "rank-sub", (r.cohort ? r.cohort + "기 · " : "") + sectionLabel(r.section)));
       row.appendChild(who);
 
       /* 무엇을 받았는지까지 보여준다. 숫자 하나만 두면 '이모지 기준' 이
@@ -4119,11 +4347,24 @@
     }).sort(function (a, b) { return b.daysAgo - a.daysAgo; });
   }
 
-  /* 이번 주에 과제를 안 낸 사람 */
+  /* 도달한 섹션까지의 과제를 다 내지 않은 사람.
+     '이번 주' 라는 시계가 없어졌으므로, 그 사람이 서 있는 섹션까지 붙은 과제 수와 낸 수를 비교한다. */
   function notSubmitted() {
-    var did = {};
-    allPosts().forEach(function (p) { if (p.cat === "과제" && p.daysAgo <= 7) did[p.author] = true; });
-    return students().filter(function (m) { return !did[m.name]; });
+    var doneBy = {};
+    allPosts().forEach(function (p) {
+      if (p.cat === "과제" && p.taskId) (doneBy[p.author] = doneBy[p.author] || {})[p.taskId] = true;
+    });
+    return students().filter(function (m) {
+      var sc = sectionById(m.section);
+      var reachSeq = sc ? sc.seq : 1;
+      var due = 0, did = 0;
+      liveSections().forEach(function (x) {
+        if (x.seq > reachSeq) return;
+        x.lessons.forEach(function (l) { (l.tasks || []).forEach(function (t) { due++; if (doneBy[m.name] && doneBy[m.name][t.id]) did++; }); });
+      });
+      m.tasksLeft = due - did;
+      return due > did;
+    });
   }
 
   function atRisk() {
@@ -4138,7 +4379,7 @@
     [
       ["대기 중인 피드백", fb.length + "건"],
       ["답 없는 과제", un.length + "건"],
-      ["이번 주 미제출", ns.length + "명"],
+      ["미제출 과제 있음", ns.length + "명"],
       ["7일 이상 조용", risk.length + "명"]
     ].forEach(function (pair) {
       var d = el("div", "stat");
@@ -4269,8 +4510,8 @@
       return b;
     }), "밀린 글이 없습니다");
 
-    section("이번 주 과제를 안 낸 사람", ns.length, nameRows(ns, function (m) {
-      return m.wk + "주차";
+    section("미제출 과제가 있는 사람", ns.length, nameRows(ns, function (m) {
+      return sectionLabel(m.section) + " · " + m.tasksLeft + "개 남음";
     }), "전원 제출했습니다");
 
     section("7일 이상 조용한 사람", risk.length, nameRows(risk, function (m) {
@@ -4309,19 +4550,20 @@
     return out;
   }
 
-  /* 주차별 분포는 '지금 어디 있나'고, 퍼널은 '어디서 빠졌나'다.
+  /* 섹션별 분포는 '지금 어디 있나'고, 퍼널은 '어디서 빠졌나'다.
      커리큘럼을 고칠 근거는 후자에서 나온다. */
   function funnelCard() {
     var stu = students();
-    var c = admCard("주차별 이탈", "수강생 " + stu.length + "명");
+    var c = admCard("섹션별 이탈", "수강생 " + stu.length + "명");
+    var seqOf = function (m) { var sc = sectionById(m.section); return sc ? sc.seq : 1; };
 
-    var rows = [], i;
-    for (i = 1; i <= COURSES.length; i++) {
-      var inn = stu.filter(function (m) { return m.wk >= i; }).length;
-      var out = stu.filter(function (m) { return m.wk > i; }).length;
-      if (!inn) break;
-      rows.push({ wk: i, "in": inn, out: out, drop: inn - out });
-    }
+    var rows = [];
+    SECTIONS.forEach(function (sc) {
+      var inn = stu.filter(function (m) { return seqOf(m) >= sc.seq; }).length;
+      var out = stu.filter(function (m) { return seqOf(m) > sc.seq; }).length;
+      if (!inn) return;
+      rows.push({ sc: sc, "in": inn, out: out, drop: inn - out });
+    });
 
     var top = rows.length ? rows[0]["in"] : 1;
     var worst = rows.reduce(function (a, b) { return b.drop > a.drop ? b : a; }, rows[0] || { drop: 0 });
@@ -4329,7 +4571,9 @@
     var bars = el("div", "bars");
     rows.forEach(function (r) {
       var row = el("div", "bar");
-      row.appendChild(el("span", "bar-k", r.wk + "주차"));
+      var k = el("span", "bar-k", "섹션 " + r.sc.seq);
+      k.title = r.sc.title;
+      row.appendChild(k);
 
       var track = el("div", "bar-t");
       var stay = el("div", "bar-f");
@@ -4348,7 +4592,7 @@
     c.appendChild(bars);
 
     var legend = el("p", "legend");
-    legend.appendChild(el("span", "lg lg-stay", "다음 주차로 넘어감"));
+    legend.appendChild(el("span", "lg lg-stay", "다음 섹션으로 넘어감"));
     legend.appendChild(el("span", "lg lg-lost", "여기서 멈춤"));
     c.appendChild(legend);
 
@@ -4517,7 +4761,7 @@
     });
     c1.appendChild(mfind);
 
-    var t = admTable(["닉네임", "기수", "가입", "주차", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
+    var t = admTable(["닉네임", "기수", "가입", "섹션", "최근 접속", "담당 라운지", "피드백권", "활동", "역할"]);
 
     var mtk = tokensOf(memQ.trim());
     var mrows = MEMBERS.filter(function (m) {
@@ -4531,7 +4775,7 @@
       tr.appendChild(el("td", "nm", m.name));
       tr.appendChild(el("td", "num", m.cohort ? m.cohort + "기" : "—"));
       tr.appendChild(el("td", "num", m.joined === 1 ? "어제" : m.joined + "일 전"));
-      tr.appendChild(el("td", "num", m.role === "student" ? m.wk + "주차" : "—"));
+      tr.appendChild(el("td", "num", m.role === "student" ? sectionLabel(m.section) : "—"));
       tr.appendChild(el("td", "num", m.lastDays === 0 ? "오늘" : m.lastDays + "일 전"));
       tr.appendChild(el("td", "num", scopeLabel(m)));
 
@@ -5215,12 +5459,16 @@
     function drop() {
       dropFrom(POSTS);
       dropFrom(INDEX);
-      dropFrom(MY_MISSIONS);
+      // 과제 글이었으면 그 과제는 다시 '미제출' 이다
+      allTasks().forEach(function (t) { if (String(t.submittedPostId) === String(p.id)) t.submittedPostId = null; });
+      Object.keys(MY_TASKS).forEach(function (k) { if (String(MY_TASKS[k].postId) === String(p.id)) delete MY_TASKS[k]; });
+      countTasks();
+      paintRail();
       if (D.stats && D.stats.posts > 0) D.stats.posts -= 1;
       delRow = -1;
       render();
       if (screenNow === "admin") renderAdmin();
-      if (screenNow === "lesson") mountClassMission();
+      if (screenNow === "lesson") { renderCurric(); if (viewTask) mountTask(viewTask); }
     }
 
     // 지우는 것은 되돌릴 수 없으므로 서버가 받아 준 뒤에 화면에서 뺀다
@@ -5329,14 +5577,20 @@
 
   /* 강의가 하나도 없는 라운지도 있다 — 막 만들었거나 아직 동기화 전이다.
      그때 강의실을 그리려다 부팅이 통째로 멈추면 커뮤니티까지 같이 죽는다. */
-  if (course()) {
-    paintWeekHead();
-    renderCurric();
-    updateProgress();
-    selectLesson(curItem());
-    mountClassMission();
+  /* 부팅 중에 그리는 것은 주소에 남기지 않는다. selectLesson 이 remember() 를 부르는데,
+     그때 주소가 덮이면 들어온 딥링크(?t=lesson&s=…)가 지워진다. 주소는 아래 applyUrl 이 맡는다. */
+  navSilent = true;
+  try {
+    if (section()) {
+      paintSectionHead();
+      renderCurric();
+      updateProgress();
+      if (viewLesson) selectLesson(viewLesson);
+    }
+    applyRole(ME.role);
+  } finally {
+    navSilent = false;
   }
-  applyRole(ME.role);
 
   /* ================= 주소와 뒤로가기 =================
      탭 전환 · 강의실 · 글 열기는 같은 페이지 안에서 화면을 바꾸는 일이라 브라우저는
@@ -5345,7 +5599,7 @@
      주소를 복사하면 그 화면이 열린다.
 
        /                 커뮤니티
-       /?t=courses       강의 목록          /?t=lesson&w=3    3주차 강의실
+       /?t=courses       강의 목록          /?t=lesson&s=3&l=6  섹션 3 · 레슨 6 강의실 (&k= 열린 과제)
        /?t=ranking       랭킹               /?t=admin&s=roles  관리 · 수강생 관리
        …&p=123           그 위에 열린 글
 
@@ -5355,7 +5609,11 @@
   function urlNow() {
     var q = [];
     if (screenNow !== "community") q.push("t=" + screenNow);
-    if (screenNow === "lesson" && viewWk) q.push("w=" + viewWk);
+    if (screenNow === "lesson" && viewSection) {
+      q.push("s=" + viewSection.id);
+      if (viewLesson) q.push("l=" + viewLesson.id);
+      if (viewTask) q.push("k=" + viewTask.id);
+    }
     if (screenNow === "admin" && admTab) q.push("s=" + admTab);
     if (openRef && openRef.id) q.push("p=" + openRef.id);
     return location.pathname + (q.length ? "?" + q.join("&") : "");
@@ -5370,7 +5628,8 @@
 
   function applyUrl() {
     var get = function (k) { return (location.search.match(new RegExp("[?&]" + k + "=([^&]+)")) || [])[1]; };
-    var t = get("t") || "community", w = get("w"), s = get("s"), p = get("p");
+    var t = get("t") || "community", w = get("w"), sId = get("s"), lId = get("l"), kId = get("k"), s = get("s"), p = get("p");
+    if (t === "lesson") s = null;   // 강의실의 s= 는 섹션 id 다. 관리 탭의 s= 와 이름이 같다
     var known = SCREENS.some(function (sc) { return sc.key === t; });
     if (!known || (t === "admin" && !can("manage"))) t = "community";
 
@@ -5378,8 +5637,10 @@
     try {
       if (t === "admin" && s) admTab = s;
       if (t === "lesson") {
-        if (w && courseOf(+w)) openWeek(+w);
-        if (screenNow !== "lesson") show(watchLocked() || !course() ? "courses" : "lesson");
+        // 옛 주소 ?w=3 은 섹션 순서로 읽는다
+        var sec = sId ? sectionById(sId) : (w ? SECTIONS.filter(function (x) { return String(x.seq) === String(w); })[0] : null);
+        if (sec) openLesson(sec.id, lId, kId);
+        if (screenNow !== "lesson") show(watchLocked() || !section() ? "courses" : "lesson");
       } else {
         show(t);
       }

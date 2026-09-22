@@ -98,11 +98,11 @@
             <textarea class="w-body" id="ta" placeholder="무슨 이야기든 좋습니다. 여기 바로 쓰세요."></textarea>
           </div>
 
-          <!-- 과제일 때만. 주차는 고르는 게 아니라 확정되어 나온다 -->
+          <!-- 과제일 때만. 어느 레슨의 어느 과제인지는 고르는 게 아니라 확정되어 나온다 -->
           <div class="wkline" id="wkLine" hidden></div>
           <div id="wkPick"></div>
 
-          <!-- 과제를 고르면 그 주차 미션 양식이 여기 펼쳐진다 -->
+          <!-- 과제를 고르면 그 과제의 질문 양식이 여기 펼쳐진다 -->
           <div id="missionBox" hidden></div>
 
           <!-- 권한이 필요한 카테고리를 고르면 조건이 쓰기 전에 보인다 -->
@@ -184,39 +184,25 @@
         </div>
       </section>
 
+      <!-- 이어보기. 마지막으로 본 레슨으로 바로 간다 -->
       <section class="card pad-s rail-card" id="railMission">
-        <div class="row">
-          <span class="kicker grow">이번 주 과제 · <span class="disp" id="railWk">3</span>주차</span>
-          <span class="badge b-none" id="railDone">미제출</span>
-        </div>
+        <span class="kicker" id="railKicker">이어보기</span>
         <div>
-          <h2 class="card-t" id="railMissionT">학부모가 검색하는 말로 블로그 글 한 편 쓰기</h2>
-          <p class="meta due-label" id="railDueLabel">정시 마감까지 · 금 18:00</p>
-          <p class="midnum tnum countdown" id="countdown">--:--:--</p>
+          <h2 class="card-t" id="railMissionT">학부모는 블로그에서 무엇을 검색하는가</h2>
+          <p class="meta due-label" id="railSub">3주차 · 1:44 / 4:20</p>
         </div>
-        <div>
-          <div class="track"><div class="fill" id="wkFill"></div></div>
-          <p class="meta-m wk-submit" id="wkSubmit"></p>
-        </div>
-        <button type="button" class="btn-primary sm" id="toCourseBtn">강의 이어보기</button>
+        <div class="track"><div class="fill" id="wkFill"></div></div>
+        <button type="button" class="btn-primary sm" id="toCourseBtn">이어보기</button>
       </section>
 
+      <!-- 과제 진행률. 과제 하나가 칸 하나 -->
       <section class="card pad-s rail-card">
         <div class="row">
-          <span class="kicker grow" id="ribbonHead">8주 완주 현황</span>
-          <span class="meta-m" id="ribbonN"><span class="tnum">2</span>/<span class="tnum">8</span></span>
+          <span class="kicker grow" id="ribbonHead">과제 진행률</span>
+          <span class="meta-m tnum" id="ribbonN">2 / 8</span>
         </div>
-        <div class="ribbon" id="ribbon" aria-label="완주 현황">
-          <div class="rcell r-ontime" title="1주차 · 정시 제출"></div>
-          <div class="rcell r-late hatch" title="2주차 · 지각 제출"></div>
-          <div class="rcell r-none" title="3주차 · 미제출"></div>
-          <div class="rcell r-future" title="4주차 · 예정"></div>
-          <div class="rcell r-future" title="5주차 · 예정"></div>
-          <div class="rcell r-future" title="6주차 · 예정"></div>
-          <div class="rcell r-future" title="7주차 · 예정"></div>
-          <div class="rcell r-future" title="8주차 · 예정"></div>
-        </div>
-        <p class="meta-m" id="ribbonSum">정시 <span class="tnum">1</span> · 지각 <span class="tnum">1</span> · 남은 주차 <span class="tnum">5</span></p>
+        <div class="ribbon" id="ribbon" aria-label="과제 진행률"></div>
+        <p class="meta-m" id="ribbonSum">남은 과제 6개</p>
       </section>
 
       <section class="card pad-s rail-card">
@@ -240,7 +226,7 @@
 <div class="page rise" id="screenCourses" hidden>
   <div class="pagehead">
     <h1>강의실</h1>
-    <span class="meta" id="classMeta">학원마케팅 올인원 강의 라운지 · 8주 과정</span>
+    <span class="meta" id="classMeta">학원마케팅 올인원 강의 라운지 · 섹션 8개</span>
   </div>
 
   <div class="courses" id="courseList"></div>
@@ -258,82 +244,57 @@
 
   <div class="grid-classroom">
 
-    <!-- 좌측 커리큘럼 -->
+    <!-- 좌측 커리큘럼 : 이 섹션의 레슨. 레슨을 누르면 그 아래로 과제 · 자료가 내려온다 -->
     <div class="curric-col">
       <div class="card pad-s curric">
         <div>
-          <span class="kicker" id="weekKicker">학원마케팅 올인원 강의 · <span class="disp">3</span>주차</span>
+          <span class="kicker" id="weekKicker">학원마케팅 올인원 강의 · 섹션 <span class="disp">3</span></span>
           <h2 class="card-t week-t" id="weekTitle">블로그 100개 썼는데, 왜 문의는 0건일까요?</h2>
         </div>
 
         <div>
           <div class="row pct-row">
-            <span class="pctpill tnum" id="pctPill">38%</span>
-            <span class="meta-m">퀘스트 <span class="tnum" id="qDone">3</span>/<span class="tnum" id="qAll">8</span></span>
+            <span class="pctpill tnum" id="pctPill">0%</span>
+            <span class="meta-m">레슨 <span class="tnum" id="qDone">0</span>/<span class="tnum" id="qAll">0</span> 시청</span>
           </div>
           <div class="track"><div class="fill" id="pctFill"></div></div>
-          <p class="meta-m pct-note">재생 시간이 아니라 스스로 체크한 퀘스트가 %를 채웁니다.</p>
+          <p class="meta-m pct-note">영상을 끝까지 보면 채워집니다. 따로 체크할 것은 없습니다.</p>
         </div>
 
         <div id="curric"></div>
       </div>
     </div>
 
-    <!-- 우측 콘텐츠 -->
+    <!-- 우측 콘텐츠 : 영상 → 타임라인(접힘) → 설명란 → 교안(접힘) -->
     <div class="col">
       <article class="card pad lesson-card">
         <div class="lessonhead">
           <div class="grow lesson-head-t">
-            <span class="kicker" id="lessonKicker">강의 · <span class="disp">02</span></span>
+            <span class="kicker" id="lessonKicker">레슨 · <span class="disp">01</span></span>
             <h1 class="card-t lesson-t" id="lessonTitle">학부모는 블로그에서 무엇을 검색하는가</h1>
           </div>
-          <button type="button" class="chip" id="lessonDone" aria-pressed="false">완료로 표시</button>
         </div>
 
-        <div class="video" id="lessonVideo">
-          <span>영상 자리 · 4:20</span>
-          <span class="video-cap" id="videoCap">학부모는 블로그에서 무엇을 검색하는가</span>
-        </div>
+        <div class="video" id="lessonVideo"></div>
 
-        <div class="prose" id="lessonProse">
-          <p>이 강의는 <strong>4~5분 단위</strong>로 쪼개져 있습니다. 위에 영상, 아래에 교안이 같이 놓입니다. 교안이 본문으로 올라가 있으니 검색만으로 이 강의에 바로 닿습니다.</p>
+        <details class="tog" id="lessonTimeline" hidden></details>
 
-          <h4>안 써서가 아니라, 하고 싶은 말만 써서다</h4>
-          <ol>
-            <li>학부모는 <strong>○○학원 소식</strong>을 검색하지 않습니다. 공지만 100개 쌓여 있으면 유입은 0입니다.</li>
-            <li>1주차에 정한 <strong>주인공 학부모가 밤에 검색하는 말</strong>이 곧 키워드입니다.</li>
-            <li>키워드는 두 갈래로 모읍니다. 지역 키워드(<code>○○동 수학학원</code>)와 고민 키워드(<code>수포자 학원</code>).</li>
-          </ol>
+        <p class="lesson-desc" id="lessonDesc" hidden></p>
 
-          <h4>블로그 3종 세트 — 이것부터 쓰면 된다</h4>
-          <ul>
-            <li><strong>소개하기.</strong> 1주차 여섯 문장을 글 한 편으로 풀어낸 것. 새로 쓰는 게 아닙니다.</li>
-            <li><strong>학부모 질문 TOP 10.</strong> 상담 전화에서 실제로 받은 질문에 미리 답해둡니다.</li>
-            <li><strong>고객의 언어.</strong> 차마 못 묻는 걱정을 먼저 꺼내서 답합니다.</li>
-          </ul>
+        <details class="tog" id="lessonDoc" hidden>
+          <summary class="tog-head"><span>강의 교안</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="prose" id="lessonProse"></div>
+        </details>
 
-          <div class="quote">
-            <b>자주 막히는 지점</b><br>
-            소재가 없다고들 하시는데, 상담에서 이미 다 들으셨습니다. 오늘 받은 질문 하나가 곧 글 한 편입니다.
-          </div>
-
-          <h4>콘텐츠 5기둥 — 올리는 모든 것의 분류함</h4>
-          <ul>
-            <li><code>전문가</code> 실력 증명 · <code>철학</code> 왜 이렇게 가르치는가</li>
-            <li><code>증거</code> 변화 사례와 후기 · <code>신뢰</code> 일상과 사람 냄새</li>
-            <li><code>상품</code> 모집과 안내. 다섯 중 어디에도 안 들어가면 안 올려도 됩니다.</li>
-          </ul>
-        </div>
-
-        <!-- 목차의 'N주차 과제 올리기'를 고르면 위 영상·교안 대신 이 칸이 열린다. -->
+        <!-- 목록에서 과제를 고르면 위 영상 · 교안 대신 이 칸이 열린다. -->
         <div id="classMission" hidden></div>
 
         <div class="hr"></div>
 
         <div class="row">
-          <button type="button" class="btn-sec" id="prevLesson">이전 강의</button>
+          <button type="button" class="btn-sec" id="prevLesson">이전 레슨</button>
           <span class="grow"></span>
-          <button type="button" class="btn-primary sm" id="nextLesson">다음 강의</button>
+          <button type="button" class="btn-primary sm" id="nextLesson">다음 레슨</button>
         </div>
       </article>
     </div>
@@ -423,23 +384,23 @@
       <b>창을 열면 빈 종이다</b> 기본 카테고리는 양식이 안 붙는 <code>자유</code>입니다. 과제 양식은 <b>&lsquo;과제&rsquo;를 직접 고른 사람에게만</b> 나옵니다. 글을 올리거나 취소하면 다시 자유로 돌아갑니다. 과제를 낼 자리는 강의를 다 본 뒤 강의실 아래에 따로 있으므로, 커뮤니티 글쓰기 창까지 과제 양식으로 열릴 이유가 없습니다.
     </div>
 
-    <h3>주차는 고르는 게 아니라 맥락이 정한다</h3>
-    <p class="lead">과제에 양식을 미리 넣어주려면 &lsquo;몇 주차 미션인가&rsquo;를 알아야 합니다. 그런데 미션이 50개인 강의에서 주차 50개를 토글로 늘어놓으면 심플함이 무너집니다. <b>그래서 묻지 않기로 했습니다.</b></p>
+    <h3>어느 과제인지는 고르는 게 아니라 맥락이 정한다</h3>
+    <p class="lead">과제에 양식을 미리 넣어주려면 &lsquo;어느 레슨의 어느 과제인가&rsquo;를 알아야 합니다. 그런데 과제가 50개인 강의에서 50개를 토글로 늘어놓으면 심플함이 무너집니다. <b>그래서 묻지 않기로 했습니다.</b></p>
     <div class="tablescroll">
       <table class="mt">
-        <thead><tr><th>경로</th><th>주차를 어떻게 아는가</th><th>고르는 횟수</th></tr></thead>
+        <thead><tr><th>경로</th><th>과제를 어떻게 아는가</th><th>고르는 횟수</th></tr></thead>
         <tbody>
-          <tr><td>강의실에서 쓰기</td><td>그 강의가 곧 주차다</td><td><b>0</b></td></tr>
-          <tr><td>라운지에서 과제 고르기</td><td>진행 중인 주차가 기본값. 시스템이 이미 아는 값이다</td><td><b>0</b></td></tr>
-          <tr data-new="true"><td>늦은 과제 · 앞선 주차</td><td><code>변경</code> → 번호나 제목으로 검색</td><td>2번</td></tr>
+          <tr><td>강의실에서 쓰기</td><td>레슨 아래 과제를 눌렀으니 그 과제다</td><td><b>0</b></td></tr>
+          <tr><td>라운지에서 과제 고르기</td><td>마지막으로 본 레슨의 미제출 과제가 기본값. 시스템이 이미 아는 값이다</td><td><b>0</b></td></tr>
+          <tr data-new="true"><td>다른 과제</td><td><code>변경</code> → 섹션 · 레슨 · 과제 제목으로 검색</td><td>2번</td></tr>
         </tbody>
       </table>
     </div>
     <div class="note">
-      <b>50개든 500개든 같습니다.</b> 기본 경로에는 선택지가 0개이고, 예외에만 검색창이 열립니다. 목록을 늘어놓지 않으니 미션 개수가 UI 를 건드리지 않습니다. 화면에는 <code>3주차 미션 · 학부모가 검색하는 말로 글 쓰기</code> 와 <code>변경</code> 한 줄만 나타납니다.
+      <b>50개든 500개든 같습니다.</b> 기본 경로에는 선택지가 0개이고, 예외에만 검색창이 열립니다. 목록을 늘어놓지 않으니 과제 개수가 UI 를 건드리지 않습니다. 화면에는 <code>과제 · 학원 소개 6문장 쓰기 · 우리 학원의 주인공 정하기</code> 와 <code>변경</code> 한 줄만 나타납니다.
     </div>
 
-    <h3>과제는 빈 화면이 아니라 주차별 양식으로 받는다</h3>
+    <h3>과제는 빈 화면이 아니라 레슨별 양식으로 받는다</h3>
     <p class="lead">현재 강의 화면(<code>pudufu.co.kr</code>)은 미션 지시문 · 작성 가이드 · 완료 조건 · 예시 답안을 에디터 본문에 통째로 부어 넣습니다. 수강생이 한 글자도 쓰기 전에 <b>780자</b>가 들어 있습니다. 허들을 낮추려는 의도는 맞지만 그대로 제출되면 피드에서 읽을 수 없는 글이 됩니다. 사람마다 다른 부분이 전체의 4분의 1뿐이고, 그마저 맨 아래 묻히기 때문입니다.</p>
     <div class="tablescroll">
       <table class="mt">
@@ -448,20 +409,20 @@
           <tr><td>1</td><td>질문 · 가이드 · 완료조건 · 예시답안이 한 덩어리로 본문에 들어감</td><td>질문마다 칸을 따로 두고, 가이드 예시는 칸의 placeholder 로만 남김</td></tr>
           <tr><td>2</td><td>비계와 본인 글이 섞여 저장됨</td><td><b>답변만 저장됨.</b> 비계는 작성 화면에만 있고 결과물에 안 남음</td></tr>
           <tr><td>3</td><td>완료 조건이 텍스트 기호 <code>□</code> 라 아무것도 트리거하지 않음</td><td>칸이 찼는지에 묶임. 셋 다 차야 게시하기가 열림</td></tr>
-          <tr><td>4</td><td>미션이 강의 플레이어 서랍 안에만 있어 라운지와 끊김</td><td>제출하면 <b>카테고리 과제 + 해당 주차</b>가 붙어 라운지 피드에 올라감</td></tr>
-          <tr><td>5</td><td>진도율과 무관</td><td>올리면 그 주차 <b>과제 퀘스트가 체크되고 진도율이 오름</b></td></tr>
+          <tr><td>4</td><td>미션이 강의 플레이어 서랍 안에만 있어 라운지와 끊김</td><td>제출하면 <b>카테고리 과제 + 어느 레슨의 과제인지</b>가 붙어 라운지 피드에 올라감</td></tr>
+          <tr><td>5</td><td>과제가 강의 구조와 무관</td><td>과제는 <b>레슨에 붙는다.</b> 관리자가 레슨마다 N개를 달고, 우측 레일의 진행률(제출 / 전체)이 올라감</td></tr>
           <tr data-new="true"><td>6</td><td>(없음)</td><td>피드에서는 질문이 작게 눕고 <b>첫 답변만 펼쳐짐</b>. 글 3개 읽기가 실제로 가능해짐</td></tr>
         </tbody>
       </table>
     </div>
     <div class="note">
-      <b>해보기</b> 글쓰기 창을 열면 카테고리가 <b>과제</b> 이므로 진행 중인 주차의 양식이 바로 펼쳐져 있습니다. 세 칸을 채우고 게시하면 피드에 답변만 요약된 카드로 뜨고, 강의 탭의 진도율이 함께 오릅니다. 제목을 비우면 <code>N주차 과제 올립니다</code> 로 자동으로 붙습니다.
+      <b>해보기</b> 글쓰기 창에서 카테고리를 <b>과제</b> 로 고르면 마지막으로 본 레슨의 미제출 과제 양식이 바로 펼쳐집니다. 칸을 채우고 게시하면 피드에 답변만 요약된 카드로 뜨고, 우측 레일의 과제 진행률이 함께 오릅니다. 제목을 비우면 과제 제목이 그대로 붙습니다.
     </div>
 
     <h3>같은 과제 모듈을 강의실에도 놓는다</h3>
-    <p class="lead">강의를 보다가 과제를 쓰고 싶은 사람이 뷰어와 게시판을 왕복해야 한다면 지금 구조와 다를 게 없습니다. 같은 미션 양식을 <b>영상 바로 아래, 교안 위</b>에 한 번 더 놓았습니다. 라운지 글쓰기 창과 강의실이 <b>같은 모듈</b>을 부릅니다.</p>
+    <p class="lead">강의를 보다가 과제를 쓰고 싶은 사람이 뷰어와 게시판을 왕복해야 한다면 지금 구조와 다를 게 없습니다. 왼쪽 목록에서 레슨을 누르면 그 아래로 <b>과제 · 자료가 내려오고</b>, 과제를 누르면 영상 자리에 같은 양식이 선다. 라운지 글쓰기 창과 강의실이 <b>같은 모듈</b>을 부릅니다.</p>
     <div class="note">
-      <b>어느 쪽에서 올리든 결과는 같습니다.</b> 라운지 피드에 <code>과제</code> · 해당 주차로 올라가고, 그 주차 과제 퀘스트가 체크되며, 진도율이 오릅니다. 강의실에서 올리면 카드가 <code>라운지에서 보기</code> 상태로 바뀝니다.
+      <b>어느 쪽에서 올리든 결과는 같습니다.</b> 라운지 피드에 <code>과제 · 레슨 제목</code> 으로 올라가고, 그 과제가 <code>제출함</code> 이 되며, 과제 진행률이 오릅니다. 강의실에서 올리면 카드가 <code>라운지에서 보기</code> 상태로 바뀝니다. 과제 하나에 한 편 — 다시 올리면 덮어쓸지 먼저 묻습니다.
     </div>
 
     <h3>권한이 필요한 카테고리는 고르기 전에 보여준다</h3>
@@ -484,25 +445,26 @@
     </div>
 
     <h3>강의실은 목록 → 상세 두 단계</h3>
-    <p class="lead">Skool 은 Classroom 을 누르면 먼저 강의가 카드로 깔리고, 그중 하나를 눌러야 커리큘럼과 영상이 나옵니다. 같은 두 단계로 만들었습니다.</p>
+    <p class="lead">Skool 은 Classroom 을 누르면 먼저 강의가 카드로 깔리고, 그중 하나를 눌러야 커리큘럼과 영상이 나옵니다. 같은 두 단계로 만들었고, 층은 프드프의 강의 구조 그대로 <b>섹션 → 레슨</b>입니다. 카드 하나가 섹션, 안의 목록이 레슨(영상 하나, 2~30분)입니다.</p>
     <div class="tablescroll">
       <table class="mt">
         <thead><tr><th>단계</th><th>화면</th><th>내용</th></tr></thead>
         <tbody>
-          <tr><td>1</td><td>강의 목록</td><td>주차 · 제목 · 진행률 · 상태(완료 / 진행중 / 자료 / 예정) 카드 그리드. 커버 사진은 두지 않는다 &mdash; 읽으러 오는 자리지 보러 오는 자리가 아니다</td></tr>
-          <tr><td>2</td><td>강의 상세</td><td>좌측 커리큘럼(진행률 + 접히는 섹션 + 레슨별 자체 체크) + 우측 영상 · 교안 · 과제</td></tr>
-          <tr><td>3</td><td>건너뛰기</td><td>우측 레일 &lsquo;강의 이어보기&rsquo;는 목록을 지나치고 보던 레슨으로 바로 간다. 매일 오는 사람은 목록을 볼 이유가 없다</td></tr>
+          <tr><td>1</td><td>강의 목록</td><td>섹션 카드 &mdash; 제목 · 레슨 수 · 총 시간 · 진도 % · 상태(완료 / 진행중 / 예정). 카드 아래 <code>목차</code> 를 펴면 레슨 줄이 카드 안에 내려오고, 줄을 누르면 그 레슨으로 바로 간다. 커버 사진은 두지 않는다 &mdash; 읽으러 오는 자리지 보러 오는 자리가 아니다</td></tr>
+          <tr><td>2</td><td>강의 상세</td><td>좌측 이 섹션의 레슨 목록(누르면 그 아래로 과제 · 자료가 내려온다) + 우측 영상 → 타임라인(접힘, 눌러 이동) → 설명란(<code>12:30</code> 도 눌러 이동) → 교안(접힘)</td></tr>
+          <tr><td>3</td><td>진도</td><td>스스로 체크하는 것이 없다. <b>영상을 끝까지 보면</b> 레슨 완료, 섹션 % = 완료 레슨 / 레슨. 시청 시간의 원본은 프드프다</td></tr>
+          <tr><td>4</td><td>건너뛰기</td><td>우측 레일 &lsquo;이어보기&rsquo;는 목록을 지나치고 마지막으로 본 레슨으로 바로 간다. 매일 오는 사람은 목록을 볼 이유가 없다</td></tr>
         </tbody>
       </table>
     </div>
 
     <h3>운영하는 쪽에도 화면이 필요하다</h3>
-    <p class="lead">여기까지는 전부 <b>수강생 한 명의 시점</b>입니다. 그런데 커뮤니티가 도는지 아닌지는 운영하는 쪽만 알 수 있고, 지금은 그걸 볼 자리가 없습니다. 수강생이 몇 주차에 몰려 멈춰 있는지, 대기 중인 피드백이 몇 건 쌓였는지, 누가 2주째 조용한지 &mdash; 답을 아는 사람이 아무도 없는 상태입니다. 조작도 마찬가지여서 공지를 아무나 쓸 수 있고 글을 지울 방법이 없습니다.</p>
+    <p class="lead">여기까지는 전부 <b>수강생 한 명의 시점</b>입니다. 그런데 커뮤니티가 도는지 아닌지는 운영하는 쪽만 알 수 있고, 지금은 그걸 볼 자리가 없습니다. 수강생이 어느 섹션에 몰려 멈춰 있는지, 대기 중인 피드백이 몇 건 쌓였는지, 누가 2주째 조용한지 &mdash; 답을 아는 사람이 아무도 없는 상태입니다. 조작도 마찬가지여서 공지를 아무나 쓸 수 있고 글을 지울 방법이 없습니다.</p>
     <div class="tablescroll">
       <table class="mt">
         <thead><tr><th>구분</th><th>현재</th><th>프로토타입</th></tr></thead>
         <tbody>
-          <tr><td>1</td><td>수강생이 어디서 빠지는지 모름</td><td>&lsquo;주차별 이탈&rsquo; 퍼널. 진입 대비 다음 주차로 넘어간 수. 가장 크게 빠진 주차가 커리큘럼을 고칠 지점이다</td></tr>
+          <tr><td>1</td><td>수강생이 어디서 빠지는지 모름</td><td>&lsquo;섹션별 이탈&rsquo; 퍼널. 진입 대비 다음 섹션으로 넘어간 수. 가장 크게 빠진 섹션이 커리큘럼을 고칠 지점이다</td></tr>
           <tr><td>2</td><td>피드백권을 썼는데 답이 안 감</td><td>&lsquo;피드백 요청&rsquo; 카드 &mdash; 권을 쓰고 답을 기다리는 글만. 대기 일수가 붙고 3일 넘으면 색이 바뀐다</td></tr>
           <tr><td>3</td><td>낸 과제에 답이 없어도 아무도 모름</td><td>&lsquo;답이 안 달린 과제&rsquo;. 행을 누르면 그 글로 바로 간다</td></tr>
           <tr><td>4</td><td>조용해진 사람을 놓침</td><td>&lsquo;7일 이상 조용한 사람&rsquo; + &lsquo;이번 주 과제를 안 낸 사람&rsquo; 명단</td></tr>
@@ -519,7 +481,7 @@
       <ul>
         <li><b>총 가입자 &middot; 누적 게시물 &middot; 총 조회수.</b> 어제도 오늘도 같은 방향으로만 움직입니다. 나쁜 주에도 올라갑니다.</li>
         <li><b>평균 진도율.</b> 평균은 두 덩어리를 하나로 뭉갭니다. 90%인 8명과 20%인 14명이 62%로 나옵니다. 필요한 건 &lsquo;14명이 20%에 서 있다&rsquo; 쪽입니다.</li>
-        <li><b>게시물 추이 꺾은선.</b> 내려가도 할 일이 안 정해집니다. 원인을 보려면 결국 주차별 이탈로 가야 합니다.</li>
+        <li><b>게시물 추이 꺾은선.</b> 내려가도 할 일이 안 정해집니다. 원인을 보려면 결국 섹션별 이탈로 가야 합니다.</li>
       </ul>
       대신 지표 타일 네 칸을 전부 <b>행동을 부르는 숫자</b>로 채웠습니다. 대기 중인 피드백 &middot; 답 없는 과제 &middot; 이번 주 미제출 &middot; 7일 이상 조용. 다음 라이브는 할 일이 아니라 일정이라 우측 카드로 내렸습니다.
     </div>
@@ -538,12 +500,12 @@
       <ul>
         <li>지우기는 <b>미사용 칸에서만</b> 됩니다. 내리기 → 지우기 두 단계가 &lsquo;이 라운지에서 안 씀&rsquo;과 &lsquo;아예 없앰&rsquo;을 갈라줍니다. 확인은 게시물 삭제와 같은 방식으로 세 칸 아래에서 받습니다.</li>
         <li>글이 남아 있거나 다른 라운지가 쓰고 있으면 지울 수 없고, 그 이유가 칩 옆에 적힙니다(<code>글 12개</code> / <code>올인원 AI에서 사용 중</code>).</li>
-        <li><b>과제 &middot; 콘텐츠 피드백은 지울 수 없습니다.</b> 이름 뒤에 동작이 붙어 있습니다 &mdash; 과제에는 주차별 미션 양식이, 콘텐츠 피드백에는 피드백권이 묶여 있어서 지우면 그 기능이 같이 죽습니다.</li>
+        <li><b>과제 &middot; 콘텐츠 피드백은 지울 수 없습니다.</b> 이름 뒤에 동작이 붙어 있습니다 &mdash; 과제에는 레슨별 과제 양식이, 콘텐츠 피드백에는 피드백권이 묶여 있어서 지우면 그 기능이 같이 죽습니다.</li>
       </ul>
     </div>
 
     <div class="note">
-      <b>강사 화면은 지표가 아니라 명단이다</b> 강사가 묻는 것은 &lsquo;오늘 누구를 챙기나&rsquo;고, 관리자가 묻는 것은 &lsquo;이 강의가 굴러가나&rsquo;입니다. 그래서 강사에게는 &lsquo;3주차 8명&rsquo;이 아니라 <b>그 여덟 사람의 이름</b>을 주고, 누르면 그 글로 가게 했습니다. 주차별 이탈 퍼널과 어제 요약은 관리자에게만 둡니다.
+      <b>강사 화면은 지표가 아니라 명단이다</b> 강사가 묻는 것은 &lsquo;오늘 누구를 챙기나&rsquo;고, 관리자가 묻는 것은 &lsquo;이 강의가 굴러가나&rsquo;입니다. 그래서 강사에게는 &lsquo;미제출 8명&rsquo;이 아니라 <b>그 여덟 사람의 이름</b>을 주고, 누르면 그 글로 가게 했습니다. 섹션별 이탈 퍼널과 어제 요약은 관리자에게만 둡니다.
     </div>
 
     <div class="note">
@@ -576,7 +538,7 @@
     <div class="note">
       <b>대시보드는 강사도 본다</b> 강사에게는 대시보드 한 장만 열리고, 권한 &middot; 필터 &middot; 게시물 세 탭은 관리자에게만 보입니다. 강사가 알아야 하는 건 &lsquo;누가 어디서 멈췄는가&rsquo;지 &lsquo;누구에게 무슨 권한을 줄까&rsquo;가 아니기 때문입니다.
       <ul>
-        <li>화면의 숫자는 전부 <b>같은 데이터를 그때그때 센 값</b>입니다. 주차 막대의 합은 수강생 수와, &lsquo;어제 올라온 글&rsquo;은 피드의 어제 글과 항상 일치합니다.</li>
+        <li>화면의 숫자는 전부 <b>같은 데이터를 그때그때 센 값</b>입니다. 섹션 막대의 합은 수강생 수와, &lsquo;어제 올라온 글&rsquo;은 피드의 어제 글과 항상 일치합니다.</li>
         <li>권한이나 필터를 바꾸면 커뮤니티 화면이 <b>저장 버튼 없이 즉시</b> 따라 바뀝니다. 같은 배열 하나를 보기 때문입니다.</li>
       </ul>
     </div>
@@ -600,12 +562,12 @@
           <tr><td>1</td><td>마지막 라운지로 랜딩</td><td>상단바 라운지명이 현재 위치. 전환 목록에서 현재 라운지에 &lsquo;지금&rsquo; 표시</td></tr>
           <tr><td>2</td><td>첫 화면이 글쓰기</td><td>메인 컬럼 최상단, 스크롤 없이 닿는 자리에 입력창</td></tr>
           <tr><td>3</td><td>클릭 한 번에 즉시 작성</td><td>입력창을 누르면 그 자리에서 펼쳐짐. 페이지 이동 없음</td></tr>
-          <tr><td>4</td><td>창은 하나, 카테고리만 토글</td><td>펼친 입력창 안의 카테고리 · 주차 칩</td></tr>
+          <tr><td>4</td><td>창은 하나, 카테고리만 토글</td><td>펼친 입력창 안의 카테고리 토글 · 과제 한 줄</td></tr>
           <tr data-new="true"><td>5</td><td>게시판 대신 필터</td><td>피드 위 두 줄 필터 바. 좌측 사이드바를 없앤 자리</td></tr>
           <tr><td>6</td><td>라운지에서 강의로 바로</td><td>탭 네비 &lsquo;강의실&rsquo;(목록) + 우측 레일 &lsquo;강의 이어보기&rsquo;(상세로 직행)</td></tr>
           <tr><td>7</td><td>라운지 간 이동 토글</td><td>상단바 라운지명 옆 토글</td></tr>
           <tr><td>8</td><td>통합 검색</td><td>상단바 중앙 검색. 글 · <b>댓글</b> · 강의 · 교안 · 멤버가 한 결과에</td></tr>
-          <tr data-new="true"><td>—</td><td>운영 대시보드</td><td>관리 탭 &rsaquo; 대시보드. 오늘 챙길 사람 명단 · 주차별 이탈 퍼널 · 어제 요약 (해당 라운지 담당 강사 · 관리자)</td></tr>
+          <tr data-new="true"><td>—</td><td>운영 대시보드</td><td>관리 탭 &rsaquo; 대시보드. 오늘 챙길 사람 명단 · 섹션별 이탈 퍼널 · 어제 요약 (해당 라운지 담당 강사 · 관리자)</td></tr>
           <tr data-new="true"><td>—</td><td>카테고리 권한</td><td>관리 탭 &rsaquo; 수강생 관리. 라운지 단위 역할 변경 + 카테고리 &times; 역할 표</td></tr>
           <tr data-new="true"><td>—</td><td>라운지별 필터 설정</td><td>관리 탭 &rsaquo; 필터 관리. 5번을 이 라운지 담당자가 직접 조정하고, 카테고리 자체를 더하고 빼는 자리</td></tr>
           <tr data-new="true"><td>—</td><td>어제 커뮤니티 요약</td><td>관리 탭 &rsaquo; 대시보드. 9장 기획을 화면에. 복사해서 오픈채팅방에 붙여넣는다</td></tr>
@@ -638,7 +600,7 @@
     <h3>프로토타입이라서 다른 점</h3>
     <div class="note">
       <ul>
-        <li><b>동작하는 것.</b> 글쓰기 펼침·게시, 카테고리·보기·주차 필터 조합, 정렬, 통합 검색, 좋아요, 커뮤니티↔강의 목록↔강의 상세 이동, 커리큘럼 섹션 접기, 레슨 전환, 퀘스트 체크와 진도율(강의 목록 카드까지 같이 갱신), 역할 전환과 그에 따른 화면·권한 분기, 관리 대시보드 집계, 카테고리 권한 · 필터 배치 변경, 게시물 삭제.</li>
+        <li><b>동작하는 것.</b> 글쓰기 펼침·게시, 카테고리·보기 필터 조합, 정렬, 통합 검색, 반응, 커뮤니티↔강의 목록↔강의 상세 이동, 레슨 전환과 그 아래 과제·자료 펼침, 타임라인·교안 토글, 시청 진도(강의 목록 카드까지 같이 갱신), 역할 전환과 그에 따른 화면·권한 분기, 관리 대시보드 집계, 카테고리 권한 · 필터 배치 변경, 게시물 삭제.</li>
         <li><b>표시만 하는 것.</b> 라운지 전환 목록, 첨부 버튼, 내 서재, 멤버 · 리더보드 · 챌린지 · 안내 탭(회색으로 비활성), 강의 목록의 나머지 강의 3개, 영상(점선 자리).</li>
         <li>피드 · 검색 · 리더보드 데이터는 예시입니다. 사람 이름과 수치는 실제 값이 아닙니다.</li>
       </ul>

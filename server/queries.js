@@ -22,7 +22,7 @@ const memberOf = (loungeId, userId) =>
         WHERE m.lounge_id = $1 AND m.user_id = $2`, [loungeId, userId]);
 
 const members = (loungeId, courseId) =>
-  rows(`SELECT m.user_id, u.nickname, m.role, m.cohort, m.week,
+  rows(`SELECT m.user_id, u.nickname, m.role, m.cohort, m.section_id,
                fp.quota_per, fp.used,
                m.joined_at, m.expires_at, m.last_seen_at, m.muted_until, m.muted_reason,
                (SELECT min(p.created_at) FROM post p JOIN category c ON c.id = p.category_id
@@ -56,8 +56,9 @@ const categoryRights = (loungeId) =>
 const PAGE = 30;
 
 const posts = (loungeId, viewerId, before, limit, ids) =>
-  rows(`SELECT p.id, p.title, p.body, p.week, p.is_pinned, p.view_count,
+  rows(`SELECT p.id, p.title, p.body, p.task_id, p.is_pinned, p.view_count,
                p.created_at, p.user_id, p.author_name, c.name AS category,
+               t.lesson_id, t.title AS task_title,
                (p.user_id = $2) AS mine,
                (SELECT count(*)::int FROM reaction r
                  WHERE r.target_kind = 'post' AND r.target_id = p.id AND r.emoji = '👍') AS likes,
@@ -81,6 +82,7 @@ const posts = (loungeId, viewerId, before, limit, ids) =>
                (SELECT count(*)::int FROM comment cm
                  WHERE cm.post_id = p.id AND cm.deleted_at IS NULL) AS comment_n
           FROM post p JOIN category c ON c.id = p.category_id
+     LEFT JOIN lesson_task t ON t.id = p.task_id
          WHERE p.lounge_id = $1 AND p.deleted_at IS NULL
            AND ($3::timestamptz IS NULL
                 OR (p.created_at, p.id) < ($3::timestamptz, $4::bigint))
@@ -101,7 +103,7 @@ const pinnedPosts = (loungeId, viewerId) =>
    답 없는 과제. 한 묶음만 보고 세면 숫자가 틀린다. 그래서 가벼운 목록을 따로 준다:
    본문 · 첨부 · 댓글 내용 없이 세는 데 필요한 것만. 스태프에게만 보낸다. */
 const postIndex = (loungeId) =>
-  rows(`SELECT p.id, p.title, p.user_id, p.author_name, p.week, p.created_at,
+  rows(`SELECT p.id, p.title, p.user_id, p.author_name, p.task_id, p.created_at,
                c.name AS category, p.is_pinned, p.view_count,
                (SELECT count(*)::int FROM comment cm
                  WHERE cm.post_id = p.id AND cm.deleted_at IS NULL) AS comment_n,
@@ -116,30 +118,45 @@ const postIndex = (loungeId) =>
 const postsByIds = (loungeId, viewerId, ids) =>
   ids && ids.length ? posts(loungeId, viewerId, null, ids.length, ids) : Promise.resolve([]);
 
-/* 레일의 '몇 명 중 몇 명 제출'. 화면이 들고 있는 글만 세면 페이지를 넘길 때마다
-   숫자가 달라진다. 세는 일은 DB 가 한다. */
-const weekSubmit = (loungeId) =>
+/* 대시보드의 '몇 명 중 몇 명 제출'. 화면이 들고 있는 글만 세면 페이지를 넘길 때마다
+   숫자가 달라진다. 세는 일은 DB 가 한다. 최근 7일 안에 과제를 낸 사람 수. */
+const taskSubmit = (loungeId) =>
   one(`SELECT (SELECT count(*)::int FROM lounge_member
                 WHERE lounge_id = $1 AND role = 'student') AS students,
               (SELECT count(DISTINCT p.user_id)::int
-                 FROM post p JOIN category c ON c.id = p.category_id
-                WHERE p.lounge_id = $1 AND c.name = '과제'
+                 FROM post p
+                WHERE p.lounge_id = $1 AND p.task_id IS NOT NULL
                   AND p.deleted_at IS NULL
                   AND p.created_at >= now() - interval '7 days') AS submitted`, [loungeId]);
 
-/* 내가 낸 과제는 묶음 밖에 있어도 알아야 한다. 안 그러면 오래전에 낸 주차가
+/* 내가 낸 과제는 묶음 밖에 있어도 알아야 한다. 안 그러면 오래전에 낸 과제가
    '미제출' 로 보이고, 다시 내면 앞의 것이 덮여 사라진다. */
-const myMissions = (loungeId, userId) =>
-  rows(`SELECT p.id, p.week, p.title, p.created_at,
+const myTasks = (loungeId, userId) =>
+  rows(`SELECT p.id, p.task_id, p.title, p.created_at,
                (SELECT json_agg(json_build_object('q', a.question, 'a', a.answer) ORDER BY a.seq)
                   FROM post_answer a WHERE a.post_id = p.id) AS answers,
                (SELECT json_agg(json_build_object('kind', t.kind, 'url', t.url, 'label', t.label)
                                  ORDER BY t.sort)
                   FROM attachment t WHERE t.post_id = p.id) AS attach
-          FROM post p JOIN category c ON c.id = p.category_id
-         WHERE p.lounge_id = $1 AND p.user_id = $2 AND c.name = '과제'
+          FROM post p
+         WHERE p.lounge_id = $1 AND p.user_id = $2 AND p.task_id IS NOT NULL
            AND p.deleted_at IS NULL
-         ORDER BY p.week`, [loungeId, userId]);
+         ORDER BY p.task_id`, [loungeId, userId]);
+
+/* 레슨에 붙은 과제 · 자료. 라운지가 소유한다. */
+const tasks = (loungeId) =>
+  rows(`SELECT id, lesson_id, seq, title, questions,
+               (SELECT count(*)::int FROM post p
+                 WHERE p.task_id = t.id AND p.deleted_at IS NULL) AS submitted
+          FROM lesson_task t
+         WHERE lounge_id = $1 AND deleted_at IS NULL
+         ORDER BY lesson_id, seq, id`, [loungeId]);
+
+const materials = (loungeId) =>
+  rows(`SELECT id, lesson_id, seq, kind, url, label
+          FROM lesson_material
+         WHERE lounge_id = $1 AND deleted_at IS NULL
+         ORDER BY lesson_id, seq, id`, [loungeId]);
 
 /* 검색은 DB 가 한다. 화면에 실린 묶음만 뒤지면 30편 밖의 글은 없는 것이 된다.
    pg_trgm 인덱스가 있어서 한글 부분 일치도 걸린다. 토큰은 모두 포함(AND). */
@@ -150,9 +167,10 @@ const search = (loungeId, viewerId, tokens, limit) => {
                   WHERE a.post_id = p.id
                     AND (a.question ILIKE $${i + 3} OR a.answer ILIKE $${i + 3})))`);
   return rows(
-    `SELECT p.id, p.title, p.body, p.week, p.author_name, c.name AS category, p.created_at,
+    `SELECT p.id, p.title, p.body, p.task_id, t.title AS task_title, p.author_name, c.name AS category, p.created_at,
             (p.user_id = $2) AS mine
        FROM post p JOIN category c ON c.id = p.category_id
+  LEFT JOIN lesson_task t ON t.id = p.task_id
       WHERE p.lounge_id = $1 AND p.deleted_at IS NULL AND ${conds.join(" AND ")}
       ORDER BY p.created_at DESC
       LIMIT ${Number(limit) || 40}`,
@@ -215,7 +233,7 @@ const received = (loungeId, days) =>
         JOIN post p2 ON p2.id = c.post_id
        WHERE p2.lounge_id = $1 AND c.deleted_at IS NULL AND r.user_id <> c.user_id
     )
-    SELECT u.nickname AS name, m.week, m.cohort,
+    SELECT u.nickname AS name, m.section_id, m.cohort,
            coalesce(sum(cnt.n), 0)::int AS total,
            coalesce(json_agg(json_build_object('e', cnt.emoji, 'n', cnt.n)
                              ORDER BY cnt.n DESC) FILTER (WHERE cnt.emoji IS NOT NULL), '[]') AS emojis
@@ -227,7 +245,7 @@ const received = (loungeId, days) =>
        GROUP BY who, emoji
     ) cnt ON cnt.who = m.user_id
      WHERE m.lounge_id = $1 AND m.role = 'student'
-     GROUP BY u.nickname, m.week, m.cohort
+     GROUP BY u.nickname, m.section_id, m.cohort
      ORDER BY total DESC, u.nickname`, [loungeId, days]);
 
 /* 기간 안에 이모지를 가장 많이 받은 글. 누가 아니라 무엇이 가닿았는지. */
@@ -244,8 +262,9 @@ const topPosts = (loungeId, days) =>
      ORDER BY got DESC, p.created_at DESC
      LIMIT 5`, [loungeId, days]);
 
-const weekFlags = (loungeId) =>
-  rows(`SELECT week, published, due_at FROM lounge_week WHERE lounge_id = $1 ORDER BY week`, [loungeId]);
+/* 섹션 게시 여부. 행이 없으면 공개다. */
+const sectionFlags = (loungeId) =>
+  rows(`SELECT section_id, published FROM lounge_section WHERE lounge_id = $1`, [loungeId]);
 
 /* 우측 레일의 숫자. 예전에는 마크업에 24 · 7 · 3 이 박혀 있었다.
    '온라인' 은 실시간이 아니라 오늘 접속한 사람이다 — 그렇게 부른다. */
@@ -261,5 +280,6 @@ const recentMembers = (loungeId, n) =>
          ORDER BY m.last_seen_at DESC LIMIT $2`, [loungeId, n || 6]);
 
 module.exports = { lounge, lounges, memberOf, members, categories, categoryRights,
-                   posts, postsByIds, pinnedPosts, postIndex, postCount, weekSubmit,
-                   myMissions, comments, search, searchComments, railStats, recentMembers, received, topPosts, weekFlags, PAGE };
+                   posts, postsByIds, pinnedPosts, postIndex, postCount, taskSubmit,
+                   myTasks, tasks, materials, comments, search, searchComments, railStats, recentMembers,
+                   received, topPosts, sectionFlags, PAGE };

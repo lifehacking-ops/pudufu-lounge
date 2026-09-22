@@ -115,7 +115,8 @@ async function handler(req, res) {
       return json(res, 200, {
         posts: ps.map((x) => ({
           id: x.id, title: x.title, body: x.body || "", cat: x.category,
-          wk: x.week || 0, author: x.author_name, mine: x.mine,
+          taskId: x.task_id == null ? null : Number(x.task_id), taskTitle: x.task_title || null,
+          author: x.author_name, mine: x.mine,
           when: present.when(x.created_at, new Date())
         })),
         comments: cms.map((x) => ({
@@ -140,10 +141,13 @@ async function handler(req, res) {
       return send(res, 200, JSON.stringify(data, null, 1), "application/json; charset=utf-8");
     }
 
-    /* 시청 기록에서 주차를 다시 계산한다. 하루 한 번이면 충분하다. */
-    if (p === "/l/sync-weeks") {
-      const L = await require("./queries").lounge(config.loungeId);
-      const n = await account.syncWeeks(config.loungeId, L.course_id);
+    /* 시청 기록에서 '지금 어느 섹션에 있나' 를 다시 계산한다. 하루 한 번이면 충분하다.
+       관리자만 — 예전 /l/sync-weeks 는 아무나 부를 수 있었다. */
+    if (p === "/l/sync-sections") {
+      const who = await Q.memberOf(config.loungeId, viewer(req));
+      if (!who || who.role !== "admin") return json(res, 403, { error: "이 라운지의 관리자가 아닙니다" });
+      const L = await Q.lounge(config.loungeId);
+      const n = await account.syncSections(config.loungeId, L.course_id);
       return send(res, 200, `${n}명 갱신`);
     }
 
@@ -191,8 +195,10 @@ async function handler(req, res) {
         if (req.method === "POST" && s[1] === "posts" && s[3] === "view")
           return json(res, 200, await writes.markView(L, me, +s[2]));
 
-        if (req.method === "PUT" && s[1] === "lessons" && s[3] === "done")
-          return json(res, 200, await writes.markWatched(L, me, +s[2], input.done));
+        /* 시청 위치. 프드프가 재는 것이 원칙이지만, 라운지 안의 플레이어에서 본 것은
+           라운지가 보고한다(원격이면 프드프로 전달). 15초마다 · 멈출 때 · 끝날 때. */
+        if (req.method === "PUT" && s[1] === "lessons" && s[3] === "watch")
+          return json(res, 200, await writes.markWatched(L, me, +s[2], input));
 
         if (req.method === "PUT" && s[3] === "reactions")
           return json(res, 200, await writes.toggleReaction(
@@ -215,20 +221,31 @@ async function handler(req, res) {
           if (req.method === "PUT" && s[2] === "categories" && s[4] === "rights")
             return json(res, 200, await writes.setRights(L, me, +s[3], input));
 
-          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "due")
-            return json(res, 200, await writes.setWeekDue(L, me, +s[3], input.dueAt));
+          /* 강의 : 게시 여부는 라운지가, 섹션 · 레슨 자체는 프드프가(로컬에서만 여기서 만든다) */
+          if (req.method === "PUT" && s[2] === "sections" && s[4] === "published")
+            return json(res, 200, await writes.setSectionPublished(L, me, +s[3], input.published));
 
-          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "published")
-            return json(res, 200, await writes.setWeekPublished(L, me, +s[3], input.published));
+          if (req.method === "POST" && s[2] === "sections" && s.length === 3)
+            return json(res, 200, await writes.addSection(L, me, input));
 
-          if (req.method === "POST" && s[2] === "lessons")
+          if (req.method === "POST" && s[2] === "lessons" && s.length === 3)
             return json(res, 200, await writes.addLesson(L, me, input));
 
-          if (req.method === "POST" && s[2] === "weeks")
-            return json(res, 200, await writes.addWeek(L, me, input));
+          /* 레슨의 과제 · 자료 — 라운지 관리자가 붙인다 */
+          if (req.method === "POST" && s[2] === "lessons" && s[4] === "tasks")
+            return json(res, 200, await writes.addTask(L, me, +s[3], input));
 
-          if (req.method === "PUT" && s[2] === "weeks" && s[4] === "mission")
-            return json(res, 200, await writes.setMission(L, me, +s[3], input));
+          if (req.method === "PATCH" && s[2] === "tasks")
+            return json(res, 200, await writes.editTask(L, me, +s[3], input));
+
+          if (req.method === "DELETE" && s[2] === "tasks")
+            return json(res, 200, await writes.deleteTask(L, me, +s[3]));
+
+          if (req.method === "POST" && s[2] === "lessons" && s[4] === "materials")
+            return json(res, 200, await writes.addMaterial(L, me, +s[3], input));
+
+          if (req.method === "DELETE" && s[2] === "materials")
+            return json(res, 200, await writes.deleteMaterial(L, me, +s[3]));
 
           if (req.method === "PUT" && s[2] === "members" && s[4] === "muted")
             return json(res, 200, await writes.setMuted(L, me, +s[3], input.days, input.reason));

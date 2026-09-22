@@ -62,10 +62,10 @@ async function writable(loungeId, me, categoryName) {
 
 /* 수강이 끝나면 강의에 딸린 것은 막고 라운지 자체는 열어 둔다.
    라운지는 사람이고 강의는 자산이다. */
-function checkExpiry(me, category, week) {
+function checkExpiry(me, category, taskId) {
   if (!me.expired || me.staff) return;
   if (category.pass_required) throw new Denied("수강 기간이 끝나 피드백권을 쓸 수 없습니다");
-  if (week) throw new Denied("수강 기간이 끝나 과제를 제출할 수 없습니다");
+  if (taskId) throw new Denied("수강 기간이 끝나 과제를 제출할 수 없습니다");
 }
 
 /* 피드백권. 소유는 프드프 소관이고 라운지는 잔여를 읽고 쓴 사실만 남긴다. */
@@ -87,7 +87,17 @@ async function createPost(loungeId, userId, input) {
   const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
   if (me.muted) throw new Denied("활동이 정지되어 글을 쓸 수 없습니다" + (me.muted_reason ? " — " + me.muted_reason : ""));
   const cat = await writable(loungeId, me, input.cat);
-  checkExpiry(me, cat, input.wk);
+
+  /* 과제 글은 어느 레슨의 어느 과제에 낸 답인지가 있어야 한다. 과제는 이 라운지 것이어야 한다. */
+  let task = null;
+  if (cat.name === "과제" || input.taskId) {
+    task = await one(
+      `SELECT id, lesson_id, title FROM lesson_task
+        WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [Number(input.taskId) || 0, loungeId]);
+    if (!task) throw new Denied("어느 과제에 내는지 골라야 합니다");
+    if (cat.name !== "과제") throw new Denied("과제는 '과제' 카테고리로 냅니다");
+  }
+  checkExpiry(me, cat, task && task.id);
 
   if (!input.title || !input.title.trim()) throw new Denied("제목이 없습니다");
 
@@ -114,20 +124,19 @@ async function createPost(loungeId, userId, input) {
   try {
     await client.query("BEGIN");
 
-    // 과제는 주차마다 한 편이다. 다시 올리면 앞의 것을 지우고 새로 쓴다.
-    if (input.overwrite && input.wk) {
+    // 과제 하나에 한 사람이 내는 글은 한 편이다. 다시 올리면 앞의 것을 지우고 새로 쓴다.
+    if (input.overwrite && task) {
       await client.query(
         `UPDATE post SET deleted_at = now(), deleted_by = $1
-          WHERE lounge_id = $2 AND user_id = $1 AND category_id = $3
-            AND week = $4 AND deleted_at IS NULL`,
-        [userId, loungeId, cat.id, input.wk]);
+          WHERE lounge_id = $2 AND user_id = $1 AND task_id = $3 AND deleted_at IS NULL`,
+        [userId, loungeId, task.id]);
     }
 
     const r = await client.query(
-      `INSERT INTO post (lounge_id, category_id, user_id, author_name, title, body, week, client_key)
+      `INSERT INTO post (lounge_id, category_id, user_id, author_name, title, body, task_id, client_key)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [loungeId, cat.id, userId, me.nickname, input.title.trim(),
-       input.body || null, input.wk || null, key]);
+       input.body || null, task ? task.id : null, key]);
     const id = r.rows[0].id;
 
     for (const [i, a] of (input.mission || []).entries()) {
@@ -168,9 +177,14 @@ async function createPost(loungeId, userId, input) {
     return { id, attach: files, card: pending || undefined };
   } catch (e) {
     await client.query("ROLLBACK");
-    if (e.code === "23505" && key) {   // 같은 열쇠가 먼저 들어갔다
-      const had = await one(`SELECT id FROM post WHERE client_key = $1`, [key]);
+    if (e.code === "23505") {   // 같은 열쇠가 먼저 들어갔거나, 이 과제에 낸 글이 이미 있다
+      const had = key ? await one(`SELECT id FROM post WHERE client_key = $1`, [key]) : null;
       if (had) return { id: had.id, attach: [], duplicate: true };
+      if (task) {
+        const mine = await one(
+          `SELECT id FROM post WHERE task_id = $1 AND user_id = $2 AND deleted_at IS NULL`, [task.id, userId]);
+        if (mine) throw new Denied("이 과제에 낸 글이 이미 있습니다. 다시 내려면 덮어쓰기를 고르세요");
+      }
     }
     throw e;
   } finally {
@@ -478,104 +492,189 @@ module.exports.removeCategory = removeCategory;
 module.exports.setPlacement = setPlacement;
 module.exports.setRights = setRights;
 
-/* ---------- 강의 게시 ----------
-   구분이 하나 있다.
+/* ---------- 강의 · 과제 · 자료 ----------
+   구분이 둘 있다.
 
-   · 어느 주차를 라운지에서 열지는 **라운지가 정한다.** 커뮤니티 운영이지
-     강의 콘텐츠가 아니다. 그래서 lounge_week 에 쓴다.
-   · 주차와 강 자체는 **프드프가 원본이다.** 로컬(PUDUFU_MODE=local)에서는
-     비계인 ext_* 에 직접 써서 혼자 개발할 수 있게 하지만, 운영에서는 막는다 —
+   · 어느 섹션을 라운지에서 열지, 어느 레슨에 무슨 과제 · 자료를 붙일지는 **라운지가 정한다.**
+     커뮤니티 운영이지 강의 콘텐츠가 아니다. lounge_section · lesson_task · lesson_material 에 쓴다.
+   · 섹션 · 레슨 자체(영상 · 길이 · 타임라인 · 교안)는 **프드프가 원본이다.** 로컬(PUDUFU_MODE=local)
+     에서는 비계인 ext_* 에 직접 써서 혼자 개발할 수 있게 하지만, 운영에서는 막는다 —
      여기서 고쳐 봐야 다음 동기화 때 덮인다. */
 
 const config = require("./config");
-const { unfurl, firstUrl } = require("./unfurl");
+const { unfurl, firstUrl, assertPublic } = require("./unfurl");
 
-/* 주차 마감. 비우면 마감 없음이다. */
-async function setWeekDue(loungeId, userId, week, dueAt) {
-  await admin(loungeId, userId);
-  const at = dueAt ? new Date(dueAt) : null;
-  if (dueAt && isNaN(at)) throw new Denied("마감 시각을 읽을 수 없습니다");
-  await rows(
-    `INSERT INTO lounge_week (lounge_id, week, due_at) VALUES ($1, $2, $3)
-     ON CONFLICT (lounge_id, week) DO UPDATE SET due_at = $3, updated_at = now()`,
-    [loungeId, week, at]);
-  return { ok: true, dueAt: at };
-}
+const QS_MAX = 8;
 
-async function setWeekPublished(loungeId, userId, week, published) {
+/* 섹션 게시 여부. 행이 없으면 공개다. 순차 잠금도 마감도 없다. */
+async function setSectionPublished(loungeId, userId, sectionId, published) {
   await admin(loungeId, userId);
+  await assertSection(loungeId, sectionId);
   await rows(
-    `INSERT INTO lounge_week (lounge_id, week, published) VALUES ($1, $2, $3)
-     ON CONFLICT (lounge_id, week) DO UPDATE SET published = $3, updated_at = now()`,
-    [loungeId, week, !!published]);
+    `INSERT INTO lounge_section (lounge_id, section_id, published) VALUES ($1, $2, $3)
+     ON CONFLICT (lounge_id, section_id) DO UPDATE SET published = $3, updated_at = now()`,
+    [loungeId, sectionId, !!published]);
   return { ok: true };
 }
 
+/* 이 라운지의 강의에 속한 섹션 · 레슨인가. 남의 강의 레슨에 과제를 붙일 수는 없다. */
+async function assertSection(loungeId, sectionId) {
+  const L = await courseOf(loungeId);
+  const s = await one(`SELECT id FROM ext_section WHERE id = $1 AND course_id = $2`, [sectionId, L.course_id]);
+  if (!s) throw new Missing("이 강의의 섹션이 아닙니다");
+  return L;
+}
+async function assertLesson(loungeId, lessonId) {
+  const L = await courseOf(loungeId);
+  const l = await one(`SELECT id FROM ext_lesson WHERE id = $1 AND course_id = $2`, [lessonId, L.course_id]);
+  if (!l) throw new Missing("이 강의의 레슨이 아닙니다");
+  return L;
+}
+
+/* 질문 양식 1~8개. 빈 질문은 두지 않는다. */
+function cleanQs(qs) {
+  const out = (qs || []).map((q) => ({ q: String(q.q || "").trim(), hint: String(q.hint || "").trim() || null }));
+  if (!out.length) throw new Denied("질문이 하나는 있어야 합니다");
+  if (out.length > QS_MAX) throw new Denied(`질문은 ${QS_MAX}개까지입니다`);
+  if (out.some((q) => !q.q)) throw new Denied("빈 질문은 둘 수 없습니다");
+  return out;
+}
+
+/* ---- 과제 : 레슨에 붙는다. 과제 하나 = 라운지 글 한 편 ---- */
+async function addTask(loungeId, userId, lessonId, input) {
+  await admin(loungeId, userId);
+  await assertLesson(loungeId, lessonId);
+  const title = String(input.title || "").trim();
+  if (!title) throw new Denied("과제 제목은 있어야 합니다");
+  const qs = cleanQs(input.qs);
+  const seq = await one(
+    `SELECT coalesce(max(seq), 0) + 1 AS s FROM lesson_task
+      WHERE lounge_id = $1 AND lesson_id = $2 AND deleted_at IS NULL`, [loungeId, lessonId]);
+  const r = await one(
+    `INSERT INTO lesson_task (lounge_id, lesson_id, seq, title, questions)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [loungeId, lessonId, seq.s, title, JSON.stringify(qs)]);
+  return { id: r.id, seq: seq.s, title, qs };
+}
+
+/* 이미 낸 글은 post_answer 에 그때의 질문 문구를 스냅샷으로 갖고 있다.
+   그래서 양식을 고쳐도 과거 제출물은 그대로 남는다. */
+async function editTask(loungeId, userId, taskId, input) {
+  await admin(loungeId, userId);
+  const t = await one(`SELECT id FROM lesson_task WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [taskId, loungeId]);
+  if (!t) throw new Missing("없는 과제입니다");
+  const title = String(input.title || "").trim();
+  if (!title) throw new Denied("과제 제목은 있어야 합니다");
+  const qs = cleanQs(input.qs);
+  await rows(`UPDATE lesson_task SET title = $1, questions = $2 WHERE id = $3`, [title, JSON.stringify(qs), taskId]);
+  const used = await one(`SELECT count(*)::int AS n FROM post WHERE task_id = $1 AND deleted_at IS NULL`, [taskId]);
+  return { id: taskId, title, qs, alreadySubmitted: used.n };
+}
+
+/* 낸 글이 있는 과제는 지우지 않는다. 지우면 그 글들이 어디에 낸 것인지 잃는다. */
+async function deleteTask(loungeId, userId, taskId) {
+  await admin(loungeId, userId);
+  const t = await one(`SELECT id FROM lesson_task WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [taskId, loungeId]);
+  if (!t) throw new Missing("없는 과제입니다");
+  const used = await one(`SELECT count(*)::int AS n FROM post WHERE task_id = $1 AND deleted_at IS NULL`, [taskId]);
+  if (used.n) throw new Denied(`제출한 글이 ${used.n}편 있어 지울 수 없습니다`);
+  await rows(`UPDATE lesson_task SET deleted_at = now() WHERE id = $1`, [taskId]);
+  return { ok: true };
+}
+
+/* ---- 자료 : 파일(올린 것) 또는 링크 ---- */
+async function addMaterial(loungeId, userId, lessonId, input) {
+  await admin(loungeId, userId);
+  await assertLesson(loungeId, lessonId);
+  const kind = input.kind === "file" ? "file" : "link";
+  let url = String(input.url || "").trim();
+  if (kind === "link") {
+    url = firstUrl(url) || "";
+    if (!url) throw new Denied("주소가 아닙니다");
+    // 내부 주소는 자료로도 붙이지 않는다 — 누르면 서버가 아니라 사람의 브라우저가 열지만, 규칙은 하나다
+    await assertPublic(url).catch((e) => { throw new Denied(e.message); });
+  } else if (!url) {
+    throw new Denied("올린 파일이 없습니다");
+  }
+  const label = String(input.label || "").trim().slice(0, 300) || null;
+  const seq = await one(
+    `SELECT coalesce(max(seq), -1) + 1 AS s FROM lesson_material
+      WHERE lounge_id = $1 AND lesson_id = $2 AND deleted_at IS NULL`, [loungeId, lessonId]);
+  const r = await one(
+    `INSERT INTO lesson_material (lounge_id, lesson_id, seq, kind, url, label)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, [loungeId, lessonId, seq.s, kind, url, label]);
+  return { id: r.id, kind, url, label };
+}
+
+async function deleteMaterial(loungeId, userId, materialId) {
+  await admin(loungeId, userId);
+  const n = await rows(
+    `UPDATE lesson_material SET deleted_at = now()
+      WHERE id = $1 AND lounge_id = $2 AND deleted_at IS NULL`, [materialId, loungeId]);
+  return { ok: true };
+}
+
+/* ---- 섹션 · 레슨 : 로컬 개발용. 운영에서는 프드프가 만든다 ---- */
 function onlyLocal() {
   if (config.pudufu.mode !== "local") {
     throw new Denied("강의 내용은 프드프에서 만듭니다. 여기서 고치면 다음 동기화 때 덮입니다");
   }
 }
 
+async function addSection(loungeId, userId, input) {
+  await admin(loungeId, userId);
+  onlyLocal();
+  const L = await courseOf(loungeId);
+  const title = String(input.title || "").trim();
+  if (!title) throw new Denied("섹션 제목은 있어야 합니다");
+  await rows(`INSERT INTO ext_course (id, title, synced_at) VALUES ($1, $2, now())
+              ON CONFLICT (id) DO NOTHING`, [L.course_id, L.name]);
+  const next = await one(`SELECT coalesce(max(seq), 0) + 1 AS s FROM ext_section WHERE course_id = $1`, [L.course_id]);
+  const r = await one(
+    `INSERT INTO ext_section (course_id, seq, title, synced_at) VALUES ($1, $2, $3, now()) RETURNING id`,
+    [L.course_id, next.s, title]);
+  await rows(`INSERT INTO lounge_section (lounge_id, section_id, published) VALUES ($1, $2, false)
+              ON CONFLICT (lounge_id, section_id) DO NOTHING`, [loungeId, r.id]);
+  return { id: r.id, seq: next.s, title };
+}
+
+/* mm:ss 또는 초 → 초 */
+function toSec(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Math.max(0, Math.round(v));
+  const m = String(v).trim().match(/^(\d+):(\d{1,2})$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  const n = Number(v);
+  return isNaN(n) ? null : Math.max(0, Math.round(n));
+}
+
 async function addLesson(loungeId, userId, input) {
   await admin(loungeId, userId);
   onlyLocal();
-  const L = await one("SELECT course_id FROM lounge WHERE id = $1", [loungeId]);
-  if (!input.chapter || !input.title) throw new Denied("챕터와 강 제목은 있어야 합니다");
-
+  const L = await assertSection(loungeId, Number(input.sectionId));
+  const title = String(input.title || "").trim();
+  if (!title) throw new Denied("레슨 제목은 있어야 합니다");
   const seq = await one(
-    `SELECT coalesce(max(seq), 0) + 1 AS s FROM ext_lesson WHERE course_id = $1 AND week = $2`,
-    [L.course_id, input.week]);
-
+    `SELECT coalesce(max(seq), 0) + 1 AS s FROM ext_lesson WHERE section_id = $1`, [input.sectionId]);
+  const timeline = Array.isArray(input.timeline)
+    ? input.timeline.map((t) => ({ t: toSec(t.t) || 0, label: String(t.label || "").trim() })).filter((t) => t.label)
+    : [];
   const r = await one(
-    `INSERT INTO ext_lesson (course_id, week, seq, chapter, title, duration, video_url, doc, synced_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now()) RETURNING id`,
-    [L.course_id, input.week, seq.s, input.chapter, input.title,
-     input.duration || null, input.duration ? "" : null, input.doc || null]);
+    `INSERT INTO ext_lesson (course_id, section_id, seq, title, duration_sec, video_url, description, timeline, doc, synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now()) RETURNING id`,
+    [L.course_id, input.sectionId, seq.s, title, toSec(input.duration), String(input.videoUrl || "").trim() || null,
+     String(input.description || "").trim() || null, JSON.stringify(timeline), String(input.doc || "").trim() || null]);
   return { id: r.id, seq: seq.s };
 }
 
-async function addWeek(loungeId, userId, input) {
-  await admin(loungeId, userId);
-  onlyLocal();
-  /* 강의 id 는 라운지가 들고 있다. ext_course 는 프드프에서 받아 온 사본일 뿐이라
-     아직 안 들어와 있을 수 있다 — 그때 join 으로 찾으면 통째로 500 이 난다. */
-  const L = await courseOf(loungeId);
-  if (!input.title) throw new Denied("강의 제목은 있어야 합니다");
-  if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
-  const qs = (input.qs || []).filter((q) => q.q && q.q.trim());
-  if (!qs.length) throw new Denied("질문이 하나는 있어야 합니다");
-  if (qs.length > 8) throw new Denied("질문은 8개까지입니다");
-
-  const next = await one(
-    `SELECT coalesce(max(week), 0) + 1 AS w FROM ext_week WHERE course_id = $1`, [L.course_id]);
-  const wk = next.w;
-
-  await rows(`INSERT INTO ext_week (course_id, week, title, synced_at) VALUES ($1, $2, $3, now())`,
-    [L.course_id, wk, input.title]);
-
-  for (const [i, q] of qs.entries()) {
-    await rows(
-      `INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now())`,
-      [L.course_id, wk, `${wk}주차 미션 · ${input.mission}`, i + 1, q.q.trim(), (q.hint || "").trim() || null]);
-  }
-
-  /* 사본이 아직 없으면 만들어 둔다. 주차 수는 이 표가 들고 있다. */
-  await rows(
-    `INSERT INTO ext_course (id, title, weeks, synced_at) VALUES ($1, $2, $3, now())
-     ON CONFLICT (id) DO UPDATE SET weeks = greatest(ext_course.weeks, $3)`,
-    [L.course_id, L.name || ("강의 " + L.course_id), wk]);
-  // 새 주차는 비공개로 연다. 열 준비가 되면 관리자가 게시한다.
-  await rows(`INSERT INTO lounge_week (lounge_id, week, published) VALUES ($1, $2, false)
-              ON CONFLICT (lounge_id, week) DO UPDATE SET published = false`, [loungeId, wk]);
-
-  return { week: wk };
-}
-
-module.exports.setWeekPublished = setWeekPublished;
+module.exports.setSectionPublished = setSectionPublished;
+module.exports.addTask = addTask;
+module.exports.editTask = editTask;
+module.exports.deleteTask = deleteTask;
+module.exports.addMaterial = addMaterial;
+module.exports.deleteMaterial = deleteMaterial;
+module.exports.addSection = addSection;
 module.exports.addLesson = addLesson;
-module.exports.addWeek = addWeek;
 
 /* ---------- 조회 ----------
    사람 단위로 한 번만 센다. 같은 사람이 다시 열어도 올라가지 않는다. */
@@ -603,30 +702,34 @@ async function markView(loungeId, userId, postId) {
 }
 
 /* ---------- 강의 시청 ----------
-   원본은 프드프다. local 에서는 비계인 ext_watch 에 직접 쓰고,
-   remote 에서는 프드프에 남긴다(docs/API.md 1부 ⑥). 둘 다 라운지는 쌓지 않는다. */
+   원본은 프드프다. 라운지 안의 플레이어에서 본 것은 라운지가 보고한다 — 15초마다 · 멈출 때 · 끝날 때.
+   local 에서는 비계인 ext_watch 에 직접 쓰고, remote 에서는 프드프에 남긴다(docs/API.md 1부 ⑥).
+   둘 다 라운지는 쌓지 않는다. 완료(is_complete)는 한 번 참이면 거두지 않고,
+   본 위치는 뒤로 물러나지 않는다(greatest). */
 
-async function markWatched(loungeId, userId, lessonId, done) {
+async function markWatched(loungeId, userId, lessonId, input) {
   await membership(loungeId, userId);
+  const seconds = Math.max(0, Math.round(Number((input || {}).seconds) || 0));
+  const complete = !!(input || {}).complete;
 
   if (config.pudufu.mode === "remote") {
     const res = await fetch(config.pudufu.base + "/api/lounge/watch", {
       method: "POST",
       headers: { "content-type": "application/json", "X-Lounge-Key": config.pudufu.key },
-      body: JSON.stringify({ user_id: userId, lesson_id: lessonId, is_complete: !!done })
+      body: JSON.stringify({ user_id: userId, lesson_id: lessonId, seconds, is_complete: complete })
     });
     if (!res.ok) throw new Denied("프드프에 시청 기록을 남기지 못했습니다");
-  } else if (done) {
-    await rows(
-      `INSERT INTO ext_watch (user_id, lesson_id, is_complete, synced_at)
-       VALUES ($1, $2, true, now())
-       ON CONFLICT (user_id, lesson_id)
-       DO UPDATE SET is_complete = true, watched_at = now(), synced_at = now()`,
-      [userId, lessonId]);
-  } else {
-    await rows(`DELETE FROM ext_watch WHERE user_id = $1 AND lesson_id = $2`, [userId, lessonId]);
+    return { ok: true };
   }
 
+  await rows(
+    `INSERT INTO ext_watch (user_id, lesson_id, watched_sec, is_complete, watched_at, synced_at)
+     VALUES ($1, $2, $3, $4, now(), now())
+     ON CONFLICT (user_id, lesson_id)
+     DO UPDATE SET watched_sec = greatest(ext_watch.watched_sec, $3),
+                   is_complete = ext_watch.is_complete OR $4,
+                   watched_at = now(), synced_at = now()`,
+    [userId, lessonId, seconds, complete]);
   return { ok: true };
 }
 
@@ -663,42 +766,6 @@ async function setPinned(loungeId, userId, postId, pinned) {
 
 module.exports.setPinned = setPinned;
 module.exports.PIN_MAX = PIN_MAX;
-
-/* ---------- 과제 양식 ----------
-   이미 낸 과제는 post_answer 에 그때의 질문 문구를 스냅샷으로 갖고 있다.
-   그래서 양식을 고쳐도 과거 제출물은 그대로 남는다 — 무엇에 답한 글이었는지가
-   보존된다. 그게 아니면 양식을 못 고칠 뻔했다. */
-
-async function setMission(loungeId, userId, week, input) {
-  await admin(loungeId, userId);
-  onlyLocal();
-
-  const L = await courseOf(loungeId);
-
-  if (!input.mission) throw new Denied("과제 미션 한 줄은 있어야 합니다");
-  if (!input.qs || !input.qs.length) throw new Denied("질문이 하나는 있어야 합니다");
-  if (input.qs.length > 8) throw new Denied("질문은 8개까지입니다");
-  if (input.qs.some((q) => !q.q || !q.q.trim())) throw new Denied("빈 질문은 둘 수 없습니다");
-
-  const title = `${week}주차 미션 · ${input.mission}`;
-
-  await rows(`DELETE FROM ext_mission WHERE course_id = $1 AND week = $2`, [L.course_id, week]);
-  for (const [i, q] of input.qs.entries()) {
-    await rows(
-      `INSERT INTO ext_mission (course_id, week, title, seq, question, hint, synced_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now())`,
-      [L.course_id, week, title, i + 1, q.q.trim(), (q.hint || "").trim() || null]);
-  }
-
-  const used = await one(
-    `SELECT count(*)::int AS n FROM post p JOIN category c ON c.id = p.category_id
-      WHERE p.lounge_id = $1 AND p.week = $2 AND c.name = '과제' AND p.deleted_at IS NULL`,
-    [loungeId, week]);
-
-  return { week: week, title: title, alreadySubmitted: used.n };
-}
-
-module.exports.setMission = setMission;
 
 /* ---------- 피드백권 지급 ----------
    권의 소유는 프드프 소관이라는 원칙은 그대로다. 다만 라운지 관리자가
@@ -863,4 +930,3 @@ async function reportPost(loungeId, userId, postId, reason) {
 
 module.exports.setMuted = setMuted;
 module.exports.reportPost = reportPost;
-module.exports.setWeekDue = setWeekDue;

@@ -45,26 +45,27 @@ async function loungeData(loungeId, viewerId) {
   const now = new Date();
   const L = await Q.lounge(loungeId);
 
-  const [mem, cats, rights, ps, allLounges, course, live, lb7, lb30, lbAll, pass, flags] =
+  const [mem, cats, rights, ps, allLounges, course, live, lb7, lb30, lbAll, pass, flags, taskRows, matRows] =
     await Promise.all([
       Q.members(loungeId, L.course_id), Q.categories(), Q.categoryRights(loungeId),
       Q.posts(loungeId, viewerId), Q.lounges(),
       account.course(L.course_id), account.live(L.course_id),
       Q.received(loungeId, 7), Q.received(loungeId, 30), Q.received(loungeId, null),
-      account.passes(viewerId, L.course_id), Q.weekFlags(loungeId)
+      account.passes(viewerId, L.course_id), Q.sectionFlags(loungeId),
+      Q.tasks(loungeId), Q.materials(loungeId)
     ]);
 
   const [submit, totalPosts, mine, railN, recent] = await Promise.all([
-    Q.weekSubmit(loungeId), Q.postCount(loungeId), Q.myMissions(loungeId, viewerId),
+    Q.taskSubmit(loungeId), Q.postCount(loungeId), Q.myTasks(loungeId, viewerId),
     Q.railStats(loungeId), Q.recentMembers(loungeId, 6)]);
 
   const [tp7, tp30, tpAll] = await Promise.all([
     Q.topPosts(loungeId, 7), Q.topPosts(loungeId, 30), Q.topPosts(loungeId, null)
   ]);
 
-  // 내가 어느 강을 봤는지. 진도율과 체크 표시가 이걸로 살아난다.
-  const seen = new Set((await account.watched(viewerId, L.course_id))
-    .filter((w) => w.is_complete).map((w) => Number(w.lesson_id)));
+  // 내가 어느 레슨을 어디까지 봤는지. 진도율 · 완료 표시 · 이어보기가 이걸로 살아난다.
+  const watchRows = await account.watched(viewerId, L.course_id);
+  const watch = new Map(watchRows.map((w) => [Number(w.lesson_id), w]));
 
   const meRow = mem.find((x) => Number(x.user_id) === Number(viewerId));
   const staff = !!(meRow && (meRow.role === "instructor" || meRow.role === "admin"));
@@ -77,7 +78,7 @@ async function loungeData(loungeId, viewerId) {
     name: m.nickname,
     cohort: m.cohort || 0,
     role: m.role,
-    wk: m.week,
+    section: m.section_id == null ? null : Number(m.section_id),
     lastDays: daysBetween(m.last_seen_at, now) ?? 99,
     joined: daysBetween(m.joined_at, now),
     first: m.first_submit_at
@@ -95,7 +96,7 @@ async function loungeData(loungeId, viewerId) {
   }));
 
   const members = staff ? fullMembers : fullMembers.map((m) => ({
-    userId: m.userId, name: m.name, role: m.role, cohort: m.cohort, wk: m.wk
+    userId: m.userId, name: m.name, role: m.role, cohort: m.cohort, section: m.section
   }));
 
   /* ---- 카테고리 : 라운지별 쓰기 권한을 roles 로 되돌린다 ---- */
@@ -129,44 +130,81 @@ async function loungeData(loungeId, viewerId) {
 
   /* 대시보드와 게시물 관리는 전체를 세야 한다. 스태프에게만 가벼운 목록을 보낸다. */
   const index = staff ? (await Q.postIndex(loungeId)).map((p) => ({
-    id: p.id, cat: p.category, wk: p.week || 0,
+    id: p.id, cat: p.category, taskId: p.task_id == null ? null : Number(p.task_id),
     author: p.author_name, mine: Number(p.user_id) === Number(viewerId),
     when: when(p.created_at, now), title: p.title,
     views: p.view_count, comments: p.comment_n, reacts: p.react_n,
     reports: p.reports || 0, pinned: !!p.is_pinned
   })) : null;
 
-  /* ---- 강의 ---- */
-  const lessons = course.lessons.map((l) => ({
-    id: Number(l.id),
-    wk: l.week, chap: l.chapter, t: l.title, d: l.duration,
-    video: !!l.video_url, doc: l.doc,
-    done: seen.has(Number(l.id))
-  }));
-
-  const missions = {};
-  course.missions.forEach((m) => {
-    if (!missions[m.week]) missions[m.week] = { title: m.title, qs: [] };
-    missions[m.week].qs.push({ q: m.question, hint: m.hint });
+  /* ---- 강의 : 섹션 → 레슨 → 과제 · 자료 ----
+     강의 구조(섹션 · 레슨)는 프드프 것이고, 과제 · 자료 · 게시 여부는 라운지 것이다.
+     화면이 쓰기 쉽게 한 나무로 엮어 보낸다. */
+  const myTaskById = new Map(mine.map((m) => [Number(m.task_id), m]));
+  const tasksOf = new Map();
+  taskRows.forEach((t) => {
+    const k = Number(t.lesson_id);
+    if (!tasksOf.has(k)) tasksOf.set(k, []);
+    const my = myTaskById.get(Number(t.id));
+    tasksOf.get(k).push({
+      id: Number(t.id), seq: t.seq, title: t.title,
+      qs: Array.isArray(t.questions) ? t.questions : JSON.parse(t.questions || "[]"),
+      submittedPostId: my ? Number(my.id) : null,
+      ...(staff ? { submitted: t.submitted } : {})
+    });
+  });
+  const matsOf = new Map();
+  matRows.forEach((m) => {
+    const k = Number(m.lesson_id);
+    if (!matsOf.has(k)) matsOf.set(k, []);
+    matsOf.get(k).push({ id: Number(m.id), kind: m.kind, url: m.url, label: m.label });
   });
 
-  const byWeek = new Map((course.weekTitles || []).map((w) => [w.week, w.title]));
-  const pub = new Map(flags.map((f) => [f.week, f.published]));
-  const weeks = [];
-  const weekPublished = [];
+  const pub = new Map(flags.map((f) => [Number(f.section_id), f.published]));
+  const lessonsOf = new Map();
+  (course.lessons || []).forEach((l) => {
+    const w = watch.get(Number(l.id));
+    const dur = l.duration_sec == null ? null : Number(l.duration_sec);
+    const sec = w ? Number(w.watched_sec || 0) : 0;
+    const k = Number(l.section_id);
+    if (!lessonsOf.has(k)) lessonsOf.set(k, []);
+    lessonsOf.get(k).push({
+      id: Number(l.id), seq: l.seq, title: l.title,
+      durationSec: dur, videoUrl: l.video_url || null,
+      doc: l.doc || null, description: l.description || null,
+      timeline: Array.isArray(l.timeline) ? l.timeline : (l.timeline ? JSON.parse(l.timeline) : []),
+      watchedSec: sec,
+      // 완료의 진실은 is_complete. 길이를 알면 끝까지 본 것도 완료로 본다.
+      done: !!(w && (w.is_complete || (dur && sec >= dur))),
+      tasks: tasksOf.get(Number(l.id)) || [],
+      materials: matsOf.get(Number(l.id)) || []
+    });
+  });
 
-  /* 주차 수는 강의 정보에서 온다. 그게 비어 있어도 주차·강이 이미 들어와
-     있으면 그것을 믿는다 — 동기화 순서 때문에 강의 목록이 통째로 비면
-     수강생은 강의가 없어진 줄 안다. */
-  const lastWeek = Math.max(
-    Number(course.weeks) || 0,
-    ...(course.weekTitles || []).map((w) => w.week),
-    ...(course.lessons || []).map((l) => l.week), 0);
+  const sections = (course.sections || []).map((sc) => ({
+    id: Number(sc.id), seq: sc.seq, title: sc.title,
+    published: pub.has(Number(sc.id)) ? !!pub.get(Number(sc.id)) : true,   // 행이 없으면 공개
+    lessons: (lessonsOf.get(Number(sc.id)) || []).sort((a, b) => a.seq - b.seq)
+  }));
 
-  for (let w = 1; w <= lastWeek; w++) {
-    weeks.push(byWeek.get(w) || `${w}주차`);
-    weekPublished.push(pub.has(w) ? pub.get(w) : true);   // 행이 없으면 공개
+  /* 이어보기 : 가장 최근에 본 레슨. 다 본 레슨만 남았으면 그중 최근 것 — 다음 레슨은 화면이 고른다. */
+  let resume = null;
+  const lessonIndex = new Map();
+  sections.forEach((sc) => sc.lessons.forEach((l) => lessonIndex.set(l.id, { sectionId: sc.id, lesson: l })));
+  const recentWatch = watchRows
+    .filter((w) => lessonIndex.has(Number(w.lesson_id)))
+    .sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
+  const pick = recentWatch.find((w) => !lessonIndex.get(Number(w.lesson_id)).lesson.done) || recentWatch[0];
+  if (pick) {
+    const hit = lessonIndex.get(Number(pick.lesson_id));
+    resume = { lessonId: hit.lesson.id, sectionId: hit.sectionId, watchedSec: Number(pick.watched_sec || 0), at: pick.watched_at };
   }
+
+  /* 과제 진행률 : 공개 섹션의 살아 있는 과제 중 내가 낸 것 */
+  let taskTotal = 0, taskDone = 0;
+  sections.filter((sc) => sc.published).forEach((sc) => sc.lessons.forEach((l) => l.tasks.forEach((t) => {
+    taskTotal++; if (t.submittedPostId) taskDone++;
+  })));
 
   /* ---- 나머지 ---- */
   const lounges = allLounges.map((l) => ({
@@ -195,7 +233,7 @@ async function loungeData(loungeId, viewerId) {
     const full = list.map((r, i) => {
       if (r.total !== prev) { rank = i + 1; prev = r.total; }
       return {
-        rank: rank, name: r.name, wk: r.week, cohort: r.cohort || 0,
+        rank: rank, name: r.name, section: r.section_id == null ? null : Number(r.section_id), cohort: r.cohort || 0,
         total: r.total,
         emojis: (r.emojis || []).map((x) => [x.e, x.n])
       };
@@ -210,7 +248,9 @@ async function loungeData(loungeId, viewerId) {
     .map((r) => [r.name, Number(r.total).toLocaleString("ko-KR")]);
 
   return {
-    members, posts, lessons, weeks, weekPublished, missions, categories, lounges, passes,
+    members, posts, sections, resume, taskProgress: { done: taskDone, total: taskTotal },
+    categories, lounges, passes,
+    editableCourse: config.pudufu.mode !== "remote",   // 로컬에서만 섹션 · 레슨을 여기서 만든다
     live: live
       ? { title: live.title,
           when: liveWhen(live.starts_at),
@@ -246,14 +286,6 @@ async function loungeData(loungeId, viewerId) {
     })(),
     stats: { students: submit.students, submitted: submit.submitted, posts: totalPosts.n },
 
-    /* 내가 낸 과제. 피드 묶음 밖에 있어도 강의실이 '제출 완료' 를 알아야 한다. */
-    /* 지금 내가 있는 주차. 시청 기록으로 계산해 lounge_member.week 에 캐시된 값이다.
-       예전에는 화면에 3 이 박혀 있어서 모두가 3주차였다. */
-    currentWk: (meRow && meRow.week) || 1,
-
-    /* 주차별 마감. 라운지가 정한다. 없으면 카운트다운도 정시·지각도 없다. */
-    weekDue: Object.fromEntries(flags.filter((f) => f.due_at).map((f) => [f.week, f.due_at])),
-
     rail: {
       students: railN.students, today: railN.today, cohorts: railN.cohorts,
       recent: recent.map((r) => r.nickname)
@@ -266,12 +298,12 @@ async function loungeData(loungeId, viewerId) {
       return [k, { rank: i < 0 ? null : i + 1, of: railN.students }];
     })),
 
-    myMissions: mine.map((m) => ({
-      id: m.id, wk: m.week, title: m.title, when: when(m.created_at, now), at: m.created_at,
+    /* 내가 낸 과제. 피드 묶음 밖에 있어도 강의실이 '제출 완료' 를 알아야 한다. */
+    myTasks: Object.fromEntries(mine.map((m) => [Number(m.task_id), {
+      postId: Number(m.id), when: when(m.created_at, now), at: m.created_at,
       mission: m.answers || [],
-      attach: (m.attach || []).map((a) => ({ type: a.kind, url: a.url || null,
-                                             title: a.label, label: a.label }))
-    })),
+      attach: (m.attach || []).map((a) => ({ type: a.kind, url: a.url || null, title: a.label, label: a.label }))
+    }])),
     more: ps.length >= Q.PAGE,   // 더 실을 글이 남았는가
     cursor: ps.length ? { at: ps[ps.length - 1].created_at, id: String(ps[ps.length - 1].id) } : null,
     postIndex: index,            // 스태프에게만. 대시보드와 게시물 관리가 센다
@@ -321,7 +353,9 @@ function shapePosts(ps, cms, now) {
     const out = {
       id: p.id,
       cat: p.category,
-      wk: p.week || 0,
+      taskId: p.task_id == null ? null : Number(p.task_id),
+      lessonId: p.lesson_id == null ? null : Number(p.lesson_id),
+      taskTitle: p.task_title || null,
       author: p.author_name,
       when: when(p.created_at, now),
       likes: p.likes,

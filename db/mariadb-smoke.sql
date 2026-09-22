@@ -16,7 +16,8 @@ SET time_zone = '+00:00';
 SET @L0 = (SELECT id FROM lounge WHERE course_id = 9001);
 DELETE FROM post WHERE lounge_id = @L0;
 DELETE FROM lounge_member WHERE lounge_id = @L0;
-DELETE FROM lounge_week WHERE lounge_id = @L0;
+DELETE FROM lounge_section WHERE lounge_id = @L0;
+DELETE FROM lesson_task WHERE lounge_id = @L0;
 DELETE FROM lounge_category WHERE lounge_id = @L0;
 DELETE FROM lounge WHERE id = @L0;
 DELETE FROM category WHERE name LIKE '검증·%';
@@ -56,12 +57,22 @@ INSERT INTO comment (post_id, user_id, author_name, body) VALUES (@P1, 8, '김�
 INSERT IGNORE INTO post_view (post_id, user_id) VALUES (@P1, 8) RETURNING post_id AS first_view;
 INSERT IGNORE INTO post_view (post_id, user_id) VALUES (@P1, 8) RETURNING post_id AS second_view_should_be_empty;
 
--- 5. ON DUPLICATE KEY UPDATE = ON CONFLICT DO UPDATE (주차 마감 · 게시 여부) -----
-INSERT INTO lounge_week (lounge_id, week, due_at) VALUES (@L, 3, '2026-09-19 09:00:00')
-  ON DUPLICATE KEY UPDATE due_at = VALUES(due_at);
-INSERT INTO lounge_week (lounge_id, week, due_at) VALUES (@L, 3, '2026-09-20 09:00:00')
-  ON DUPLICATE KEY UPDATE due_at = VALUES(due_at);
-SELECT '5 upsert' AS chk, count(*) AS rows_should_be_1, max(due_at) AS due FROM lounge_week WHERE lounge_id = @L;
+-- 5. ON DUPLICATE KEY UPDATE = ON CONFLICT DO UPDATE (섹션 게시 여부) ----------
+INSERT INTO lounge_section (lounge_id, section_id, published) VALUES (@L, 9001, FALSE)
+  ON DUPLICATE KEY UPDATE published = VALUES(published);
+INSERT INTO lounge_section (lounge_id, section_id, published) VALUES (@L, 9001, TRUE)
+  ON DUPLICATE KEY UPDATE published = VALUES(published);
+SELECT '5 upsert' AS chk, count(*) AS rows_should_be_1, max(published) AS pub FROM lounge_section WHERE lounge_id = @L;
+
+-- 5b. 과제 하나에 한 사람 한 편 = Postgres 부분 유니크(uq_post_task_user) 의 생성 컬럼 대체 ---
+INSERT INTO lesson_task (lounge_id, lesson_id, seq, title, questions) VALUES (@L, 9001, 1, '검증·과제 하나', '[{"q":"질문","hint":null}]');
+SET @T = LAST_INSERT_ID();
+INSERT INTO post (lounge_id, category_id, user_id, author_name, title, task_id) VALUES (@L, @CAT, 7, '박현종', '과제 답', @T);
+INSERT IGNORE INTO post (lounge_id, category_id, user_id, author_name, title, task_id) VALUES (@L, @CAT, 7, '박현종', '과제 답 두 번째', @T);
+SET @dupTask = ROW_COUNT();   -- 0 이면 막힌 것
+UPDATE post SET deleted_at = NOW(6) WHERE task_id = @T AND user_id = 7 AND deleted_at IS NULL;
+INSERT INTO post (lounge_id, category_id, user_id, author_name, title, task_id) VALUES (@L, @CAT, 7, '박현종', '과제 다시 냄', @T);   -- 지운 뒤라 들어가야 한다
+SELECT '5b task-unique' AS chk, @dupTask AS dup_inserted, count(*) AS live_now FROM post WHERE task_id = @T AND deleted_at IS NULL;
 
 -- 6. UPDATE 뒤 값 읽기 (Postgres 는 UPDATE … RETURNING 이었다. MariaDB 는 두 문장) -
 UPDATE post SET view_count = view_count + 1 WHERE id = @P1;
@@ -115,7 +126,8 @@ SELECT '14 twin-window' AS chk, count(*) AS recent
 
 -- 판정 --------------------------------------------------------------------------
 SET @ok = (@dup = 0) AND (@twin = 0)
-      AND (SELECT count(*) FROM lounge_week WHERE lounge_id = @L) = 1
+      AND (SELECT count(*) FROM lounge_section WHERE lounge_id = @L) = 1
+      AND (@dupTask = 0)
       AND (SELECT view_count FROM post WHERE id = @P1) = 1
       AND (SELECT updated_at > created_at FROM post WHERE id = @P1);
 SELECT IF(@ok, 'SMOKE OK', 'SMOKE FAILED') AS result;
@@ -123,7 +135,8 @@ SELECT IF(@ok, 'SMOKE OK', 'SMOKE FAILED') AS result;
 -- 청소 --------------------------------------------------------------------------
 DELETE FROM post WHERE lounge_id = @L;              -- answer · comment · view 는 CASCADE
 DELETE FROM lounge_member WHERE lounge_id = @L;
-DELETE FROM lounge_week WHERE lounge_id = @L;
+DELETE FROM lounge_section WHERE lounge_id = @L;
+DELETE FROM lesson_task WHERE lounge_id = @L;
 DELETE FROM lounge_category WHERE lounge_id = @L;
 DELETE FROM lounge WHERE id = @L;
 DELETE FROM category WHERE name LIKE '검증·%';

@@ -47,15 +47,24 @@ GET  /api/lounge/purchases?user_id=1234
 
 기수는 프드프가 판정해서 내려준다. 라운지는 그대로 표시만 한다.
 
-### ③ 시청 기록 — 주차 계산용
+### ③ 시청 기록 — 진도 · 이어보기 · 현재 섹션
 
 ```
 GET  /api/lounge/watch?user_id=1234&course_id=1
-     → [ { "lesson_id": 7, "watched_at": "...", "is_complete": true } ]
+     → [ { "lesson_id": 7, "watched_sec": 184, "is_complete": true, "watched_at": "..." } ]
+
+GET  /api/lounge/watch?course_id=1&since=2026-09-01T00:00:00Z        (③b · 있으면 좋다)
+     → [ { "user_id": 1234, "lesson_id": 7, "watched_sec": 184, "is_complete": true, "watched_at": "..." }, … ]
 ```
 
+- `is_complete` = 끝까지 봤다(100%). 레슨 완료의 진실이다. 섹션 % = 완료 레슨 / 레슨.
+- `watched_sec` = 어디까지 봤나. 이어보기와 레슨 안 진도 막대에 쓴다. 비율은 라운지가 `duration_sec` 으로 계산한다.
+- `watched_at` = 마지막으로 본 시각. 가장 최근인 레슨이 '이어보기' 다.
+- ③b 는 모든 멤버의 기록을 한 번에 받는 것 — 대시보드의 '지금 어느 섹션에 있나' 를 하루 한 번 맞추는 데 쓴다.
+  없으면 라운지가 멤버마다 ③ 을 부른다(200명이면 200회 · 하루 한 번).
+
 **시청 기록의 원본은 언제나 프드프다.** 라운지 뷰어에서 영상을 봐도 기록은
-프드프로 간다(→ ⑥). 두 곳에 쌓이면 진도가 갈라지고, 주차가 시청 기록 기준이라
+프드프로 간다(→ ⑥). 두 곳에 쌓이면 진도가 갈라지고, 현재 섹션이 시청 기록 기준이라
 대시보드 전체가 틀어진다.
 
 ### ④ 피드백권 잔여
@@ -68,38 +77,49 @@ GET  /api/lounge/passes?user_id=1234&course_id=1
 권의 소유와 지급은 프드프 소관이다. 라운지는 잔여를 읽고, 쓴 사실은 자기
 `feedback_pass_use` 에 남긴다.
 
-### ⑤ 강의 구조 — 주차 · 강 · 영상 · 교안
+### ⑤ 강의 구조 — 섹션 · 레슨 · 영상 · 타임라인 · 교안
 
 ```
 GET  /api/lounge/course/1
      → {
-         "course_id": 1, "title": "...", "weeks": 8,
+         "course_id": 1, "title": "...",
+         "sections": [ { "id": 31, "seq": 3, "title": "3주차 · 블로그 100개 썼는데, 왜 문의는 0건일까요?" } ],
          "lessons": [
-           { "id": 7, "week": 3, "seq": 1, "chapter": "콘텐츠 5기둥",
-             "title": "...", "duration": "4:20",
+           { "id": 7, "section_id": 31, "seq": 1, "title": "...",
+             "duration_sec": 260,
              "video_url": "https://customer-xxx.cloudflarestream.com/<uid>/iframe",
+             "description": "0:00 인트로 · 1:26 키워드 · 2:53 정리 …",
+             "timeline": [ { "t": 0, "label": "인트로" }, { "t": 86, "label": "키워드" } ],
              "doc": "교안 본문 …" }
-         ],
-         "missions": [
-           { "week": 3, "title": "3주차 미션 · …", "seq": 1,
-             "question": "…", "hint": "…" }
          ]
        }
 ```
 
+- 층은 **섹션 → 레슨**이다. 섹션이 강의 탭의 카드 하나, 레슨이 영상 하나(2~30분). 섹션 제목에 '3주차' 처럼 주차를 글자로 넣어도 된다.
+- **레슨 id 는 바뀌지 않아야 한다.** 라운지의 과제 · 자료(`lesson_task` · `lesson_material`)가 이 id 를 가리킨다.
+- `description` 은 영상 아래 설명란. `12:30` 같은 시각을 적으면 화면이 눌러서 이동하게 만든다. `timeline` 은 구간 목록.
+- 과제(미션 양식)는 여기 없다 — **라운지 관리자가 레슨에 붙인다.** 프드프는 강의 내용만 준다.
+- 어느 섹션을 라운지에서 열지(게시/비공개)도 라운지가 정한다(`lounge_section`).
+
 영상은 **Cloudflare Stream 의 허용 도메인 목록에 라운지 도메인을 추가**하면
-그대로 재생된다. 별도 처리가 필요 없다.
+그대로 재생된다. 라운지는 Stream SDK 로 시각 이동(타임라인)과 재생 시간을 받는다.
 
-교안 본문이 통합 검색의 대상이므로 텍스트로 내려와야 한다.
+교안 본문과 설명란이 통합 검색의 대상이므로 텍스트로 내려와야 한다.
 
-### ⑥ 시청 기록 기록 (선택)
+### ⑥ 시청 기록 기록
 
-라운지 뷰어에서 본 것을 프드프에 남긴다. ③의 짝이다.
+라운지 뷰어에서 본 것을 프드프에 남긴다. ③의 짝이다. 라운지 플레이어가 15초마다 · 멈출 때 · 끝날 때 보낸다.
 
 ```
 POST /api/lounge/watch
-     { "user_id": 1234, "lesson_id": 7, "is_complete": true }
+     { "user_id": 1234, "lesson_id": 7, "seconds": 184, "is_complete": false }
 ```
+
+- `seconds` = 지금까지 본 가장 먼 위치(초). 프드프는 더 큰 값만 남긴다(뒤로 물러나지 않는다).
+- `is_complete` 는 한 번 참이면 거두지 않는다.
+- **열어 둘 질문**: 라운지가 Stream iframe 을 직접 넣으므로 재생 이벤트는 라운지 페이지만 본다. "프드프가 시청 시간을 잰다" 는 것은
+  (a) 라운지가 여기로 보내 주는 값을 프드프가 저장하는 것, 또는 (b) 프드프가 자기 플레이어 페이지를 두고 라운지가 그것을 iframe 하는 것.
+  라운지는 (a) 로 만들어져 있다. (b) 로 가려면 타임라인 시각 이동을 위한 postMessage 약속이 따로 필요하다.
 
 없으면 라운지 뷰어에서 본 것이 진도에 안 잡힌다. **⑤를 열어줄 거면 ⑥도 같이
 열어야 짝이 맞는다.**
@@ -129,7 +149,7 @@ GET  /l/{lounge}/posts                피드
 GET  /l/{lounge}/posts/{id}           글 상세 + 댓글
 GET  /l/{lounge}/search?q=            글 · 댓글 · 강의 · 멤버 한 번에
 GET  /l/{lounge}/course               강의 목록 (⑤의 캐시)
-GET  /l/{lounge}/course/{week}        주차 상세 + 미션 양식 + 내 제출 여부
+(강의 구조 · 과제 · 자료 · 내 시청 기록은 첫 화면 데이터(sections)에 실린다)
 GET  /l/{lounge}/admin/dashboard      강사 · 관리자
 GET  /l/{lounge}/admin/members        관리자
 ```
@@ -137,7 +157,7 @@ GET  /l/{lounge}/admin/members        관리자
 ### 쓰기 — 만들어져 있다
 
 ```
-POST   /l/posts                    { cat, title, body, wk, mission[], attach, overwrite }
+POST   /l/posts                    { cat, title, body, taskId, mission[], attach, overwrite, key }
 PATCH  /l/posts/{id}               본인 글만
 DELETE /l/posts/{id}               이 라운지 관리자만
 POST   /l/posts/{id}/comments      { body, parentId }   답글은 한 단계까지
@@ -145,7 +165,7 @@ DELETE /l/comments/{id}            본인 또는 관리자
 PUT    /l/posts/{id}/reactions     { emoji }            토글
 PUT    /l/posts/{id}/pinned        { pinned }           관리자. 최대 3개
 POST   /l/posts/{id}/view          사람 단위로 한 번만 센다
-PUT    /l/lessons/{id}/done        { done }             시청 기록 → 프드프
+PUT    /l/lessons/{id}/watch       { seconds, complete } 시청 위치 → 프드프(⑥). 15초마다 · 멈출 때 · 끝날 때
 POST   /l/unfurl                   { url }              붙여넣은 주소를 카드로
 POST   /l/uploads                  { type, size }       올려도 되는 주소를 받는다
 POST   /l/posts/{id}/report        { reason }           남의 글만
@@ -218,10 +238,15 @@ POST   /l/admin/categories                   { name }
 DELETE /l/admin/categories/{id}
 PUT    /l/admin/categories/{id}/placement    { placement: show|more|off }
 PUT    /l/admin/categories/{id}/rights       { student, instructor }
-PUT    /l/admin/weeks/{week}/published        { published }
-PUT    /l/admin/weeks/{week}/mission          { mission, qs[] }
-POST   /l/admin/lessons                       { week, chapter, title, duration, doc }
-POST   /l/admin/weeks                         { title, mission, qs[] }
+PUT    /l/admin/sections/{id}/published       { published }
+POST   /l/admin/lessons/{id}/tasks            { title, qs[] }            레슨에 과제 붙이기
+PATCH  /l/admin/tasks/{id}                    { title, qs[] }
+DELETE /l/admin/tasks/{id}                                                제출 글이 있으면 거절
+POST   /l/admin/lessons/{id}/materials        { kind: file|link, url, label }
+DELETE /l/admin/materials/{id}
+POST   /l/admin/sections                      { title }                  로컬(PUDUFU_MODE=local) 전용
+POST   /l/admin/lessons                       { sectionId, title, duration, videoUrl, description, timeline[], doc }   로컬 전용
+GET    /l/sync-sections                       관리자만. 시청 기록으로 '현재 섹션' 재계산(하루 한 번)
 PATCH  /l/admin/categories/{id}                { name }        이름 변경
 POST   /l/admin/members/{userId}/passes        { count }       피드백권 지급
 PUT    /l/admin/members/{userId}/muted         { days, reason } 0 이면 해제
@@ -279,3 +304,5 @@ GET    /l/admin/digest?date=                 어제 요약 (아직)
 | 강퇴 | **두지 않는다.** 돈을 낸 사람을 쫓아낼 수는 없다. 대신 **활동 정지** — 읽기는 두고 쓰기만 멈추고, 기한(최대 90일)이 지나면 저절로 풀린다 |
 | 내 서재 · 라운지 전환 | 만들 예정. 지금은 자리만 있다 |
 | 프드프 → 라운지 변경 통지 | 지금은 라운지가 주기적으로 당겨 온다(pull). 웹훅은 나중에 |
+| 시청 시간을 누가 재나 | 라운지 플레이어가 ⑥으로 보내는 것으로 만들어져 있다(위 ⑥). 프드프가 자기 플레이어로 재려면 (b) 로 바꿔야 한다 — 개발자 확인 필요 |
+| ③b 전체 시청 기록 | 있으면 일일 동기화가 1회 호출. 없으면 멤버별 반복 |

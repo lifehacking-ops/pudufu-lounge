@@ -13,21 +13,21 @@
 --     DISTINCT ON · 배열 타입 · RETURNING 남용을 피한다
 --
 -- 두 덩어리로 나뉜다
---   1부  라운지 테이블   라운지가 소유한다. 원본이 여기 있다
---   2부  ext_* 캐시      프드프에서 받아 온 것. 원본은 저쪽이고 여기는 사본이다.
+--   1부  라운지 테이블   라운지가 소유한다. 원본이 여기 있다 (과제 · 자료 · 섹션 게시 포함)
+--   2부  ext_* 캐시      프드프에서 받아 온 것(강의 · 섹션 · 레슨 · 시청). 원본은 저쪽이고 여기는 사본이다.
 --                        절대 여기서 고치지 않는다 — 고쳐야 할 값은 프드프에 있다
 -- =============================================================================
 
 -- 한글 부분 일치 검색용. Supabase 에는 이미 들어 있다.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TABLE IF EXISTS post_report, lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
-  comment, attachment, post_answer, post, lounge_category, category,
+DROP TABLE IF EXISTS post_report, lounge_section, lounge_week, lounge_digest, feedback_pass_use, post_view, reaction,
+  comment, attachment, post_answer, post, lesson_material, lesson_task, lounge_category, category,
   lounge_member, lounge CASCADE;
 DROP TABLE IF EXISTS ext_live, ext_feedback_pass, ext_watch, ext_purchase,
-  ext_mission, ext_lesson, ext_week, ext_course, ext_user CASCADE;
+  ext_mission, ext_lesson, ext_section, ext_week, ext_course, ext_user CASCADE;
 DROP TYPE IF EXISTS lounge_role, chip_placement, attachment_kind,
-  reaction_target, pass_period CASCADE;
+  reaction_target, pass_period, material_kind CASCADE;
 DROP FUNCTION IF EXISTS touch_updated_at CASCADE;
 
 CREATE TYPE lounge_role     AS ENUM ('student', 'instructor', 'admin');
@@ -35,6 +35,7 @@ CREATE TYPE chip_placement  AS ENUM ('show', 'more');
 CREATE TYPE attachment_kind AS ENUM ('image', 'link', 'youtube', 'video');
 CREATE TYPE reaction_target AS ENUM ('post', 'comment');
 CREATE TYPE pass_period     AS ENUM ('week', 'month');
+CREATE TYPE material_kind   AS ENUM ('file', 'link');
 
 -- updated_at 을 손으로 챙기지 않는다. MySQL 의 ON UPDATE CURRENT_TIMESTAMP 자리.
 CREATE FUNCTION touch_updated_at() RETURNS trigger AS $fn$
@@ -86,10 +87,10 @@ CREATE TABLE lounge_member (
   expires_at     timestamptz,
   last_seen_at   timestamptz,
 
-  -- 프드프 시청 기록에서 계산한 값의 캐시. 원본이 아니다.
-  -- 하루 한 번 동기화면 충분하다(대시보드가 오늘 아침 기준으로만 맞으면 된다).
-  week           smallint    NOT NULL DEFAULT 1,
-  week_synced_at timestamptz,
+  -- 지금 어느 섹션에 있는가. 프드프 시청 기록에서 계산한 값의 캐시. 원본이 아니다.
+  -- 마지막으로 본 레슨의 섹션, 그 섹션을 다 봤으면 다음 섹션. 하루 한 번 동기화면 충분하다.
+  section_id        bigint,
+  section_synced_at timestamptz,
 
   /* 돈을 낸 사람을 쫓아낼 수는 없다. 읽기는 두고 쓰기만 멈춘다.
      기한이 지나면 저절로 풀린다 — 영구 정지는 사실상 환불 문제가 된다. */
@@ -106,8 +107,8 @@ COMMENT ON COLUMN lounge_member.expires_at IS 'NULL 이면 무기한(스태프)'
 CREATE INDEX ix_member_role ON lounge_member (lounge_id, role);
 -- 이탈 위험 명단
 CREATE INDEX ix_member_seen ON lounge_member (lounge_id, last_seen_at);
--- 주차별 이탈 퍼널
-CREATE INDEX ix_member_week ON lounge_member (lounge_id, week);
+-- 섹션별 이탈 퍼널
+CREATE INDEX ix_member_section ON lounge_member (lounge_id, section_id);
 CREATE INDEX ix_member_user ON lounge_member (user_id);
 CREATE TRIGGER member_touch BEFORE UPDATE ON lounge_member
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
@@ -164,6 +165,46 @@ CREATE TRIGGER lc_touch BEFORE UPDATE ON lounge_category
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 
+-- 레슨의 과제 · 자료 -----------------------------------------------------------
+-- 강의 내용(섹션 · 레슨 · 영상 · 교안)은 프드프 것이지만, 어느 레슨에 무슨 과제와
+-- 자료를 붙일지는 라운지 관리자가 정한다. 그래서 ext_ 가 아니라 여기 있다.
+--
+-- 과제 하나 = 라운지 글 한 편. 질문 양식(1~8개)은 통째로 고치고 통째로 저장하므로
+-- 한 컬럼(jsonb)에 둔다. 제출한 글은 그때의 질문 문구를 post_answer 에 스냅샷으로
+-- 갖고 있어서, 양식을 고쳐도 과거 제출물은 그대로다.
+
+CREATE TABLE lesson_task (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  lounge_id  bigint       NOT NULL REFERENCES lounge (id),
+  lesson_id  bigint       NOT NULL,
+  seq        smallint     NOT NULL DEFAULT 1,
+  title      varchar(200) NOT NULL,
+  questions  jsonb        NOT NULL,
+  created_at timestamptz  NOT NULL DEFAULT now(),
+  updated_at timestamptz  NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+COMMENT ON COLUMN lesson_task.lesson_id IS '프드프 레슨 id. 우리 표가 아니므로 FK 를 걸지 않는다 — 레슨 id 는 바뀌지 않아야 한다';
+COMMENT ON COLUMN lesson_task.questions IS '[{q, hint}] 1~8개. 안을 뒤지지 않는다 — 걸러야 할 값이 생기면 컬럼으로 꺼낸다';
+CREATE INDEX ix_task_lesson ON lesson_task (lounge_id, lesson_id, seq) WHERE deleted_at IS NULL;
+CREATE TRIGGER task_touch BEFORE UPDATE ON lesson_task
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE TABLE lesson_material (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  lounge_id  bigint        NOT NULL REFERENCES lounge (id),
+  lesson_id  bigint        NOT NULL,
+  seq        smallint      NOT NULL DEFAULT 0,
+  kind       material_kind NOT NULL,
+  url        varchar(1000) NOT NULL,
+  label      varchar(300),
+  created_at timestamptz   NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+COMMENT ON COLUMN lesson_material.kind IS 'file = 올린 파일(PDF 등) · link = 바깥 주소';
+CREATE INDEX ix_material_lesson ON lesson_material (lounge_id, lesson_id, seq) WHERE deleted_at IS NULL;
+
+
 -- 글 -------------------------------------------------------------------------
 -- author_name 은 작성 시점 닉네임의 스냅샷이다. 닉네임을 바꿔도 과거 글의
 -- 이름은 그대로 남는다. 표시는 author_name, 판정과 집계는 전부 user_id 다.
@@ -180,7 +221,7 @@ CREATE TABLE post (
   author_name    varchar(60)  NOT NULL,
   title          varchar(200) NOT NULL,
   body           text,
-  week           smallint,
+  task_id        bigint       REFERENCES lesson_task (id),
   is_pinned      boolean      NOT NULL DEFAULT false,
   reaction_count integer      NOT NULL DEFAULT 0,
   comment_count  integer      NOT NULL DEFAULT 0,
@@ -197,15 +238,16 @@ COMMENT ON COLUMN post.client_key  IS '화면이 글 한 편에 하나 붙이는
 -- 같은 열쇠는 한 번만. NULL(열쇠 없는 옛 글 · 서버가 만든 글)은 여럿이어도 된다.
 CREATE UNIQUE INDEX uq_post_client_key ON post (client_key) WHERE client_key IS NOT NULL;
 COMMENT ON COLUMN post.body        IS '평문. 리치 텍스트 아님';
-COMMENT ON COLUMN post.week        IS '과제 글만. 그 외 NULL';
+COMMENT ON COLUMN post.task_id     IS '과제 글만 — 어느 레슨의 어느 과제에 낸 답인가. 그 외 NULL';
 COMMENT ON COLUMN post.edited_at   IS '사용자가 고친 시각. updated_at 과 다르다';
 
 CREATE INDEX ix_post_feed   ON post (lounge_id, is_pinned DESC, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX ix_post_cat    ON post (lounge_id, category_id, created_at DESC)    WHERE deleted_at IS NULL;
 CREATE INDEX ix_post_hot    ON post (lounge_id, reaction_count DESC)             WHERE deleted_at IS NULL;
 CREATE INDEX ix_post_mine   ON post (user_id, created_at DESC)                   WHERE deleted_at IS NULL;
--- 과제 제출 여부 · 미제출 명단
-CREATE INDEX ix_post_submit ON post (lounge_id, category_id, week, user_id)      WHERE deleted_at IS NULL;
+-- 과제 제출 여부 · 미제출 명단. 한 사람이 한 과제에 내는 글은 한 편 — 다시 내면 앞 글을 지우고 쓴다.
+CREATE INDEX ix_post_task ON post (lounge_id, task_id, user_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_post_task_user ON post (task_id, user_id) WHERE task_id IS NOT NULL AND deleted_at IS NULL;
 -- 어제 올라온 글 집계
 CREATE INDEX ix_post_recent ON post (lounge_id, created_at);
 -- 한글 부분 일치. ILIKE '%…%' 가 인덱스를 탄다.
@@ -345,19 +387,19 @@ CREATE TABLE post_report (
 CREATE INDEX ix_report_recent ON post_report (created_at);
 
 
--- 주차 게시 여부 ---------------------------------------------------------------
--- 강의 내용은 프드프가 갖지만, 어느 주차를 라운지에서 열지는 라운지가 정한다.
--- 그래서 ext_ 가 아니라 여기 있다. 행이 없으면 공개로 본다.
+-- 섹션 게시 여부 ---------------------------------------------------------------
+-- 강의 내용은 프드프가 갖지만, 어느 섹션을 라운지에서 열지는 라운지가 정한다.
+-- 그래서 ext_ 가 아니라 여기 있다. 행이 없으면 공개로 본다. 순차 잠금은 없다.
+-- 마감은 없다 — 과제는 레슨에 붙고 기한 없이 낸다.
 
-CREATE TABLE lounge_week (
+CREATE TABLE lounge_section (
   lounge_id  bigint      NOT NULL REFERENCES lounge (id),
-  week       smallint    NOT NULL,
+  section_id bigint      NOT NULL,
   published  boolean     NOT NULL DEFAULT true,
-  due_at     timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (lounge_id, week)
+  PRIMARY KEY (lounge_id, section_id)
 );
-COMMENT ON COLUMN lounge_week.due_at IS '과제 마감. NULL 이면 마감 없음 — 카운트다운도 정시·지각 구분도 없다';
+COMMENT ON COLUMN lounge_section.section_id IS '프드프 섹션 id. 우리 표가 아니므로 FK 를 걸지 않는다';
 
 
 -- 어제 커뮤니티 요약 -----------------------------------------------------------
@@ -411,53 +453,44 @@ CREATE INDEX ix_user_nick ON ext_user (nickname);
 CREATE TABLE ext_course (
   id        bigint       PRIMARY KEY,
   title     varchar(200) NOT NULL,
-  weeks     smallint     NOT NULL DEFAULT 8,
   synced_at timestamptz
 );
 
 
--- 주차 제목. 강의 목록의 카드 제목이 된다.
-CREATE TABLE ext_week (
+-- 섹션. 강의 목록의 카드 하나. 제목에 '3주차 …' 처럼 주차를 글자로 넣어도 된다.
+CREATE TABLE ext_section (
+  id        bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   course_id bigint       NOT NULL,
-  week      smallint     NOT NULL,
+  seq       smallint     NOT NULL,
   title     varchar(200) NOT NULL,
   synced_at timestamptz,
-  PRIMARY KEY (course_id, week)
+  UNIQUE (course_id, seq)
 );
+COMMENT ON TABLE ext_section IS 'remote 에서는 프드프 id 를 그대로 받고, local 에서는 자동 번호. 그래서 BY DEFAULT';
 
 
+-- 레슨 = 영상 하나(2~30분). 진도는 이것을 끝까지 봤는지로 센다.
 CREATE TABLE ext_lesson (
-  id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  course_id bigint       NOT NULL,
-  week      smallint     NOT NULL,
-  seq       smallint     NOT NULL,
-  chapter   varchar(120),
-  title     varchar(200) NOT NULL,
-  duration  varchar(12),
-  video_url varchar(500),
-  doc       text,
-  synced_at timestamptz,
-  UNIQUE (course_id, week, seq)
+  id           bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  course_id    bigint       NOT NULL,
+  section_id   bigint       NOT NULL,
+  seq          smallint     NOT NULL,
+  title        varchar(200) NOT NULL,
+  duration_sec integer,
+  video_url    varchar(500),
+  description  text,
+  timeline     jsonb,
+  doc          text,
+  synced_at    timestamptz,
+  UNIQUE (section_id, seq)
 );
-COMMENT ON COLUMN ext_lesson.chapter IS '소속 챕터. 검색 결과에 뜬다';
-COMMENT ON COLUMN ext_lesson.doc     IS '교안 본문. 검색 대상';
+COMMENT ON COLUMN ext_lesson.duration_sec IS '영상 길이(초). 없으면 완료 여부는 is_complete 만 믿는다';
+COMMENT ON COLUMN ext_lesson.description  IS '영상 아래 설명란. 12:30 같은 시각을 적으면 화면이 눌러서 이동하게 만든다';
+COMMENT ON COLUMN ext_lesson.timeline     IS '[{t: 초, label}] 구간 목록. 읽기만 한다';
+COMMENT ON COLUMN ext_lesson.doc          IS '교안 본문. 검색 대상';
+CREATE INDEX ix_lesson_section ON ext_lesson (section_id, seq);
 CREATE INDEX ix_lesson_trgm ON ext_lesson USING gin (doc gin_trgm_ops);
-
-
--- 프드프의 회차별 미션 양식. 글쓰기 창의 과제 폼이 이걸 읽는다.
-CREATE TABLE ext_mission (
-  id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  course_id bigint       NOT NULL,
-  week      smallint     NOT NULL,
-  title     varchar(200) NOT NULL,
-  seq       smallint     NOT NULL,
-  question  varchar(300) NOT NULL,
-  hint      varchar(300),
-  synced_at timestamptz,
-  UNIQUE (course_id, week, seq)
-);
-COMMENT ON COLUMN ext_mission.title IS '이번 주 과제 제목';
-COMMENT ON COLUMN ext_mission.hint  IS '입력칸 placeholder';
+CREATE INDEX ix_lesson_trgm_desc ON ext_lesson USING gin (description gin_trgm_ops);
 
 
 -- 기수와 만료일이 여기서 나온다.
@@ -475,15 +508,19 @@ CREATE INDEX ix_purchase_course ON ext_purchase (course_id, cohort);
 
 
 -- 시청 기록. 원본은 프드프다. 라운지 뷰어에서 봐도 기록은 그쪽으로 간다.
--- lounge_member.week 는 이 표에서 계산한 값의 캐시일 뿐이다.
+-- lounge_member.section_id 는 이 표에서 계산한 값의 캐시일 뿐이다.
+-- 완료의 진실은 is_complete 다(100% 시청). watched_sec 은 '어디까지 봤나' — 이어보기와
+-- 레슨 안 진도 막대에 쓴다. 비율은 duration_sec 으로 계산하고 저장하지 않는다.
 CREATE TABLE ext_watch (
   user_id     bigint      NOT NULL,
   lesson_id   bigint      NOT NULL,
+  watched_sec integer     NOT NULL DEFAULT 0,
   watched_at  timestamptz NOT NULL DEFAULT now(),
   is_complete boolean     NOT NULL DEFAULT false,
   synced_at   timestamptz,
   PRIMARY KEY (user_id, lesson_id)
 );
+COMMENT ON COLUMN ext_watch.watched_at IS '마지막으로 본 시각. 이어보기는 이 값이 가장 최근인 레슨이다';
 CREATE INDEX ix_watch_lesson ON ext_watch (lesson_id);
 
 

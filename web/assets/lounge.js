@@ -3352,7 +3352,6 @@
           a.href = m.url; a.target = "_blank"; a.rel = "noopener";
           a.appendChild(el("span", "sub-k", "자료"));
           a.appendChild(el("span", "t", m.label || pretty(m.url)));
-          a.appendChild(el("span", "d", m.kind === "file" ? (m.url.split(".").pop().toUpperCase().slice(0, 4) || "파일") : "링크"));
           row.appendChild(a);
           sub.appendChild(row);
         });
